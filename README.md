@@ -12,7 +12,8 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 |---|---|---|
 | **AI Workflow Management** | Event-Driven Orchestration, Clean Architecture 4 Lớp, FastAPI, Socket.IO, gRPC, 21 Node Types, Worker SDK, Kafka, SAP HANA | 📖 [Xem Tài Liệu](./docs/ai-workflow-management/) |
 | **AI Agent Ecosystem** | Autonomous AI Agents, LangGraph, Multi-Agent Orchestration, Agent SDK, HITL Checkpointing, SAP BTP, LaidonLLM Gateway | 📖 [Xem Tài Liệu](./docs/agent/) |
-| *(Mở Rộng Trong Tương Lai)* | *RAG System, Data Migration Platform, Knowledge Graph, SAP Integration Engine...* | *(Đang cập nhật)* |
+| **HANA RAG Service** | SAP HANA-First RAG, `REAL_VECTOR`, Structured SQL Pushdown, GraphRAG-lite, Hybrid RRF Rerank, Presidio PII Masking, Smart Tools | 📖 [Xem Tài Liệu](./docs/hana-rag-service/) |
+| *(Mở Rộng Trong Tương Lai)* | *Data Migration Platform, Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
 ---
 
@@ -34,29 +35,45 @@ Hệ thống điều phối quy trình AI cốt lõi theo triết lý **Event-Dr
 Hệ sinh thái các tác nhân AI tự trị có khả năng suy luận, lập kế hoạch và phối hợp đa tác nhân xây dựng trên nền tảng **LangGraph** và **FastAPI**:
 
 ### Cấu Trúc Module:
-- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/agent/01-architecture/):**
-  - [Tổng Quan & So Sánh: Workflow vs Agent](./docs/agent/01-architecture/01-overview-and-philosophy.md)
-  - [Topology Hệ Thống Đa Tác Nhân Phân Cấp](./docs/agent/01-architecture/02-agent-topology.md)
-  - [Kiến Trúc Phân Tầng Clean Architecture Trong Agent SDK](./docs/agent/01-architecture/03-clean-architecture-4-layers.md)
-- 🛠️ **[02. Bộ Công Cụ Phát Triển Agent SDK](./docs/agent/02-agent-sdk/):**
-  - [4 Bộ Dựng Đồ Thị: Tool, Graph, Flow, SubGraph](./docs/agent/02-agent-sdk/01-graph-builders.md)
-  - [Lưu Trữ Điểm Phục Hồi HANA Checkpointing & Tương Tác Con Người (HITL)](./docs/agent/02-agent-sdk/02-checkpointing-and-hitl.md)
-  - [Quản Lý Ngân Sách Ngữ Cảnh (Context Budget) & 5 Chiến Lược Nén](./docs/agent/02-agent-sdk/03-context-budget-management.md)
-  - [Dual Transports (SERVER vs CONSUMER) & Vòng Đời Sự Kiện 2 Tầng](./docs/agent/02-agent-sdk/04-transports-and-events.md)
-- 👑 **[03. Bộ Điều Phối Hội Thoại Đa Tác Nhân (Orchestrator)](./docs/agent/03-orchestrator/):**
-  - [Kiến Trúc 6 Tầng: Guardrails, Intent Classifier, Planner, JourneyTracker](./docs/agent/03-orchestrator/01-orchestrator-architecture.md)
-  - [Cơ Chế Phối Hợp Đa Tác Nhân: AgentSelector, AgentCallCoordinator, Hand-off](./docs/agent/03-orchestrator/02-multi-agent-coordination.md)
-- 🎯 **[04. Các Tác Nhân Nghiệp Vụ Chuyên Biệt (Domain Agents)](./docs/agent/04-domain-agents/):**
-  - [Workflow Designer Agent: Tự động thiết kế quy trình AI Workflow](./docs/agent/04-domain-agents/01-workflow-designer-agent.md)
-  - [Governance Schema Agent & Validation Rule Agent: Quản trị cấu trúc & sinh luật dữ liệu](./docs/agent/04-domain-agents/02-governance-and-validation-agents.md)
-  - [Data & File Agents: Xử lý tệp đa định dạng, CSV tự chữa lành & Data Profiling](./docs/agent/04-domain-agents/03-data-and-file-agents.md)
-  - [Troubleshooting Agent, Business Agent & Cổng Kết Nối LaidonLLM Gateway](./docs/agent/04-domain-agents/04-business-and-troubleshooting-agents.md)
+- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/agent/01-architecture/):** So sánh Workflow vs Agent, Topology đa tác nhân phân cấp, Clean Architecture trong Agent SDK.
+- 🛠️ **[02. Bộ Công Cụ Phát Triển Agent SDK](./docs/agent/02-agent-sdk/):** 4 bộ dựng đồ thị (Tool, Graph, Flow, SubGraph), Checkpointing SAP HANA, Human-in-the-loop (`interrupt`/`resume`), Context Budget Manager (5 chiến lược nén), Dual Transports.
+- 👑 **[03. Bộ Điều Phối Hội Thoại Đa Tác Nhân (Orchestrator)](./docs/agent/03-orchestrator/):** Kiến trúc 6 tầng (Guardrails, Intent Classifier, Planner, JourneyTracker), Lựa chọn Agent động và Hand-off delegation.
+- 🎯 **[04. Các Tác Nhân Nghiệp Vụ Chuyên Biệt (Domain Agents)](./docs/agent/04-domain-agents/):** Workflow Designer Agent, Governance Schema Agent, Validation Rule Agent, Data & File Agents, Troubleshooting Agent (RCA).
+
+---
+
+## 📚 Tiêu Điểm 3: HANA RAG Service (Enterprise SAP HANA-First RAG Platform)
+
+Nền tảng Retrieval-Augmented Generation doanh nghiệp đặt **SAP HANA** làm nguồn dữ liệu chân lý duy nhất (System of Record), xóa bỏ hoàn toàn hiện tượng phân mảnh dữ liệu (Data Sprawl):
+
+### Cấu Trúc Module:
+- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/hana-rag-service/01-architecture/):**
+  - [Triết Lý SAP HANA as System of Record, REAL_VECTOR & Dual Workloads (API vs WORKER)](./docs/hana-rag-service/01-architecture/01-overview-and-hana-core.md)
+  - [Topology Hệ Thống, Cổng Mạng & Lựa Chọn Embedding Providers](./docs/hana-rag-service/01-architecture/02-system-topology.md)
+  - [Clean Architecture 4 Tầng & Composition Containers Trong bootstrap.py](./docs/hana-rag-service/01-architecture/03-clean-architecture-and-containers.md)
+- 📥 **[02. Quy Trình Nhập Liệu (Ingestion Pipeline)](./docs/hana-rag-service/02-ingestion-pipeline/):**
+  - [Bóc Tách Đa Định Dạng: PDF (Docling OCR fallback), DOCX, TXT, MD, JSON](./docs/hana-rag-service/02-ingestion-pipeline/01-multi-format-parsing.md)
+  - [Xử Lý Bảng Tính CSV & XLSX Bằng Dữ Liệu Quan Hệ Chuẩn (Không ép thành chunks vô nghĩa)](./docs/hana-rag-service/02-ingestion-pipeline/02-spreadsheets-and-structured-tables.md)
+  - [Parent-Child Chunk Linking, Che Giấu PII Với Presidio & Streaming Tệp Dung Lượng Lớn](./docs/hana-rag-service/02-ingestion-pipeline/03-chunking-pii-masking-and-streaming.md)
+  - [Vòng Đời Job Nạp Liệu Bất Đồng Bộ (RAG_INGESTION_JOBS) & SSE Status Streaming](./docs/hana-rag-service/02-ingestion-pipeline/04-worker-and-job-lifecycle.md)
+- 🔎 **[03. Bộ Máy Truy Xuất Lai (Retrieval Engine)](./docs/hana-rag-service/03-retrieval-engine/):**
+  - [Định Tuyến Truy Vấn Thông Minh & Structured SQL Pushdown Trong Bộ Nhớ HANA](./docs/hana-rag-service/03-retrieval-engine/01-query-routing-and-sql-pushdown.md)
+  - [Tìm Kiếm Vector Hai Giai Đoạn, Tái Xếp Hạng bm25s, Thuật Toán RRF & HyDE](./docs/hana-rag-service/03-retrieval-engine/02-dense-vector-and-hybrid-rerank.md)
+  - [GraphRAG-lite: Bóc Tách Thực Thể Bằng spaCy NLP (0$ chi phí LLM) & HANA Graph Workspace](./docs/hana-rag-service/03-retrieval-engine/03-graphrag-lite.md)
+  - [Bộ Nhớ Đệm Ngữ Nghĩa (Redis Semantic Cache) & Tuyệt Đối Chống Rò Rỉ Tenant (No Tenant Bleed)](./docs/hana-rag-service/03-retrieval-engine/04-semantic-caching.md)
+- ✍️ **[04. Sinh Câu Trả Lời Có Căn Cứ (Grounded Generation)](./docs/hana-rag-service/04-grounded-generation/):**
+  - [Evidence Gating: Ngưỡng điểm tối thiểu chống ảo giác & Trích dẫn nguồn minh bạch](./docs/hana-rag-service/04-grounded-generation/01-evidence-gating-and-citations.md)
+  - [Fast Answer Mode (< 1.5s) vs Deep Answer Mode (Tổng hợp suy luận đa nguồn)](./docs/hana-rag-service/04-grounded-generation/02-fast-vs-deep-answer-modes.md)
+  - [Claim Support Verification: Thẩm định từng câu khẳng định & SSE Token Streaming](./docs/hana-rag-service/04-grounded-generation/03-claim-verification-and-sse-streaming.md)
+- 🧰 **[05. Bộ Công Cụ Thông Minh & Nền Tảng (Smart Tools & Platform)](./docs/hana-rag-service/05-smart-tools-and-platform/):**
+  - [Smart Tools Catalog: match/dedupe (phát hiện bản ghi trùng lặp), keyword-screen, extract, classify](./docs/hana-rag-service/05-smart-tools-and-platform/01-smart-tools-catalog.md)
+  - [Bảo Mật Doanh Nghiệp: Fail-Closed Tenant Isolation, SSRF Protection, Circuit Breaker, Observability](./docs/hana-rag-service/05-smart-tools-and-platform/02-security-and-resilience.md)
 
 ---
 
 ## 🛠️ Nguyên Tắc Thiết Kế Cốt Lõi (Core Principles)
 
 1. **Clean Architecture:** Tách biệt tuyệt đối giữa tầng nghiệp vụ Domain/Application và tầng hạ tầng Frameworks/Drivers.
-2. **Deterministic vs Autonomous Synergy:** Kết hợp sức mạnh của quy trình xác định (Workflow) với năng lực suy luận tự trị (Agent).
-3. **Event Sourcing & Replayability:** Nhật ký sự kiện (Event Log) và Checkpoint là chân lý, mọi trạng thái hệ thống đều có thể tái hiện chính xác.
-4. **Mở Rộng Phân Tán (Horizontal Scalability):** Toàn bộ các dịch vụ đều thiết kế dạng stateless hoặc checkpoint-backed, scale độc lập theo nhu cầu.
+2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, quan hệ và đồ thị tri thức tập trung trong SAP HANA để đảm bảo toàn vẹn và bảo mật RBAC.
+3. **Deterministic vs Autonomous Synergy:** Kết hợp sức mạnh của quy trình xác định (Workflow) với năng lực suy luận tự trị (Agent) và truy xuất tri thức (RAG).
+4. **Bảo Mật Cấp Doanh Nghiệp (Enterprise-Grade Security):** Che giấu PII tại chỗ, kiểm tra SSRF nghiêm ngặt, cách ly đa người thuê tuyệt đối (No Tenant Bleed).
