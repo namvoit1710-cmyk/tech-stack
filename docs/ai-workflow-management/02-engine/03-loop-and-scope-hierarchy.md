@@ -1,13 +1,13 @@
-# 03. Vòng Lặp & Phân Cấp Phạm Vi (Loop & Scope Hierarchy)
+# 03. Vòng Lặp & Phân Cấp Phạm Vi Biến (Loop & Scope Hierarchy)
 
 > **Phân hệ:** AI Workflow Management  
-> **Chủ đề:** Xử lý vòng lặp lồng nhau, định danh `invocation_id`, cô lập phạm vi bằng `scope_stack` và các node điều khiển vòng lặp.
+> **Chủ đề:** Xử lý vòng lặp lồng nhau, định danh `invocation_id`, cô lập phạm vi bằng `scope_stack`, và chuỗi Chain of Responsibility của `ResolutionScope`.
 
 ---
 
 ## 1. Thách Thức Của Vòng Lặp Trong Event-Driven Engine
 
-Trong một engine xử lý theo sự kiện phân tán, vòng lặp (Loops) tạo ra bài toán phức tạp:
+Trong một engine xử lý theo sự kiện phân tán, vòng lặp (Loops) tạo ra 3 bài toán kỹ thuật lớn:
 1. **Trùng lặp định danh:** Nếu node `process_item` nằm trong vòng lặp 100 lần, làm sao phân biệt được task của lần lặp 1 với lần lặp 2?
 2. **Vòng lặp lồng nhau (Nested Loops):** Một vòng lặp ngoài duyệt qua các `Department`, và một vòng lặp trong duyệt qua các `Employee` của phòng ban đó.
 3. **Phạm vi biến (Scope Isolation):** Node bên trong vòng lặp phải truy xuất được dữ liệu của phần tử hiện tại (`{{$loop.item}}`), nhưng không được làm biến dạng biến của vòng lặp ngoài hoặc các luồng song song khác.
@@ -25,7 +25,7 @@ invocation_id = uuid5(
     f"{run_id}:{loop_node_id}:{parent_invocation_id}:{iteration_index}"
 )
 ```
-- **Đặc tính:** Nếu một bước bị retry hoặc replay lại từ đầu, `invocation_id` sinh ra sẽ giống hệt lần chạy trước, đảm bảo tính idempotency tuyệt đối.
+- **Đặc tính Idempotency:** Nếu một bước bị retry hoặc replay lại từ đầu từ Event Log, `invocation_id` sinh ra sẽ giống hệt lần chạy trước, đảm bảo an toàn tuyệt đối khi phân phối song song.
 
 ---
 
@@ -53,9 +53,30 @@ Mỗi thực thể `Task` lưu giữ một danh sách ngăn xếp đại diện 
 
 ---
 
-## 3. Các Biến Tự Động Của Vòng Lặp
+## 3. Mô Hình Phân Cấp Khung Phạm Vi (Chain of Responsibility)
 
-Trong suốt quá trình lặp, `EventDrivenLoopDriver` tự động nạp các biến sau vào ngữ cảnh cục bộ:
+Cơ chế phân giải biến thực tế trong codebase (`layer1_domain/value_objects/resolution_scope.py`) được thiết kế theo mẫu **Composite + Chain of Responsibility**:
+
+```mermaid
+flowchart TD
+    HEAD["Đầu biểu thức: parsed.source (vd: $loop, $node_1, $variable)"] --> F1["1. IterationLocalsFrame"]
+    F1 -->|Khớp: $loop, $item, mapping $custom| R1[Trả về Giá trị Cục bộ Vòng lặp]
+    F1 -->|UNRESOLVED| F2["2. RunLocalsFrame"]
+    F2 -->|Khớp: $node_a, $input, name aliases| R2[Trả về Giá trị Node Tiền nhiệm]
+    F2 -->|UNRESOLVED| F3["3. UserVariablesFrame"]
+    F3 -->|Khớp: $variable.X| R3[Trả về Biến Người Dùng Khai Báo]
+    F3 -->|UNRESOLVED| F4["4. ParentRunFrame"]
+    F4 -->|Khớp: $parent.*, $root.*| R4[Trả về Biến Từ Workflow Cha]
+```
+
+1. **`IterationLocalsFrame`:** Ưu tiên giải quyết các biến nội bộ vòng lặp hiện tại: `$loop`, `$item`, `$custom`.
+2. **`RunLocalsFrame`:** Giải quyết các tham chiếu đến các node đã hoàn thành trong cùng run: `$node_a`, `$input`.
+3. **`UserVariablesFrame`:** Giải quyết các biến do người dùng định nghĩa ở cấp workflow: `$variable.X`.
+4. **`ParentRunFrame`:** Nếu node đang chạy trong một Sub-workflow con, frame này cho phép đọc ngược dữ liệu từ workflow cha thông qua `$parent.*` hoặc `$root.*`.
+
+---
+
+## 4. Các Biến Tự Động Của Vòng Lặp
 
 | Biến | Kiểu Dữ Liệu | Ý Nghĩa |
 |---|---|---|
@@ -67,15 +88,7 @@ Trong suốt quá trình lặp, `EventDrivenLoopDriver` tự động nạp các 
 
 ---
 
-## 4. Các Node Điều Khiển Vòng Lặp
+## 5. Các Node Điều Khiển Vòng Lặp
 
-Hệ thống hỗ trợ 2 node chuyên biệt để điều hướng luồng lặp mà không cần hoàn tất toàn bộ thân vòng lặp:
-
-### 4.1. `LOOP_EXIT` (Tương đương lệnh `break`)
-- Khi luồng đi vào node `LOOP_EXIT`, engine lập tức hủy bỏ các task đang chạy dở của vòng lặp đó.
-- Thu thập kết quả tích lũy đến thời điểm hiện tại.
-- Kích hoạt cổng ra ngoài của vòng lặp (`exit_edge`) để đi tiếp sang các node phía sau vòng lặp.
-
-### 4.2. `LOOP_CONTINUE` (Tương đương lệnh `continue`)
-- Khi một điều kiện kiểm tra bên trong thân vòng lặp không thỏa mãn và chạm tới `LOOP_CONTINUE`, engine sẽ bỏ qua các node còn lại của lần lặp này.
-- Ngay lập tức kích hoạt `LoopIterationAction` để tăng `iteration_index` lên 1 và bắt đầu lần lặp tiếp theo.
+- **`LOOP_EXIT` (Break):** Lập tức chấm dứt toàn bộ vòng lặp, giải phóng tài nguyên và kích hoạt cổng ra ngoài (`exit_edge`).
+- **`LOOP_CONTINUE` (Continue):** Bỏ qua các bước còn lại của lần lặp hiện tại, kích hoạt `LoopIterationAction` kế tiếp.

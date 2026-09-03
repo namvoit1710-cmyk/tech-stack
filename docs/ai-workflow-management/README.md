@@ -5,7 +5,7 @@
 
 ---
 
-## 📚 Mục Lục Tài Liệu Chi Tiết
+## 📚 Danh Mục Toàn Bộ Tài Liệu Chi Tiết
 
 Tài liệu được phân tách thành 5 phân hệ chuyên sâu theo cấu trúc thư mục module hóa:
 
@@ -15,9 +15,10 @@ Tài liệu được phân tách thành 5 phân hệ chuyên sâu theo cấu tr�
 - [03. Kiến Trúc Phân Tầng Clean Architecture](./01-architecture/03-clean-architecture-layers.md): Phân tích chi tiết 4 tầng: Domain Core, Application Use Cases, Interface Adapters và Frameworks/Drivers.
 
 ### 2. [Bộ Máy Điều Phối (Orchestration Engine)](./02-engine/)
-- [01. Mô Hình Thực Thi Thống Nhất](./02-engine/01-uniform-execution-model.md): Phương thức `_exec_uniform`, 6 chế độ hoàn thành (`immediate`, `dispatched`, `pending`, `child_run`, `loop_body`, `deferred`) và danh mục 16 Node Types.
+- [01. Mô Hình Thực Thi Thống Nhất & 21 Node Types](./02-engine/01-uniform-execution-model.md): Phương thức `_exec_uniform`, 6 chế độ hoàn thành (`immediate`, `dispatched`, `pending`, `child_run`, `loop_body`, `deferred`) và danh mục đầy đủ **21 Node Types** trong codebase.
 - [02. Thuật Toán Fanout & Cascade-Skip](./02-engine/02-fanout-and-cascade-skip.md): Hàm thuần túy `compute_fanout()`, duyệt BFS loại bỏ nhánh phụ thuộc, và kiểm tra tính sẵn sàng tiền nhiệm (Predecessor Readiness).
-- [03. Vòng Lặp & Phân Cấp Phạm Vi](./02-engine/03-loop-and-scope-hierarchy.md): Quản lý vòng lặp lồng nhau (Nested Loops), định danh xác định `invocation_id` (uuid5), ngăn xếp `scope_stack`, và các node điều khiển `LOOP_EXIT`, `LOOP_CONTINUE`.
+- [03. Vòng Lặp & Phân Cấp Phạm Vi Biến](./02-engine/03-loop-and-scope-hierarchy.md): Quản lý vòng lặp lồng nhau (Nested Loops), định danh xác định `invocation_id` (uuid5), ngăn xếp `scope_stack`, và chuỗi Chain of Responsibility của `ResolutionScope` (`ScopeFrame`s).
+- [04. Điều Phối Sub-Workflow & Quy Trình Con](./02-engine/04-child-workflows-and-subflows.md): Bộ điều phối `ChildWorkflowCoordinator`, input/output binding, phòng chống chu trình chéo `CrossWorkflowCycleError`, và xử lý lỗi `on_failure`.
 
 ### 3. [Hệ Thống Sự Kiện & Realtime (Event System)](./03-event-system/)
 - [01. Chuỗi Xuất Bản Sự Kiện](./03-event-system/01-event-publishing-chain.md): Chuỗi Decorator Pattern 5 tầng (Write-Ahead Log, Realtime Broadcast, Enrich, Task Dispatch Fork, Backend Publisher), và phân cấp ưu tiên `EventCollector`.
@@ -26,11 +27,13 @@ Tài liệu được phân tách thành 5 phân hệ chuyên sâu theo cấu tr�
 ### 4. [Hệ Sinh Thái Workers (Workers Ecosystem)](./04-workers/)
 - [01. Dịch Vụ Quản Lý Worker Executor](./04-workers/01-worker-executor-service.md): Quản lý đăng ký động (Dynamic Registry), nhịp tim Heartbeat, Stale Sweeper, và 2 chế độ phân phối Push vs Pull (Pull-lease model).
 - [02. Bộ Công Cụ Worker SDK](./04-workers/02-worker-sdk.md): Clean Architecture trong Worker SDK, 2 chế độ SERVER vs HEADLESS, và hướng dẫn từng bước viết một worker mới.
-- [03. Danh Mục Các Worker Tiêu Biểu](./04-workers/03-workers-catalog.md): Chi tiết tính năng các worker có sẵn: `http-request-worker`, `agent-worker` (LLMs), `mapping-data-worker`, `wait-worker`, v.v.
+- [03. Danh Mục Toàn Bộ 14 Worker Trong Hệ Sinh Thái](./04-workers/03-workers-catalog.md): Chi tiết 14 worker có sẵn: `http-request-worker`, `agent-worker`, `claude-worker`, `mapping-data-worker`, `wait-worker`, `code-worker`, `database-connection-worker`, `gateway-worker`, `jira-worker`, `email-worker`, `ms-teams-worker`, `req2tpl-worker`, `log-worker`, `worker-sdk`.
+- [04. Tích Hợp API Gateway & OpenAPI Importer](./04-workers/04-api-gateway-and-openapi-integration.md): Bộ nhập khẩu OpenAPI Swagger Spec tự động (`openapi_import.py`), tạo Gateway Apps, Gateway Functions và đưa vào Node Palette.
 
 ### 5. [Độ Bền Vững & Dữ Liệu (Resilience & Data Flow)](./05-resilience/)
 - [01. Luồng Dữ Liệu & Phân Giải Biến](./05-resilience/01-data-flow-and-variables.md): Biểu thức n8n `{{ ... }}`, 4 tầng tra cứu của `VariableResolver`, và giải pháp xử lý streaming dữ liệu lớn (CSV/BLOB) qua `DataStoreService`.
-- [02. Tính Bền Vững & Tối Ưu Enterprise](./05-resilience/02-production-hardening.md): Khóa lạc quan CAS Retry, Transactional Outbox Pattern, các Janitor giải phóng RAM (`malloc_trim`), giám sát độ trễ event loop, và bộ hẹn giờ bền vững (Durable Timers).
+- [02. Tính Bền Vững & Tối Ưu Enterprise](./05-resilience/02-production-hardening.md): Khóa lạc quan CAS Retry, Transactional Outbox Pattern, các Janitor giải phóng RAM (`malloc_trim`), giám sát độ trễ event loop (`EventLoopLagMonitor`), và bộ hẹn giờ bền vững (Durable Timers).
+- [03. Run Generation Guard & Tái Tạo Trạng Thái](./05-resilience/03-run-generation-guard-and-replays.md): Chống Zombie Callback (`TASK_SUPERSEDED` HTTP 409), cấu trúc `ProjectedRunState` Schema Version 3, và cơ chế Event Sourcing Replay.
 
 ---
 
@@ -45,7 +48,7 @@ flowchart TB
     subgraph ENGINE["Workflow Control Plane (:8001)"]
         direction TB
         DISP["Dispatcher<br/>(Fanout & Skip)"]
-        EXEC["Executor Runner<br/>(16 Node Handlers)"]
+        EXEC["Executor Runner<br/>(21 Node Handlers)"]
         PROJ["Projector<br/>(State Materialization)"]
     end
 
@@ -54,11 +57,14 @@ flowchart TB
         DISPATCHER["Task Dispatcher (Push / Pull)"]
     end
 
-    subgraph AGENTS["Worker Pool (:35000+)"]
+    subgraph AGENTS["Worker Pool (14+ Microservices :35000+)"]
         W_HTTP["http-request-worker"]
-        W_AGENT["agent-worker (LLMs)"]
+        W_AGENT["agent-worker (OpenAI)"]
+        W_CLAUDE["claude-worker (Anthropic)"]
         W_MAP["mapping-data-worker"]
+        W_DB["database-connection-worker"]
         W_WAIT["wait-worker"]
+        W_MORE["code / jira / email / teams workers..."]
     end
 
     subgraph STORAGE["Hạ Tầng Dữ Liệu & Hàng Đợi"]
@@ -68,7 +74,7 @@ flowchart TB
     end
 
     CLIENT <-- "REST API & WebSocket" --> ENGINE
-    ENGINE <-- "gRPC / REST / Broker" --> WORKERS
+    ENGINE <-- "gRPC (:50051) / REST / Broker" --> WORKERS
     WORKERS <-- "HTTP POST /execute" --> AGENTS
     ENGINE --> HANA
     ENGINE --> KAFKA

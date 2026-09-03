@@ -1,13 +1,11 @@
-# 01. Mô Hình Thực Thi Thống Nhất (Uniform Execution Model)
+# 01. Mô Hình Thực Thi Thống Nhất & 21 Node Types
 
 > **Phân hệ:** AI Workflow Management  
-> **Chủ đề:** Phương thức thực thi thống nhất `_exec_uniform`, các Completion Modes và danh mục 16 Node Types.
+> **Chủ đề:** Phương thức thực thi thống nhất `_exec_uniform`, các Completion Modes và danh mục đầy đủ 21 Node Types thực tế trong codebase.
 
 ---
 
 ## 1. Giới Thiệu Mô Hình Thực Thi Thống Nhất (Phase 6 Architecture)
-
-Trước đây, hệ thống có thể xử lý phân mảnh: các node điều kiện chạy inline bằng code riêng, các task worker gọi RPC riêng, và các điểm dừng chờ người dùng lại có đường dẫn logic tách biệt.
 
 Từ **Phase 6**, hệ thống áp dụng kiến trúc **Uniform Execution**: Mọi node trong đồ thị đều đi qua cùng một điểm vào duy nhất:
 ```python
@@ -25,11 +23,53 @@ class NodeHandlerResult:
     skipped_nodes: List[str] = field(default_factory=list)
 ```
 
-Engine chỉ cần phân nhánh xử lý dựa trên `completion_mode` mà không cần biết chi tiết logic bên trong của node đó là gì.
+Engine phân nhánh xử lý dựa trên `completion_mode` mà không cần biết chi tiết logic bên trong của node đó là gì.
 
 ---
 
-## 2. Sơ Đồ Tuần Tự Uniform Execution
+## 2. Bảng Phân Loại Toàn Diện 21 Node Types (Chuẩn Codebase Thực Tế)
+
+Dựa trên enum [`NodeType`](file:///C:/Users/Public/Documents/Project/github-proj/solace-root/data-migration/apps/backend/ai-workflow-management/workflow/workflow-control-plane-service/app/layer1_domain/value_objects/node_type.py) và từ điển phân loại [`NodeKind`](file:///C:/Users/Public/Documents/Project/github-proj/solace-root/data-migration/apps/backend/ai-workflow-management/workflow/workflow-control-plane-service/app/layer1_domain/value_objects/node_kind.py):
+
+| STT | Loại Node (`node_type`) | Nhóm Chức Năng (`node_kind`) | Mục Đích Sử Dụng | Chế Độ Hoàn Thành (`completion_mode`) |
+|---|---|---|---|---|
+| 1 | `TRIGGER` | `trigger` | Điểm bắt đầu của quy trình, tiếp nhận payload kích hoạt ban đầu. | `immediate` |
+| 2 | `TASK` | *Tùy worker* (`read` / `action`) | Ủy thác tác vụ cho worker ngoại vi (HTTP, Agent LLM, Database...). | `dispatched` |
+| 3 | `CONDITION` | `logic` | Rẽ 2 nhánh nhị phân (`true` / `false`) theo biểu thức so sánh. | `immediate` |
+| 4 | `SWITCH` | `logic` | Định tuyến nhiều nhánh theo giá trị khớp (`cases[]`) hoặc `default`. | `immediate` |
+| 5 | `PARALLEL` | `logic` | Tách nhánh thực thi đồng thời nhiều đường dẫn độc lập (Fan-out). | `immediate` |
+| 6 | `MERGE` | `logic` | Hội tụ các luồng song song, chờ đủ điều kiện (Quorum join). | `immediate` hoặc `deferred` |
+| 7 | `LOOP` | `logic` | Khởi tạo vòng lặp mảng, nạp biến và kích hoạt thân vòng lặp. | `loop_body` |
+| 8 | `LOOP_EXIT` | `logic` | Ngắt vòng lặp khẩn cấp (tương đương lệnh `break`). | `immediate` |
+| 9 | `LOOP_CONTINUE` | `logic` | Chuyển ngay sang lần lặp kế tiếp (tương đương `continue`). | `immediate` |
+| 10 | `WAIT` | `logic` | Tạm dừng luồng theo timer bền vững hoặc mốc thời gian. | `immediate` / `pending` |
+| 11 | `WORKFLOW` | `logic` | Kích hoạt Sub-workflow con độc lập với input/output binding. | `child_run` |
+| 12 | `COMPUTE` | `transform` | Thực thi mã tính toán inline (Python / NodeJS script sandbox). | `immediate` |
+| 13 | `SET_VARIABLE` | `transform` | Gán hoặc cập nhật biến vào ngữ cảnh `run.context.variables`. | `immediate` |
+| 14 | `OUTPUT` | `util` | Định nghĩa dữ liệu đầu ra cuối cùng của toàn bộ Workflow Run. | `immediate` |
+| 15 | `INPUT` | `human` | Tạm dừng quy trình chờ người dùng nhập form dữ liệu. | `pending` |
+| 16 | `HUMAN_ACTION` | `human` | Tạm dừng chờ người có thẩm quyền bấm Approve hoặc Reject. | `pending` |
+| 17 | `DATA_EDIT` | `human` | Tạm dừng cho phép người dùng sửa đổi trực tiếp dữ liệu trung gian. | `pending` |
+| 18 | `TEMPLATE_DATA_EDIT` | `human` | Chỉnh sửa dữ liệu theo mẫu template bảng biểu định sẵn. | `pending` |
+| 19 | `FILE_UPLOAD` | `human` | Tạm dừng chờ người dùng tải file tài liệu đính kèm lên hệ thống. | `pending` |
+| 20 | `APPROVAL_FLOW` | `human` | Quy trình phê duyệt nâng cao nhiều bước phân cấp. | `pending` |
+| 21 | `PROMPT` | `action` | Soạn thảo và gửi prompt trực tiếp tới mô hình LLM. | `immediate` / `dispatched` |
+
+---
+
+## 3. Bản Đồ Phân Loại Node (`NodeClass` & `Collection Buckets`)
+
+Để phục vụ giao diện kéo thả (Canvas Palette):
+- **Phân loại cấp cao (`NodeClass`):**
+  - `TECHNICAL`: Các node kỹ thuật nền tảng (Condition, Switch, Parallel, Merge, Loop, Compute...).
+  - `BUSINESS`: Các node nghiệp vụ gắn với quy trình doanh nghiệp (Approval, Data Edit, Gateway Functions...).
+- **Collection Buckets:**
+  - `Core`: Thư mục chứa toàn bộ các node built-in có sẵn của hệ thống.
+  - `My Nodes`: Thư mục chứa các node tùy biến do từng Tenant tự tạo (Business nodes / Custom functions).
+
+---
+
+## 4. Sơ Đồ Tuần Tự Xử Lý Uniform Execution
 
 ```mermaid
 sequenceDiagram
@@ -56,7 +96,7 @@ sequenceDiagram
         NH-->>OE: NodeHandlerResult
 
         alt completion_mode == "immediate"
-            note over OE: Condition, Switch, Parallel, Merge, Compute...
+            note over OE: Condition, Switch, Parallel, Merge, Compute, SetVariable, Output...
             OE->>DB: task.status = COMPLETED
             OE->>EP: buffer(TaskCompleted)
             OE->>OE: _route_to_successors()
@@ -64,9 +104,9 @@ sequenceDiagram
         else completion_mode == "dispatched"
             note over OE: TASK node (Worker ngoại vi)
             OE->>DB: task.status = RUNNING
-            OE->>EP: publish(TaskDispatched) -> Bắn sang Worker Executor
+            OE->>EP: publish(TaskDispatched) -> Gửi sang Worker Executor
         else completion_mode == "pending"
-            note over OE: INPUT, HUMAN_ACTION, DATA_EDIT...
+            note over OE: INPUT, HUMAN_ACTION, APPROVAL_FLOW, DATA_EDIT...
             OE->>DB: task.status = PENDING
             OE->>EP: publish(InputRequested) -> Dừng chờ người dùng
         else completion_mode == "loop_body"
@@ -84,36 +124,3 @@ sequenceDiagram
         OE->>OE: check_run_completion()
     end
 ```
-
----
-
-## 3. Bảng Chi Tiết 16 Node Types
-
-| Nhóm Tính Năng | Loại Node (`node_type`) | Mục Đích & Hoạt Động | Chế Độ Hoàn Thành (`completion_mode`) |
-|---|---|---|---|
-| **Khởi Động** | `TRIGGER` | Điểm bắt đầu nhận payload kích hoạt workflow. | `immediate` |
-| **Rẽ Nhánh** | `CONDITION` | Rẽ 2 nhánh theo biểu thức logic (`true` hoặc `false`). | `immediate` |
-| **Rẽ Nhánh** | `SWITCH` | Định tuyến nhiều nhánh theo giá trị khớp (`cases[]`) hoặc `default`. | `immediate` |
-| **Song Song** | `PARALLEL` | Tách nhánh thực thi đồng thời nhiều đường dẫn độc lập. | `immediate` |
-| **Hội Tụ** | `MERGE` | Đồng bộ hóa và chờ các nhánh song song hội tụ (Quorum join). | `immediate` hoặc `deferred` |
-| **Vòng Lặp** | `LOOP` | Lặp qua các phần tử mảng, kích hoạt thân vòng lặp. | `loop_body` |
-| **Vòng Lặp** | `LOOP_EXIT` | Ngắt vòng lặp khẩn cấp (tương tự lệnh `break`). | `immediate` |
-| **Vòng Lặp** | `LOOP_CONTINUE`| Chuyển sang bước lặp tiếp theo (tương tự `continue`). | `immediate` |
-| **Tác Vụ Ngoài**| `TASK` | Ủy thác thực thi cho external worker (HTTP, LLM...). | `dispatched` |
-| **Tính Toán** | `COMPUTE` | Thực thi mã inline (Python / NodeJS sandbox). | `immediate` |
-| **Sub-flow** | `WORKFLOW` | Gọi một workflow con độc lập như một quy trình con. | `child_run` |
-| **Human In Loop**| `INPUT` | Tạm dừng để chờ người dùng nhập biểu mẫu dữ liệu. | `pending` |
-| **Human In Loop**| `HUMAN_ACTION` | Tạm dừng để chờ người có thẩm quyền phê duyệt / từ chối. | `pending` |
-| **Human In Loop**| `DATA_EDIT` | Cho phép người dùng chỉnh sửa trực tiếp dữ liệu trung gian. | `pending` |
-| **Human In Loop**| `FILE_UPLOAD` | Chờ người dùng tải tệp đính kèm lên hệ thống. | `pending` |
-
----
-
-## 4. Kiểm Tra Hoàn Thành Quy Trình (`check_run_completion`)
-
-Sau khi mỗi node hoàn tất việc định tuyến:
-1. Engine kiểm tra danh sách tất cả các lá của đồ thị (Leaf nodes - các node không có node con).
-2. Nếu **toàn bộ các node lá** đều đã ở một trong các trạng thái cuối (`COMPLETED` hoặc `SKIPPED`), đồng thời không còn task nào đang `RUNNING` hoặc `PENDING` trong toàn bộ run:
-   - Trạng thái Run được chuyển thành `COMPLETED`.
-   - Engine phát ra sự kiện `RunCompleted`.
-   - Nếu workflow có cấu hình Webhook Callback, engine sẽ gửi bản tin thông báo kết quả tới endpoint đã đăng ký.

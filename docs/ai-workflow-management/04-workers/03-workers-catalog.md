@@ -1,67 +1,52 @@
-# 03. Danh Mục Các Worker Tiêu Biểu (Workers Catalog)
+# 03. Danh Mục Toàn Bộ 14 Worker Trong Hệ Sinh Thái (Workers Catalog)
 
 > **Phân hệ:** AI Workflow Management  
-> **Chủ đề:** Chi tiết tính năng và cấu hình của các worker dựng sẵn trong hệ thống.
+> **Chủ đề:** Khảo sát chi tiết toàn bộ các worker chuyên biệt hóa trong thư mục `workflow/worker/`.
 
 ---
 
-## 1. `http-request-worker` (Gọi API / REST Client)
+## 1. Bảng Tổng Quan Hệ Sinh Thái Worker
 
-- **Vị trí mã nguồn:** `workflow/worker/http-request-worker/`
-- **Mục đích:** Đóng vai trò là HTTP Client vạn năng, gọi các dịch vụ web bên ngoài hoặc dịch vụ nội bộ khác.
-- **Phương thức hỗ trợ:** `GET`, `POST`, `PUT`, `DELETE`, `PATCH`.
-- **Cấu hình chính:**
-  - `url`: Địa chỉ API đích (hỗ trợ nội suy biến n8n-style `{{$node.data.url}}`).
-  - `method`: Động từ HTTP.
-  - `headers[]`: Danh sách key-value HTTP headers.
-  - `query_params[]`: Tham số URL query string.
-  - `body_type`: `JSON`, `Form-Data`, hoặc `Raw text`.
-  - `authentication`: Hỗ trợ `None`, `Basic Auth`, `Bearer Token`, và `OAuth2 Client Credentials`.
+Hệ thống cung cấp một tập hợp đa dạng các worker chuyên biệt, mỗi worker được đóng gói thành một container độc lập:
 
----
-
-## 2. `agent-worker` (Tác Vụ Trí Tuệ Nhân Tạo & LLMs)
-
-- **Vị trí mã nguồn:** `workflow/worker/agent-worker/`
-- **Mục đích:** Tích hợp với các mô hình ngôn ngữ lớn (Large Language Models) để thực hiện tóm tắt văn bản, trích xuất dữ liệu, hoặc lập kế hoạch đa bước.
-- **Nhà cung cấp hỗ trợ:** OpenAI (GPT-4o, GPT-4 Turbo), Anthropic Claude (Claude 3.5 Sonnet).
-- **Cấu hình chính:**
-  - `provider`: `openai` hoặc `anthropic`.
-  - `model`: Mã định danh model cụ thể.
-  - `system_prompt`: Câu lệnh chỉ đạo bối cảnh và vai trò cho AI.
-  - `user_prompt`: Nội dung prompt từ người dùng kèm biến nội suy.
-  - `prompt_variables[]`: Danh sách biến gắn vào template prompt.
-  - `conversation_history[]`: Ngữ cảnh hội thoại trước đó nếu là chat nhiều lượt.
-  - `response_format`: `text` hoặc `json_object` (ép AI trả về JSON có cấu trúc).
+| Tên Thư Mục Worker | Cổng Mạng Mặc Định | Chức Năng Chính | Nhà Cung Cấp / Công Nghệ Tích Hợp |
+|---|---|---|---|
+| `http-request-worker` | `36000` | Gọi RESTful HTTP APIs ngoài hệ thống. | `httpx`, Basic, Bearer, OAuth2 |
+| `agent-worker` | `36001` | Thực thi các tác vụ LLM AI đa bước. | OpenAI API (GPT-4o, GPT-4 Turbo) |
+| `claude-worker` | `36002` | Tác vụ AI chuyên sâu với Anthropic Claude. | Anthropic SDK (Claude 3.5 Sonnet) |
+| `mapping-data-worker`| `36003` | Biến đổi cấu trúc JSON và mảng lồng nhau. | JSONPath, Custom Mapping Engine |
+| `wait-worker` | `36004` | Hẹn giờ trì hoãn (Duration / Datetime). | Asyncio sleep, Durable Timers |
+| `code-worker` | `36005` | Chạy code tùy biến Python/JS trong sandbox. | Python restricted execution |
+| `database-connection-worker` | `36006` | Kết nối & chạy truy vấn CSDL quan hệ. | SAP HANA, PostgreSQL, MySQL |
+| `gateway-worker` | `36007` | Cầu nối thực thi các Gateway App Functions. | OpenAPI Dynamic Proxy |
+| `jira-worker` | `36008` | Tự động hóa Atlassian Jira (Create/Update). | Jira REST API v3 |
+| `email-worker` | `36009` | Gửi email thông báo tự động. | SMTP / SendGrid / Microsoft 365 |
+| `ms-teams-worker` | `36010` | Bắn tin nhắn thông báo vào kênh Microsoft Teams.| Teams Incoming Webhook Cards |
+| `req2tpl-worker` | `36011` | Phân tích yêu cầu tự nhiên thành template. | LLM + Template Spec Engine |
+| `log-worker` | `36012` | Ghi log kiểm toán tập trung (Audit Trail). | OpenTelemetry / ElasticSearch |
+| `worker-sdk` | *(Thư viện)* | Bộ SDK nền tảng Clean Architecture. | Shared Core Library |
 
 ---
 
-## 3. `mapping-data-worker` (Biến Đổi & Ánh Xạ Dữ Liệu)
+## 2. Chi Tiết Các Worker Tiêu Biểu
 
-- **Vị trí mã nguồn:** `workflow/worker/mapping-data-worker/`
-- **Mục đích:** Chuyển đổi cấu trúc JSON từ hệ thống này sang hệ thống khác mà không cần viết code thủ công.
-- **Tính năng nổi bật:**
-  - Hỗ trợ duyệt và ánh xạ các mảng lồng nhau (Nested arrays).
-  - Trích xuất dữ liệu theo đường dẫn JSONPath: `$.orders[*].items[*].price`.
-  - Cơ chế `strict_mode`: Báo lỗi nếu thiếu trường bắt buộc hoặc tự động bỏ qua nếu là trường tùy chọn.
+### 2.1. `claude-worker` & `agent-worker`
+- **`claude-worker`:** Được tối ưu hóa cho mô hình Claude 3.5 Sonnet với cửa sổ ngữ cảnh lớn (200k tokens), rất mạnh trong việc phân tích mã nguồn, đọc hiểu tài liệu kỹ thuật phức tạp và sinh JSON chuẩn xác.
+- **`agent-worker`:** Tích hợp OpenAI Function Calling, hỗ trợ chế độ System Prompt động và quản lý lịch sử hội thoại nhiều lượt.
 
----
+### 2.2. `database-connection-worker`
+- Cung cấp khả năng kết nối trực tiếp vào cơ sở dữ liệu quan hệ doanh nghiệp.
+- Nhận cấu hình kết nối đã được mã hóa từ `run_credentials` (Host, Port, User, Password, SSL).
+- Trả về dữ liệu dạng JSON mảng các bản ghi (records), tự động chuyển sang chế độ file-backed nếu số lượng bản ghi vượt ngưỡng 10,000 dòng.
 
-## 4. `wait-worker` (Hẹn Giờ & Trì Hoãn)
+### 2.3. `gateway-worker`
+- Phối hợp cùng hệ thống **API Gateway**:
+  - Tiếp nhận các tác vụ thuộc loại `GATEWAY_FUNCTION`.
+  - Tự động nạp cấu hình xác thực (OAuth2 token / API Key) đã liên kết với Gateway App đó.
+  - Định tuyến request tới máy chủ đích của đối tác và chuẩn hóa response trả về.
 
-- **Vị trí mã nguồn:** `workflow/worker/wait-worker/`
-- **Mục đích:** Tạm dừng tiến trình theo thời gian thực trước khi chuyển tiếp sang node tiếp theo.
-- **Chế độ hẹn giờ:**
-  - `FIXED_DURATION`: Chờ một số giây/phút cố định (ví dụ chờ 30 giây để webhook đối tác kịp xử lý).
-  - `UNTIL_DATETIME`: Tạm dừng cho đến một mốc ngày giờ cụ thể trong tương lai (ví dụ 08:00 AM sáng mai).
-  - `MANUAL_APPROVAL`: Tạm dừng cho đến khi nhận được tín hiệu phê duyệt.
-
----
-
-## 5. Các Worker Khác Trong Hệ Sinh Thái
-
-- **`code-worker`:** Thực thi các đoạn script code Python/JavaScript tùy biến trong môi trường cô lập an toàn.
-- **`database-connection-worker`:** Kết nối và thực thi các câu lệnh SQL trên SAP HANA, PostgreSQL, MySQL hoặc Oracle.
-- **`jira-worker`:** Tự động tạo issue, cập nhật trạng thái ticket trên Atlassian Jira.
-- **`email-worker` / `ms-teams-worker`:** Gửi thông báo tự động qua Email SMTP hoặc Microsoft Teams Webhook.
-- **`req2tpl-worker`:** Phân tích yêu cầu tự nhiên của người dùng và chuyển đổi thành mẫu template cấu hình.
+### 2.4. `req2tpl-worker` (Requirement to Template)
+- Phân tích văn bản mô tả nghiệp vụ của người dùng thông qua mô hình AI để tự động sinh ra:
+  - Cấu hình các node trong workflow.
+  - Schema biểu mẫu auto-form phù hợp.
+  - Gợi ý các kết nối dữ liệu giữa các bước.
