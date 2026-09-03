@@ -14,6 +14,7 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **AI Agent Ecosystem** | Autonomous AI Agents, LangGraph, Multi-Agent Orchestration, Agent SDK, HITL Checkpointing, SAP BTP, LaidonLLM Gateway | 📖 [Xem Tài Liệu](./docs/agent/) |
 | **HANA RAG Service** | SAP HANA-First RAG, `REAL_VECTOR`, Structured SQL Pushdown, GraphRAG-lite, Hybrid RRF Rerank, Presidio PII Masking, Smart Tools | 📖 [Xem Tài Liệu](./docs/hana-rag-service/) |
 | **BI Dashboard & Analytics**| Data Vault 2.0 (Hubs/Links/Sats), OLAP Star Schema, SAP HANA Columnar Engine, React 19 Canvas (@dnd-kit), AI Chat-to-Chart | 📖 [Xem Tài Liệu](./docs/bi-dashboard/) |
+| **File Service** | Tiered Object Storage (SSD Hot Tier + S3/SeaweedFS Cold Tier), Zero-Downtime Versioning, CSV `row_id` Canonicalization, Presigned Multipart | 📖 [Xem Tài Liệu](./docs/file-service/) |
 | *(Mở Rộng Trong Tương Lai)* | *Data Migration Platform, Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
 ---
@@ -83,9 +84,34 @@ Nền tảng Business Intelligence thế hệ mới kết hợp sức mạnh lư
 
 ---
 
+## 📁 Tiêu Điểm 5: File Service (Tiered Storage & Versioning Platform)
+
+Nền tảng lưu trữ đối tượng phân tầng và quản lý phiên bản tệp doanh nghiệp hỗ trợ AWS S3, SeaweedFS và bộ đệm Hot Tier SSD siêu tốc:
+
+### Cấu Trúc Module:
+- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/file-service/01-architecture/):**
+  - [Tổng Quan & Các Khái Niệm Cốt Lõi: file_id vs version_id, Raw vs Processed, OCC](./docs/file-service/01-architecture/01-overview-and-core-concepts.md)
+  - [Topology Hệ Thống & Cổng Giao Tiếp: Tầng Nóng Local SSD & Tầng Lạnh Cloud S3](./docs/file-service/01-architecture/02-system-topology.md)
+  - [Kiến Trúc Phân Tầng Clean Architecture 4 Lớp & Các Interfaces Cốt Lõi](./docs/file-service/01-architecture/03-clean-architecture-and-layers.md)
+- 🗄️ **[02. Động Cơ Lưu Trữ Đối Tượng (Storage Engine)](./docs/file-service/02-storage-engine/):**
+  - [Bộ Lưu Trữ Phân Tầng (TieredStorageProvider): Ghi đệm Write-Behind & Thu hồi đĩa LRU](./docs/file-service/02-storage-engine/01-tiered-storage-provider.md)
+  - [Các Nhà Cung Cấp Lưu Trữ: AWS S3, MinIO, Cloudflare R2 & SeaweedFS Filer](./docs/file-service/02-storage-engine/02-s3-and-seaweedfs-providers.md)
+  - [Kho Siêu Dữ Liệu Tệp SAP HANA: Schema FILES, FILE_VERSIONS, SESSIONS & Phòng Ngừa Injection](./docs/file-service/02-storage-engine/03-metadata-repositories.md)
+- 🔄 **[03. Vòng Đời Tệp & Giao Diện API (File Lifecycle & APIs)](./docs/file-service/03-file-lifecycle-and-apis/):**
+  - [Tải Lên Trực Tiếp & Quản Lý Phiên Bản: Xử lý xung đột HTTP 409 Conflict với previous_version_id](./docs/file-service/03-file-lifecycle-and-apis/01-direct-and-versioned-uploads.md)
+  - [Tải Lên Nhiều Phần Kèm Presigned URLs (Multipart Upload) Cho Tệp Lớn Hàng GBs](./docs/file-service/03-file-lifecycle-and-apis/02-presigned-multipart-upload.md)
+  - [Tải Xuống & Truyền Phát Dữ Liệu: Asynchronous Chunked Streaming & Presigned GET](./docs/file-service/03-file-lifecycle-and-apis/03-download-and-streaming.md)
+  - [Chuẩn Hóa & Bổ Sung Cột Định Danh CSV (Row-ID Canonicalization) Cho Toàn Hệ Sinh Thái](./docs/file-service/03-file-lifecycle-and-apis/04-csv-row-id-canonicalization.md)
+- ⏱️ **[04. Hiệu Năng & Khả Năng Vận Hành (Performance & Observability)](./docs/file-service/04-performance-and-observability/):**
+  - [Động Cơ Giám Sát Hiệu Năng: Đo lường Execution Time, RAM Peak, CPU & Nhật Ký JSONL Hàng Ngày](./docs/file-service/04-performance-and-observability/01-performance-monitoring-engine.md)
+  - [Tính Bền Bỉ & Khả Năng Chống Chịu Lỗi: Exponential Backoff Retry & Graceful Drain](./docs/file-service/04-performance-and-observability/02-resilience-and-disk-pressure.md)
+
+---
+
 ## 🛠️ Nguyên Tắc Thiết Kế Cốt Lõi (Core Principles)
 
 1. **Clean Architecture:** Tách biệt tuyệt đối giữa tầng nghiệp vụ Domain/Application và tầng hạ tầng Frameworks/Drivers.
-2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, Data Vault và Star Schema tập trung trong SAP HANA để đảm bảo toàn vẹn và bảo mật RBAC.
-3. **Auditability & Traceability:** Data Vault 2.0 đảm bảo dữ liệu lịch sử bất biến và kiểm toán 100%.
+2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, Data Vault, Star Schema và File Metadata tập trung trong SAP HANA để đảm bảo toàn vẹn ACID và RBAC.
+3. **Auditability & Traceability:** Data Vault 2.0 và File Versioning đảm bảo dữ liệu lịch sử bất biến và kiểm toán 100%.
 4. **Interactive & AI-Augmented Analytics:** Biểu đồ tương tác lọc chéo mượt mà kết hợp trợ lý AI Copilot chuyển đổi ngôn ngữ tự nhiên thành biểu đồ trong 5 giây.
+5. **High-Performance Tiered Storage:** Đệm đĩa cứng SSD cục bộ giúp phản hồi API trong vài mili-giây, kết hợp lưu trữ lâu dài bền vững trên Cloud S3 / SeaweedFS.
