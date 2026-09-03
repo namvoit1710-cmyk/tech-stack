@@ -13,6 +13,7 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **AI Workflow Management** | Event-Driven Orchestration, Clean Architecture 4 Lớp, FastAPI, Socket.IO, gRPC, 21 Node Types, Worker SDK, Kafka, SAP HANA | 📖 [Xem Tài Liệu](./docs/ai-workflow-management/) |
 | **AI Agent Ecosystem** | Autonomous AI Agents, LangGraph, Multi-Agent Orchestration, Agent SDK, HITL Checkpointing, SAP BTP, LaidonLLM Gateway | 📖 [Xem Tài Liệu](./docs/agent/) |
 | **HANA RAG Service** | SAP HANA-First RAG, `REAL_VECTOR`, Structured SQL Pushdown, GraphRAG-lite, Hybrid RRF Rerank, Presidio PII Masking, Smart Tools | 📖 [Xem Tài Liệu](./docs/hana-rag-service/) |
+| **BI Dashboard & Analytics**| Data Vault 2.0 (Hubs/Links/Sats), OLAP Star Schema, SAP HANA Columnar Engine, React 19 Canvas (@dnd-kit), AI Chat-to-Chart | 📖 [Xem Tài Liệu](./docs/bi-dashboard/) |
 | *(Mở Rộng Trong Tương Lai)* | *Data Migration Platform, Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
 ---
@@ -47,33 +48,44 @@ Hệ sinh thái các tác nhân AI tự trị có khả năng suy luận, lập 
 Nền tảng Retrieval-Augmented Generation doanh nghiệp đặt **SAP HANA** làm nguồn dữ liệu chân lý duy nhất (System of Record), xóa bỏ hoàn toàn hiện tượng phân mảnh dữ liệu (Data Sprawl):
 
 ### Cấu Trúc Module:
-- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/hana-rag-service/01-architecture/):**
-  - [Triết Lý SAP HANA as System of Record, REAL_VECTOR & Dual Workloads (API vs WORKER)](./docs/hana-rag-service/01-architecture/01-overview-and-hana-core.md)
-  - [Topology Hệ Thống, Cổng Mạng & Lựa Chọn Embedding Providers](./docs/hana-rag-service/01-architecture/02-system-topology.md)
-  - [Clean Architecture 4 Tầng & Composition Containers Trong bootstrap.py](./docs/hana-rag-service/01-architecture/03-clean-architecture-and-containers.md)
-- 📥 **[02. Quy Trình Nhập Liệu (Ingestion Pipeline)](./docs/hana-rag-service/02-ingestion-pipeline/):**
-  - [Bóc Tách Đa Định Dạng: PDF (Docling OCR fallback), DOCX, TXT, MD, JSON](./docs/hana-rag-service/02-ingestion-pipeline/01-multi-format-parsing.md)
-  - [Xử Lý Bảng Tính CSV & XLSX Bằng Dữ Liệu Quan Hệ Chuẩn (Không ép thành chunks vô nghĩa)](./docs/hana-rag-service/02-ingestion-pipeline/02-spreadsheets-and-structured-tables.md)
-  - [Parent-Child Chunk Linking, Che Giấu PII Với Presidio & Streaming Tệp Dung Lượng Lớn](./docs/hana-rag-service/02-ingestion-pipeline/03-chunking-pii-masking-and-streaming.md)
-  - [Vòng Đời Job Nạp Liệu Bất Đồng Bộ (RAG_INGESTION_JOBS) & SSE Status Streaming](./docs/hana-rag-service/02-ingestion-pipeline/04-worker-and-job-lifecycle.md)
-- 🔎 **[03. Bộ Máy Truy Xuất Lai (Retrieval Engine)](./docs/hana-rag-service/03-retrieval-engine/):**
-  - [Định Tuyến Truy Vấn Thông Minh & Structured SQL Pushdown Trong Bộ Nhớ HANA](./docs/hana-rag-service/03-retrieval-engine/01-query-routing-and-sql-pushdown.md)
-  - [Tìm Kiếm Vector Hai Giai Đoạn, Tái Xếp Hạng bm25s, Thuật Toán RRF & HyDE](./docs/hana-rag-service/03-retrieval-engine/02-dense-vector-and-hybrid-rerank.md)
-  - [GraphRAG-lite: Bóc Tách Thực Thể Bằng spaCy NLP (0$ chi phí LLM) & HANA Graph Workspace](./docs/hana-rag-service/03-retrieval-engine/03-graphrag-lite.md)
-  - [Bộ Nhớ Đệm Ngữ Nghĩa (Redis Semantic Cache) & Tuyệt Đối Chống Rò Rỉ Tenant (No Tenant Bleed)](./docs/hana-rag-service/03-retrieval-engine/04-semantic-caching.md)
-- ✍️ **[04. Sinh Câu Trả Lời Có Căn Cứ (Grounded Generation)](./docs/hana-rag-service/04-grounded-generation/):**
-  - [Evidence Gating: Ngưỡng điểm tối thiểu chống ảo giác & Trích dẫn nguồn minh bạch](./docs/hana-rag-service/04-grounded-generation/01-evidence-gating-and-citations.md)
-  - [Fast Answer Mode (< 1.5s) vs Deep Answer Mode (Tổng hợp suy luận đa nguồn)](./docs/hana-rag-service/04-grounded-generation/02-fast-vs-deep-answer-modes.md)
-  - [Claim Support Verification: Thẩm định từng câu khẳng định & SSE Token Streaming](./docs/hana-rag-service/04-grounded-generation/03-claim-verification-and-sse-streaming.md)
-- 🧰 **[05. Bộ Công Cụ Thông Minh & Nền Tảng (Smart Tools & Platform)](./docs/hana-rag-service/05-smart-tools-and-platform/):**
-  - [Smart Tools Catalog: match/dedupe (phát hiện bản ghi trùng lặp), keyword-screen, extract, classify](./docs/hana-rag-service/05-smart-tools-and-platform/01-smart-tools-catalog.md)
-  - [Bảo Mật Doanh Nghiệp: Fail-Closed Tenant Isolation, SSRF Protection, Circuit Breaker, Observability](./docs/hana-rag-service/05-smart-tools-and-platform/02-security-and-resilience.md)
+- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/hana-rag-service/01-architecture/):** Triết lý SAP HANA as System of Record, REAL_VECTOR & Dual Workloads (API vs WORKER), Topology, Clean Architecture.
+- 📥 **[02. Quy Trình Nhập Liệu (Ingestion Pipeline)](./docs/hana-rag-service/02-ingestion-pipeline/):** Bóc tách đa định dạng (PDF OCR Docling), Xử lý bảng tính CSV/XLSX bằng dữ liệu quan hệ, Parent-Child Chunks, Che giấu PII với Presidio, Ingestion Jobs.
+- 🔎 **[03. Bộ Máy Truy Xuất Lai (Retrieval Engine)](./docs/hana-rag-service/03-retrieval-engine/):** Định tuyến Structured vs Unstructured, SQL Pushdown in-memory, Dense Vector 2 giai đoạn, bm25s Lexical Rerank, GraphRAG-lite, Redis Semantic Cache.
+- ✍️ **[04. Sinh Câu Trả Lời Có Căn Cứ (Grounded Generation)](./docs/hana-rag-service/04-grounded-generation/):** Evidence Gating chống ảo giác, Trích dẫn nguồn chi tiết, Fast Answer vs Deep Answer, Claim Verification.
+- 🧰 **[05. Bộ Công Cụ Thông Minh & Nền Tảng (Smart Tools & Platform)](./docs/hana-rag-service/05-smart-tools-and-platform/):** Smart Tools Catalog (match/dedupe, keyword-screen, extract, classify), Bảo mật Fail-Closed, SSRF Protection.
+
+---
+
+## 📊 Tiêu Điểm 4: BI Dashboard & Analytics Platform (Data Vault 2.0 to Star Schema)
+
+Nền tảng Business Intelligence thế hệ mới kết hợp sức mạnh lưu trữ lịch sử bất biến của **Data Vault 2.0** với tốc độ phân tích siêu tốc của **OLAP Star Schema** trên **SAP HANA In-Memory**:
+
+### Cấu Trúc Module:
+- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/bi-dashboard/01-architecture/):**
+  - [Chuỗi Chuyển Đổi 3 Tầng: Staging ➔ Data Vault 2.0 ➔ Star Schema ➔ Canvas Studio](./docs/bi-dashboard/01-architecture/01-overview-and-concepts.md)
+  - [Topology Hệ Thống, Kết Nối FastAPI (:8001) & React 19 (:3000), Tích Hợp XSUAA](./docs/bi-dashboard/01-architecture/02-system-topology.md)
+  - [Chuỗi 11 Giai Đoạn Vận Hành Pipeline Tuyến Tính (WF1 ➔ WF6) & Variable Bus](./docs/bi-dashboard/01-architecture/03-end-to-end-pipeline-stages.md)
+- 🗄️ **[02. Động Cơ Data Vault 2.0 (Data Vault Engine)](./docs/bi-dashboard/02-data-vault-engine/):**
+  - [Mô Hình Hóa Data Vault 2.0: Hubs, Links, Satellites, Hash Diff & Satellite Splitting](./docs/bi-dashboard/02-data-vault-engine/01-data-vault-2.0-modeling.md)
+  - [Tối Ưu Truy Vấn Lịch Sử Dưới 100ms Bằng Point-In-Time (PIT) & Bridge Tables](./docs/bi-dashboard/02-data-vault-engine/02-pit-and-bridge-tables.md)
+  - [Tự Động Sinh DDL VARBINARY(32) SAP HANA, Kịch Bản Nạp ELT & Xử Lý Schema Drift](./docs/bi-dashboard/02-data-vault-engine/03-schema-generation-and-ddl.md)
+- ⭐ **[03. Mô Hình Hình Sao & Truy Vấn OLAP (OLAP Star Schema)](./docs/bi-dashboard/03-olap-star-schema/):**
+  - [Bản Kê Mô Hình Hình Sao (StarManifest): Facts, Dimensions & Conformed Dimensions](./docs/bi-dashboard/03-olap-star-schema/01-star-schema-manifest.md)
+  - [Bộ Sinh Chiều Thời Gian Đa Cấp: Lịch Dương Chuẩn & Năm Tài Chính Doanh Nghiệp](./docs/bi-dashboard/03-olap-star-schema/02-date-dimension-generator.md)
+  - [Biên Soạn Truy Vấn SQL Động (ComposedQuery), Toán Tử Tập Hợp & Nhúng RLS](./docs/bi-dashboard/03-olap-star-schema/03-dynamic-query-composition.md)
+- 📈 **[04. Xưởng Biểu Đồ & Không Gian Làm Việc (Dashboard & Charts)](./docs/bi-dashboard/04-dashboard-and-charts/):**
+  - [Xưởng Thiết Kế Biểu Đồ: 11 Visualization Types (Bar, Line, Pie, Funnel, KPI...)](./docs/bi-dashboard/04-dashboard-and-charts/01-chart-studio-and-types.md)
+  - [Không Gian Kéo Thả Canvas (@dnd-kit), Tương Tác Lọc Chéo & Dashboard State](./docs/bi-dashboard/04-dashboard-and-charts/02-dashboard-canvas-and-cross-filtering.md)
+  - [Đồ Thị Tri Thức Metadata Graph & Trợ Lý AI Tự Động Tạo Biểu Đồ (Chat-to-Chart)](./docs/bi-dashboard/04-dashboard-and-charts/03-knowledge-graph-and-ai-chat.md)
+- 🛡️ **[05. Bảo Mật & Quản Trị Hệ Thống (Governance & Resilience)](./docs/bi-dashboard/05-governance-and-resilience/):**
+  - [Bảo Mật Dòng Cưỡng Bức (Row-Level Security) & 4 Chính Sách Che Giấu Cột (Masking)](./docs/bi-dashboard/05-governance-and-resilience/01-row-level-security-and-masking.md)
+  - [Tự Động Phát Hiện Lệch Cấu Trúc (Schema Drift), Dead-Letter Queue & Audit Trail](./docs/bi-dashboard/05-governance-and-resilience/02-schema-drift-and-monitoring.md)
 
 ---
 
 ## 🛠️ Nguyên Tắc Thiết Kế Cốt Lõi (Core Principles)
 
 1. **Clean Architecture:** Tách biệt tuyệt đối giữa tầng nghiệp vụ Domain/Application và tầng hạ tầng Frameworks/Drivers.
-2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, quan hệ và đồ thị tri thức tập trung trong SAP HANA để đảm bảo toàn vẹn và bảo mật RBAC.
-3. **Deterministic vs Autonomous Synergy:** Kết hợp sức mạnh của quy trình xác định (Workflow) với năng lực suy luận tự trị (Agent) và truy xuất tri thức (RAG).
-4. **Bảo Mật Cấp Doanh Nghiệp (Enterprise-Grade Security):** Che giấu PII tại chỗ, kiểm tra SSRF nghiêm ngặt, cách ly đa người thuê tuyệt đối (No Tenant Bleed).
+2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, Data Vault và Star Schema tập trung trong SAP HANA để đảm bảo toàn vẹn và bảo mật RBAC.
+3. **Auditability & Traceability:** Data Vault 2.0 đảm bảo dữ liệu lịch sử bất biến và kiểm toán 100%.
+4. **Interactive & AI-Augmented Analytics:** Biểu đồ tương tác lọc chéo mượt mà kết hợp trợ lý AI Copilot chuyển đổi ngôn ngữ tự nhiên thành biểu đồ trong 5 giây.
