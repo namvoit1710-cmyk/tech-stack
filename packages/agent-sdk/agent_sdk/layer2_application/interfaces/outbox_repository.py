@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from agent_sdk.layer1_domain.entities.outbox_record import OutboxRecord
+
+
+class IOutboxRepository(Protocol):
+    def save(self, record: OutboxRecord) -> OutboxRecord: ...
+
+    def mark_published(self, outbox_id: str, published_at: str) -> bool: ...
+
+    def mark_failed(self, outbox_id: str) -> bool: ...
+
+    def find_pending(self, *, limit: int = 50) -> list[OutboxRecord]: ...

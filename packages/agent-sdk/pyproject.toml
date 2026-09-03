@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wio-agent-sdk"
+version = "1.1.0"
+description = "Agent SDK for AI Workflow Management"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "pydantic-settings",
+    "langgraph",
+    "langchain",
+    "langchain-core",
+    "langchain-anthropic",
+    "langchain-google-genai",
+    "langchain-ollama",
+    "langchain-openai",
+    "openai",
+    "aiokafka",
+    "confluent-kafka>=2.6,<3",
+    "grpcio>=1.78.0",
+    "httpx",
+    "jsonschema",
+    "protobuf>=6.31.1",
+    "hdbcli",
+    "mcp>=1.9.2",
+    "amqtt==0.11.3",
+    # TODO: publish simplemdg-mcp to Nexus and replace this local path
+    # with "simplemdg-mcp>=1.0,<2" for production/release builds.
+    "simplemdg-mcp @ file:../../../../libs/mcp/python",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "grpcio-tools>=1.78.0"]
+
+[tool.setuptools.packages.find]
+include = ["agent_sdk*"]
+
+[tool.uv.sources]
+simplemdg-mcp = { path = "../../../../libs/mcp/python", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = ["--strict-markers", "--tb=short"]

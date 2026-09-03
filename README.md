@@ -15,7 +15,18 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **HANA RAG Service** | SAP HANA-First RAG, `REAL_VECTOR`, Structured SQL Pushdown, GraphRAG-lite, Hybrid RRF Rerank, Presidio PII Masking, Smart Tools | 📖 [Xem Tài Liệu](./docs/hana-rag-service/) |
 | **BI Dashboard & Analytics**| Data Vault 2.0 (Hubs/Links/Sats), OLAP Star Schema, SAP HANA Columnar Engine, React 19 Canvas (@dnd-kit), AI Chat-to-Chart | 📖 [Xem Tài Liệu](./docs/bi-dashboard/) |
 | **File Service** | Tiered Object Storage (SSD Hot Tier + S3/SeaweedFS Cold Tier), Zero-Downtime Versioning, CSV `row_id` Canonicalization, Presigned Multipart | 📖 [Xem Tài Liệu](./docs/file-service/) |
+| **Worker SDK (Package)** | Thư viện phát triển Workflow Workers (Server, Pull, Headless modes, gRPC/REST, Streaming I/O) | 📦 [Xem Mã Nguồn](./packages/worker-sdk/) |
+| **Agent SDK (Package)** | Thư viện phát triển Autonomous AI Agents (LangGraph, SAP HANA Checkpointing, HITL, Context Compaction) | 📦 [Xem Mã Nguồn](./packages/agent-sdk/) |
 | *(Mở Rộng Trong Tương Lai)* | *Data Migration Platform, Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
+
+---
+
+## 📦 Mã Nguồn Các Bộ SDK (Developer Packages)
+
+Toàn bộ mã nguồn phát triển chính thức của các SDK hiện đã được đưa vào thư mục [`packages/`](./packages/):
+
+- 🛠️ **[`packages/worker-sdk/`](./packages/worker-sdk/):** Bộ công cụ phát triển Worker cho hệ thống quy trình AI Workflow. Hỗ trợ 3 chế độ chạy (`SERVER`, `PULL`, `HEADLESS`), đa giao thức `gRPC` (:50051) & `REST HTTP`, giải quyết tham chiếu tệp qua File Service, và tối ưu ngân sách kết quả `ResultBudget`.
+- 🤖 **[`packages/agent-sdk/`](./packages/agent-sdk/):** Bộ công cụ phát triển tác nhân AI tự trị trên nền tảng **LangGraph**. Cung cấp 4 bộ dựng đồ thị (`ToolAgentBuilder`, `GraphAgentBuilder`, `FlowAgentBuilder`, `SubGraphAgentBuilder`), lưu vết trạng thái phân tán trên **SAP HANA** (`HanaCheckpointSaver`), tương tác phê duyệt Human-In-The-Loop (`HITL`), và nén ngữ cảnh thông minh qua `ContextBudgetManager`.
 
 ---
 

@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package pushgateway;
+
+service PushGateway {
+    rpc SendData(SendDataRequest) returns (SendDataResponse);
+    rpc SendDataStream(stream SendDataRequest) returns (stream SendDataResponse);
+}
+
+message SendDataRequest {
+    string key = 1;
+    string data = 2;
+    bool is_final = 3;
+}
+
+message SendDataResponse {
+    bool success = 1;
+    string message = 2;
+    int32 chunk_index = 3;
+    bool is_final = 4;
+}
+
+message PersistedTopicData {
+    string key = 1;
+    string state = 2;
+    double created_at = 3;
+    double expires_at = 4;
+}

@@ -1,0 +1,6 @@
+from typing import Protocol
+
+
+class IStorage(Protocol):
+    def save(self, filename: str, data: bytes) -> None: ...
+    def get(self, filename: str) -> bytes: ...

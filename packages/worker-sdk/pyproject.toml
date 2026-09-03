@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wio-worker-sdk"
+version = "1.0.0"
+description = "Worker SDK for AI Workflow Management"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "pydantic-settings",
+    "httpx",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+include = ["worker_sdk*"]
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["build"]
+
+[tool.ruff.lint]
+# ANN = flake8-annotations (every function needs a return type, every arg a type).
+# UP006/UP035 = prefer PEP 585 builtin generics (list[...] over typing.List).
+select = ["ANN", "UP006", "UP035"]
+# ANN401 permits explicit `Any` where a payload is genuinely dynamic.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.importlinter]
+root_package = "worker_sdk"
+
+# Encodes the two explicit rules: layer 1 is pure domain (imports nothing from
+# outer layers); layer 2 is pure application (no adapters/frameworks imports —
+# connect through interfaces instead).
+[[tool.importlinter.contracts]]
+name = "Layer 1 (domain) imports nothing from outer layers"
+type = "forbidden"
+source_modules = ["worker_sdk.layer1_domain"]
+forbidden_modules = [
+    "worker_sdk.layer2_application",
+    "worker_sdk.layer3_adapters",
+    "worker_sdk.layer4_frameworks",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layer 2 (application) imports nothing from adapters/frameworks"
+type = "forbidden"
+source_modules = ["worker_sdk.layer2_application"]
+forbidden_modules = [
+    "worker_sdk.layer3_adapters",
+    "worker_sdk.layer4_frameworks",
+]
