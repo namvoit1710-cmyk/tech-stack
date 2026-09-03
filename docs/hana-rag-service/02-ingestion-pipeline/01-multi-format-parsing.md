@@ -33,8 +33,8 @@ flowchart TD
     PDF["Tệp PDF Tải Lên"] --> P1["1. Đọc Thử Bằng pdfplumber"]
     P1 --> CHECK{"Mật Độ Ký Tự Số Hóa Trên Trang Có Đạt Ngưỡng? (Text Density)"}
     
-    CHECK -->|Đạt Chuẩn (Văn Bản Số)| EXTRACT["Trích Xuất Trực Tiếp Lớp Text & Bảng Biểu"]
-    CHECK -->|Không Đạt (Ảnh Quét / Scanned)| OCR["2. Kích Hoạt Docling OCR Fallback Engine"]
+    CHECK -->|"Đạt Chuẩn (Văn Bản Số)"| EXTRACT["Trích Xuất Trực Tiếp Lớp Text & Bảng Biểu"]
+    CHECK -->|"Không Đạt (Ảnh Quét / Scanned)"| OCR["2. Kích Hoạt Docling OCR Fallback Engine"]
     
     OCR --> VISUAL["Nhận Diện Ký Tự Quang Học & Layout Phân Đoạn"]
     VISUAL --> EXTRACT

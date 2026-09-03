@@ -64,9 +64,9 @@ flowchart TB
         KAFKA_MESH[["Kafka / SAP Event Mesh"]]
     end
 
-    USER <-- "Hội thoại tự nhiên" --> SUPERVISOR
+    USER <-->|"Hội thoại tự nhiên"| SUPERVISOR
     SUPERVISOR <--> REGISTRY_HUB
-    SUPERVISOR <-- "Ủy thác việc (Hand-off)" --> SPECIALIZED_AGENTS
+    SUPERVISOR <-->|"Ủy thác việc (Hand-off)"| SPECIALIZED_AGENTS
     SPECIALIZED_AGENTS <--> REGISTRY_HUB
     SPECIALIZED_AGENTS --> HANA_CK
     SPECIALIZED_AGENTS --> LLM_GW

@@ -73,9 +73,9 @@ flowchart TB
         REDIS[("Redis (:6379)<br/>Socket.IO Cluster & Cache")]
     end
 
-    CLIENT <-- "REST API & WebSocket" --> ENGINE
-    ENGINE <-- "gRPC (:50051) / REST / Broker" --> WORKERS
-    WORKERS <-- "HTTP POST /execute" --> AGENTS
+    CLIENT <-->|"REST API & WebSocket"| ENGINE
+    ENGINE <-->|"gRPC (:50051) / REST / Broker"| WORKERS
+    WORKERS <-->|"HTTP POST /execute"| AGENTS
     ENGINE --> HANA
     ENGINE --> KAFKA
     ENGINE --> REDIS

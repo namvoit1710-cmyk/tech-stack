@@ -42,7 +42,7 @@ flowchart TD
     
     AUTH --> CACHE_SEARCH{"Tìm Kiếm Vector Trong Phân Vùng Redis Thuộc Tenant T1"}
     
-    CACHE_SEARCH -->|Có Câu Hỏi Tương Đồng > 0.95 CÙNG QUYỀN| HIT["CACHE HIT: Trả Về Ngay Kết Quả An Toàn (< 10ms)"]
+    CACHE_SEARCH -->|"Có Câu Hỏi Tương Đồng > 0.95 CÙNG QUYỀN"| HIT["CACHE HIT: Trả Về Ngay Kết Quả An Toàn (< 10ms)"]
     CACHE_SEARCH -->|Khác Tenant Hoặc Khác Quyền Truy Cập| MISS["CACHE MISS: Bắt Buộc Chạy Pipeline Mới Xuống SAP HANA"]
     
     MISS --> HANA_RUN["Truy Vấn SAP HANA (Lọc Quyền Tại Chỗ)"]

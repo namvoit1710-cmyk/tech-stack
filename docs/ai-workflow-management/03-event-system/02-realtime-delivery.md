@@ -27,7 +27,7 @@ flowchart LR
     BULK --> SIO
     PGC --> PG[Push Gateway REST API]
     
-    SIO -->|3. WebSocket push tới room run:{id}| CLIENTS[Frontend Canvas UI]
+    SIO -->|"3. WebSocket push tới room run:run_id"| CLIENTS["Frontend Canvas UI"]
 ```
 
 ---

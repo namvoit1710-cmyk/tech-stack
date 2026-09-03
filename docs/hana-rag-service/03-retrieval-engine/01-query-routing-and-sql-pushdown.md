@@ -26,9 +26,9 @@ flowchart TD
     
     ROUTER --> CLASSIFY{"Phân Loại Ý Định Truy Vấn"}
     
-    CLASSIFY -->|Ý Định Số Liệu / Bảng Biểu (Structured)| SQL_PATH["1. Nhánh Structured SQL Pushdown"]
-    CLASSIFY -->|Ý Định Ngữ Nghĩa / Văn Bản (Unstructured)| HYBRID_PATH["2. Nhánh Hybrid Vector Retrieval"]
-    CLASSIFY -->|Câu Hỏi Hỗn Hợp (Hybrid Query)| BOTH_PATH["3. Kích Hoạt Cả Hai & Hòa Trộn Kết Quả"]
+    CLASSIFY -->|"Ý Định Số Liệu / Bảng Biểu (Structured)"| SQL_PATH["1. Nhánh Structured SQL Pushdown"]
+    CLASSIFY -->|"Ý Định Ngữ Nghĩa / Văn Bản (Unstructured)"| HYBRID_PATH["2. Nhánh Hybrid Vector Retrieval"]
+    CLASSIFY -->|"Câu Hỏi Hỗn Hợp (Hybrid Query)"| BOTH_PATH["3. Kích Hoạt Cả Hai & Hòa Trộn Kết Quả"]
     
     SQL_PATH --> EXEC_SQL["Sinh SQL Chuẩn Hóa & Thực Thi Trên RAG_STRUCTURED_ROWS"]
     HYBRID_PATH --> EXEC_VEC["Vector Cosine Similarity + bm25s Lexical Rerank"]

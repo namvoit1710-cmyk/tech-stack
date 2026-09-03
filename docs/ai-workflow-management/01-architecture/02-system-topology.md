@@ -42,10 +42,10 @@ flowchart TB
         REDIS[("Redis (:6379)<br/>Phân phối Socket.IO & Bộ đệm Cache")]
     end
 
-    BROWSER <-- "REST API & WebSocket (Socket.IO)" --> WCP
+    BROWSER <-->|"REST API & WebSocket (Socket.IO)"| WCP
     API_CALLER --> GW --> WCP
-    WCP <-- "gRPC (:50051) / REST / Kafka" --> WES
-    WES <-- "HTTP POST /api/v1/execute (Push) hoặc Pull" --> WORKER_POOL
+    WCP <-->|"gRPC (:50051) / REST / Kafka"| WES
+    WES <-->|"HTTP POST /api/v1/execute (Push) hoặc Pull"| WORKER_POOL
 
     WCP --> HANA
     WCP --> KAFKA

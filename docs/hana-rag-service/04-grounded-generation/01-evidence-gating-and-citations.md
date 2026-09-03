@@ -15,8 +15,8 @@ Hệ thống áp dụng cơ chế kiểm soát nghiêm ngặt **Low-Score Eviden
 flowchart TD
     RETRIEVE["Kết Quả Truy Xuất Bằng Chứng (Top Chunks)"] --> EVAL{"Điểm Số Tương Đồng Cao Nhất (Max Retrieval Score)?"}
     
-    EVAL -->|Điểm < Ngưỡng Tối Thiểu (VD: < 0.65)| GATE_FAIL["KÍCH HOẠT EVIDENCE GATING (Từ Chối Trả Lời)"]
-    EVAL -->|Điểm >= Ngưỡng Tối Thiểu (VD: >= 0.65)| PASS["ĐỦ ĐIỀU KIỆN: Đưa Bằng Chứng Vào Prompt LLM"]
+    EVAL -->|"Điểm < Ngưỡng Tối Thiểu (VD: < 0.65)"| GATE_FAIL["KÍCH HOẠT EVIDENCE GATING (Từ Chối Trả Lời)"]
+    EVAL -->|"Điểm >= Ngưỡng Tối Thiểu (VD: >= 0.65)"| PASS["ĐỦ ĐIỀU KIỆN: Đưa Bằng Chứng Vào Prompt LLM"]
     
     GATE_FAIL --> SAFE_RESP["Trả Về Thông Báo Minh Bạch:<br/>'Không tìm thấy thông tin phù hợp trong các tài liệu được cấp quyền.'"]
     PASS --> GEN["LLM Sinh Câu Trả Lời Kèm Trích Dẫn Minh Bạch"]

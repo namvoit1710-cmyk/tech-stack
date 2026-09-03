@@ -40,7 +40,7 @@ flowchart TB
         FILE_SVC["Remote File Service / Object Store / Local FS"]
     end
 
-    CLIENTS <-- "REST API & SSE" --> API_APP
+    CLIENTS <-->|"REST API & SSE"| API_APP
     API_APP --> ROUTER --> GEN_ENGINE
     GEN_ENGINE --> LLM_CORE
     

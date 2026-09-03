@@ -18,8 +18,8 @@ flowchart TD
     QUERY["Câu Hỏi Của Người Dùng"] --> SPLIT{"Kích Hoạt Hybrid Pipeline"}
     
     subgraph STAGE_1["Giai Đoạn 1: Truy Thu Ứng Viên (Candidate Recall)"]
-        SPLIT -->|Nhánh Ngữ Nghĩa (Dense)| HANA_VEC["SAP HANA COSINE_SIMILARITY<br/>(Lấy Top 50 Chunks tương đồng ngữ nghĩa)"]
-        SPLIT -->|Nhánh Từ Khóa (Lexical)| BM25["Bộ Xếp Hạng bm25s<br/>(Lấy Top 50 Chunks khớp từ khóa chính xác)"]
+        SPLIT -->|"Nhánh Ngữ Nghĩa (Dense)"| HANA_VEC["SAP HANA COSINE_SIMILARITY<br/>(Lấy Top 50 Chunks tương đồng ngữ nghĩa)"]
+        SPLIT -->|"Nhánh Từ Khóa (Lexical)"| BM25["Bộ Xếp Hạng bm25s<br/>(Lấy Top 50 Chunks khớp từ khóa chính xác)"]
     end
 
     subgraph STAGE_2["Giai Đoạn 2: Hòa Trộn & Tái Xếp Hạng (Fusion & Rerank)"]

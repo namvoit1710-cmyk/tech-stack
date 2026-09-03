@@ -41,10 +41,10 @@ flowchart TB
         EVENT_MESH[["Kafka / SAP Event Mesh<br/>Realtime Agent Event Stream"]]
     end
 
-    USERS <-- "REST API / SSE Streaming" --> ORCH
+    USERS <-->|"REST API / SSE Streaming"| ORCH
     ORCH <--> REGISTRY
     ORCH --> EXEC_RT
-    ORCH <-- "HTTP / Kafka" --> DOMAIN_AGENTS
+    ORCH <-->|"HTTP / Kafka"| DOMAIN_AGENTS
     DOMAIN_AGENTS <--> REGISTRY
     DOMAIN_AGENTS --> LAIDON_LLM
     DOMAIN_AGENTS --> HANA_CHECKPOINT

@@ -12,9 +12,9 @@ Trong một hệ thống lớn, số lượng Domain Agents có thể tăng lên
 ```mermaid
 flowchart LR
     INTENT["Intent: 'Cần kiểm tra schema'"] --> SELECTOR["AgentSelector"]
-    REGISTRY[("Agent Registry Service")] <-->|1. Tra cứu năng lực: domain=governance, action=check_schema| SELECTOR
+    REGISTRY[("Agent Registry Service")] <-->|"1. Tra cứu năng lực: domain=governance, action=check_schema"| SELECTOR
     
-    SELECTOR -->|2. Lọc các Agent HEALTHY & Trọng số tải thấp| TARGET["governance-schema-agent (:36002)"]
+    SELECTOR -->|"2. Lọc các Agent HEALTHY và Trọng số tải thấp"| TARGET["governance-schema-agent (:36002)"]
 ```
 
 ### Tiêu Chí Tuyển Chọn Của `AgentSelector`:
