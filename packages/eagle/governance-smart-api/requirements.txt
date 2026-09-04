@@ -1,0 +1,2 @@
+-e ../smart-service-sdk
+httpx==0.28.1

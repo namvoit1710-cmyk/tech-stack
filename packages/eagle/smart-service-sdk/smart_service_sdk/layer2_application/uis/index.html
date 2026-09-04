@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Service SDK API Console</title>
+  <style>
+    :root {
+      --bg: #f5efe4;
+      --panel: rgba(255, 250, 242, 0.92);
+      --ink: #1f2a2c;
+      --muted: #5f6b6d;
+      --accent: #c65d3a;
+      --accent-strong: #8b3420;
+      --line: rgba(31, 42, 44, 0.12);
+      --shadow: 0 24px 48px rgba(67, 41, 20, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(198, 93, 58, 0.22), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(56, 106, 98, 0.18), transparent 28%),
+        linear-gradient(180deg, #f7f1e8 0%, #efe2d0 100%);
+    }
+
+    .shell {
+      width: min(1100px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 56px;
+    }
+
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 32px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -40px -70px auto;
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: rgba(198, 93, 58, 0.12);
+      filter: blur(2px);
+    }
+
+    .eyebrow {
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-size: 12px;
+      color: var(--accent-strong);
+      margin: 0 0 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.2rem, 5vw, 4.2rem);
+      line-height: 0.98;
+      max-width: 8ch;
+    }
+
+    .lead {
+      max-width: 56ch;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+      margin-top: 28px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 22px;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(198, 93, 58, 0.45);
+      box-shadow: 0 16px 32px rgba(67, 41, 20, 0.1);
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 1.3rem;
+    }
+
+    .card p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .card code {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(139, 52, 32, 0.08);
+      color: var(--accent-strong);
+      font-size: 0.88rem;
+    }
+
+    .notes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .note {
+      background: rgba(31, 42, 44, 0.95);
+      color: #f9f4ec;
+      border-radius: 22px;
+      padding: 20px;
+    }
+
+    .note h3 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .note p,
+    .note li {
+      color: rgba(249, 244, 236, 0.8);
+      line-height: 1.5;
+    }
+
+    .note ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">Smart Service SDK</p>
+      <h1>API console for search and retrieval demos.</h1>
+      <p class="lead">
+        Use these pages to try the current `search`, `similarity`, `material-sds-analysis`, and
+        runtime configuration APIs with sample payloads and inline JSON responses. The UI talks directly to the live
+        `/api/v1/...` endpoints in this app.
+      </p>
+
+      <div class="cards">
+        <a class="card" href="/api/v1/ui/search">
+          <h2>Search demo</h2>
+          <p>Run `POST /api/v1/search` with fielded payloads and fuzzy rules.</p>
+          <code>/api/v1/ui/search</code>
+        </a>
+        <a class="card" href="/api/v1/ui/similarity">
+          <h2>Similarity demo</h2>
+          <p>Explore vector and graph-backed retrieval with `POST /api/v1/similarity`.</p>
+          <code>/api/v1/ui/similarity</code>
+        </a>
+        <a class="card" href="/api/v1/ui/config">
+          <h2>Config demo</h2>
+          <p>Load and update both runtime config surfaces from one page.</p>
+          <code>/api/v1/ui/config</code>
+        </a>
+        <a class="card" href="/api/v1/ui/material-sds-analysis">
+          <h2>Material SDS demo</h2>
+          <p>Submit one or many materials to `POST /api/v1/material-sds-analysis`.</p>
+          <code>/api/v1/ui/material-sds-analysis</code>
+        </a>
+        <a class="card" href="/api/v1/ui/material-group-recommendation">
+          <h2>Material Group demo</h2>
+          <p>Recommend Material Group values from `POST /api/v1/similarity` evidence.</p>
+          <code>/api/v1/ui/material-group-recommendation</code>
+        </a>
+        <a class="card" href="/api/v1/ui/buyer-recommendation">
+          <h2>Buyer demo</h2>
+          <p>Recommend Buyer or Purchasing Group values from `POST /api/v1/similarity` evidence.</p>
+          <code>/api/v1/ui/buyer-recommendation</code>
+        </a>
+      </div>
+    </section>
+
+    <section class="notes">
+      <article class="note">
+        <h3>Included API routes</h3>
+        <ul>
+          <li>`POST /api/v1/search`</li>
+          <li>`POST /api/v1/similarity`</li>
+          <li>`POST /api/v1/material-sds-analysis`</li>
+          <li>`GET /api/v1/search/config` and `PUT /api/v1/search/config`</li>
+          <li>`GET /api/v1/similarity/config` and `PUT /api/v1/similarity/config`</li>
+          <li>`GET /api/v1/ui/material-group-recommendation`</li>
+          <li>`GET /api/v1/ui/buyer-recommendation`</li>
+        </ul>
+      </article>
+      <article class="note">
+        <h3>Good to know</h3>
+        <p>
+          These pages are intentionally lightweight: plain HTML, embedded CSS, and small `fetch`
+          helpers so the showcase stays close to the backend and easy to extend.
+        </p>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

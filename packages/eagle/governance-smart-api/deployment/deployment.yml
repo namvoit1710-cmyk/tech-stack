@@ -1,0 +1,103 @@
+name: governance-smart-api
+
+# Docker build context root = the service dir (parent of this deployment/ dir).
+buildContext: ..
+
+# BuildKit named build contexts injected at `docker build` time. The editable
+# sibling dependency in requirements.txt (`-e ../smart-service-sdk`) lives outside
+# this service's build context — expose it as `smart-service-sdk`.
+# Resolved relative to this deployment/ dir (-> eagle/smart-service-sdk).
+buildContexts:
+  smart-service-sdk: ../../smart-service-sdk
+
+# The SDK loads a sentence-transformers embedding model + spaCy + torch into
+# memory, and the container image carries that whole ML stack. Size to match the
+# working hana-rag-service (same sentence-transformers/torch image): the default
+# 5120M disk quota is too small to unpack the image on the Diego cell, which
+# fails with "uncompressed layer size exceeds quota" -> container CRASHED ->
+# CF reports "Start app timeout" (SA-1480 deploy failure).
+memory:
+  dev: 5120M
+  qas: 5120M
+
+disk:
+  dev: 10240M
+  qas: 10240M
+
+instances:
+  dev: 1
+  qas: 1
+
+# NOTE — secrets are NOT set here. Provide them per space as CloudFoundry secured
+# vars (e.g. `cf set-env governance-smart-api OPENAI_API_KEY ...`) or via a
+# user-provided service binding. Never commit them to this file or the image:
+#   OPENAI_API_KEY   — OpenAI credential (blank => SDK falls back to a local stub)
+#   HANA_PASSWORD    — SAP HANA Cloud password
+env:
+  APP_NAME:
+    dev: "Governance Smart API"
+    qas: "Governance Smart API"
+  APP_VERSION:
+    dev: "0.1.0"
+    qas: "0.1.0"
+  APP_MODE:
+    dev: "REST"
+    qas: "REST"
+  LOG_LEVEL:
+    dev: "INFO"
+    qas: "WARNING"
+  LOG_FORMAT:
+    dev: "json"
+    qas: "json"
+  DEFAULT_TENANT_ID:
+    dev: "default-tenant"
+    qas: "default-tenant"
+  ENABLE_RESUME_RUNNING_BACKGROUND_JOBS:
+    dev: "true"
+    qas: "true"
+
+  # --- SAP HANA Cloud ---
+  # ALL HANA_* settings (HANA_HOST / HANA_SCHEMA / HANA_USER / HANA_PASSWORD /
+  # HANA_PORT / HANA_POOL_* / HANA_STATEMENT_TIMEOUT_MS) are provided PER SPACE
+  # (secured vars via `cf set-env` or a service binding) and are intentionally
+  # NOT set here, so the generated CF manifest never overwrites the space's own
+  # HANA config. This mirrors hana-rag-service (same HANA + sentence-transformers
+  # stack). SDK defaults in app_config.py cover any HANA_* the space does not set.
+  AUTO_CREATE_SCHEMA:
+    dev: "true"
+    qas: "false"
+  AUTO_SEED_DATA:
+    dev: "false"
+    qas: "false"
+
+  # --- Embeddings / ingestion ---
+  EMBEDDING_MODEL_NAME:
+    dev: "microsoft/harrier-oss-v1-270m"
+    qas: "microsoft/harrier-oss-v1-270m"
+  EMBEDDING_VECTOR_DIMENSIONS:
+    dev: 640
+    qas: 640
+  EMBEDDING_BATCH_SIZE:
+    dev: 32
+    qas: 32
+
+  # --- OpenAI (model/endpoint only; the API key is a secret, see note above) ---
+  OPENAI_MODEL:
+    dev: "gpt-4.1-mini"
+    qas: "gpt-4.1-mini"
+  OPENAI_BASE_URL:
+    dev: "https://api.openai.com/v1"
+    qas: "https://api.openai.com/v1"
+  OPENAI_TIMEOUT_SECONDS:
+    dev: 30.0
+    qas: 30.0
+
+  # --- Local file storage ---
+  LOCAL_FILE_STORAGE_PATH:
+    dev: "./local-files"
+    qas: "./local-files"
+
+# Remaining SDK settings (graph tuning, circuit breaker, file-service, retries,
+# duplicate thresholds) fall back to the defaults declared in
+# smart_service_sdk/layer4_frameworks/config/app_config.py — all documented in
+# env.example. Override here per env only when a space needs a non-default value.

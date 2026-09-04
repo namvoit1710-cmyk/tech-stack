@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Governance Upload Console</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5d6675;
+      --panel: rgba(255, 255, 255, 0.9);
+      --line: rgba(23, 33, 43, 0.12);
+      --accent: #0f766e;
+      --accent-strong: #0b4f49;
+      --warn: #9a3412;
+      --error: #be123c;
+      --shadow: 0 24px 46px rgba(23, 33, 43, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(154, 52, 18, 0.16), transparent 24%),
+        linear-gradient(180deg, #f8f3eb 0%, #edf0f4 100%);
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.5rem);
+    }
+
+    .hero p, .panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+      min-width: 0;
+    }
+
+    .dropzone {
+      border: 2px dashed rgba(15, 118, 110, 0.28);
+      border-radius: 22px;
+      padding: 28px;
+      text-align: center;
+      background: rgba(15, 118, 110, 0.04);
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(15, 118, 110, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .dropzone strong {
+      display: block;
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .dropzone button,
+    .actions button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #effcf9;
+    }
+
+    .secondary {
+      background: rgba(23, 33, 43, 0.08);
+      color: var(--ink);
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid rgba(23, 33, 43, 0.16);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.94);
+      color: inherit;
+      margin-top: 8px;
+    }
+
+    .meta {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(23, 33, 43, 0.05);
+      font-size: 0.95rem;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 16px;
+      font-weight: 700;
+    }
+
+    .status.warn {
+      color: var(--warn);
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .stack section {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.66);
+      min-width: 0;
+    }
+
+    .stack h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    pre {
+      margin: 0;
+      padding: 16px;
+      min-height: 150px;
+      overflow: auto;
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      border-radius: 16px;
+      background: #131922;
+      color: #edf3ff;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .stack h2,
+    .stack p {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Governance upload console</h1>
+      <p>
+        Drop one CSV file, parse it with the governance upload flow, save the parsed JSON payload,
+        and inspect the upload result inline before using its file ID in an import job.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <div id="dropzone" class="dropzone">
+          <strong>Drop a file here</strong>
+          <p>or choose a file manually for upload and parsing</p>
+          <div class="actions" style="justify-content:center;">
+            <button id="pick-file" class="primary" type="button">Choose file</button>
+          </div>
+          <input id="file-input" type="file" hidden>
+        </div>
+
+        <label for="tenant-id" style="display:block; margin-top:18px; font-weight:700;">Tenant ID</label>
+        <input id="tenant-id" type="text" placeholder="default-tenant">
+
+        <div id="file-meta" class="meta">No file selected.</div>
+
+        <div class="actions">
+          <button id="start-import" class="primary" type="button" disabled>Upload file</button>
+          <button id="reset" class="secondary" type="button">Reset</button>
+        </div>
+
+        <div id="status" class="status">Idle.</div>
+      </article>
+
+      <article class="panel">
+        <div class="stack">
+          <section>
+            <h2>Upload response</h2>
+            <pre id="upload-response">Waiting for upload.</pre>
+          </section>
+          <section>
+            <h2>Saved parsed result</h2>
+            <pre id="saved-response">Waiting for parsed upload result.</pre>
+          </section>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("file-input");
+    const pickFileButton = document.getElementById("pick-file");
+    const startButton = document.getElementById("start-import");
+    const resetButton = document.getElementById("reset");
+    const tenantInput = document.getElementById("tenant-id");
+    const fileMeta = document.getElementById("file-meta");
+    const statusNode = document.getElementById("status");
+    const uploadResponse = document.getElementById("upload-response");
+    const savedResponse = document.getElementById("saved-response");
+
+    let selectedFile = null;
+
+    function setStatus(message, tone = "") {
+      statusNode.textContent = message;
+      statusNode.className = tone ? `status ${tone}` : "status";
+    }
+
+    function renderJson(node, payload) {
+      node.textContent = JSON.stringify(payload, null, 2);
+    }
+
+    function setFile(file) {
+      selectedFile = file;
+      startButton.disabled = !selectedFile;
+      fileMeta.textContent = selectedFile
+        ? `${selectedFile.name} (${selectedFile.type || "unknown type"}, ${selectedFile.size} bytes)`
+        : "No file selected.";
+    }
+
+    async function callJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+      return { response, data };
+    }
+
+    async function uploadAndSave() {
+      if (!selectedFile) {
+        setStatus("Select a file first.", "error");
+        return;
+      }
+
+      uploadResponse.textContent = "Uploading...";
+      savedResponse.textContent = "Waiting for parsed upload result.";
+      setStatus("Uploading and parsing file...", "warn");
+
+      const tenantId = tenantInput.value.trim();
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      if (tenantId) {
+        formData.append("tenant_id", tenantId);
+      }
+
+      try {
+        const uploadResult = await callJson("/api/v1/governance/import-data/upload", {
+          method: "POST",
+          body: formData
+        });
+        renderJson(uploadResponse, uploadResult.data);
+        if (!uploadResult.response.ok) {
+          setStatus(`Upload failed with ${uploadResult.response.status}.`, "error");
+          return;
+        }
+        renderJson(savedResponse, uploadResult.data);
+        setStatus(`Parsed and saved ${uploadResult.data.row_count} rows.`);
+      } catch (error) {
+        setStatus(`Request failed: ${error.message}`, "error");
+      }
+    }
+
+    function resetAll() {
+      setFile(null);
+      fileInput.value = "";
+      tenantInput.value = "";
+      uploadResponse.textContent = "Waiting for upload.";
+      savedResponse.textContent = "Waiting for parsed upload result.";
+      setStatus("Idle.");
+    }
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("dragover");
+      });
+    });
+
+    dropzone.addEventListener("drop", (event) => {
+      const [file] = event.dataTransfer.files;
+      if (file) {
+        setFile(file);
+        setStatus("File ready to upload.");
+      }
+    });
+
+    pickFileButton.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      const [file] = fileInput.files;
+      setFile(file || null);
+      setStatus(file ? "File ready to upload." : "Idle.");
+    });
+    startButton.addEventListener("click", uploadAndSave);
+    resetButton.addEventListener("click", resetAll);
+  </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.coverage
+tmp_debug/
+.env
+.venv
+local-files/
+smart_service_sdk.egg-info/
+build/

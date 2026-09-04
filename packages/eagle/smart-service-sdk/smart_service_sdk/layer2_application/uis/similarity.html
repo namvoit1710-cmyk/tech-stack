@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Similarity Demo</title>
+  <style>
+    :root {
+      --panel: rgba(255, 255, 255, 0.86);
+      --ink: #1a2030;
+      --muted: #59627a;
+      --accent: #9a3412;
+      --accent-strong: #7c2d12;
+      --line: rgba(26, 32, 48, 0.12);
+      --error: #be123c;
+      --shadow: 0 24px 42px rgba(54, 34, 16, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(154, 52, 18, 0.18), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.14), transparent 22%),
+        linear-gradient(180deg, #f9f4eb 0%, #eceef4 100%);
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .topbar a {
+      color: var(--accent-strong);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 58ch;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+      min-width: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid rgba(26, 32, 48, 0.16);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.92);
+      color: inherit;
+    }
+
+    textarea {
+      min-height: 220px;
+      resize: vertical;
+    }
+
+    .fields {
+      display: grid;
+      gap: 16px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff8ef;
+    }
+
+    button.secondary {
+      background: rgba(154, 52, 18, 0.12);
+      color: var(--accent-strong);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .endpoint {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(154, 52, 18, 0.1);
+      color: var(--accent-strong);
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 16px;
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .timer {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      min-height: 180px;
+      overflow: auto;
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      border-radius: 18px;
+      background: #121723;
+      color: #f8e6c3;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-top: 10px;
+    }
+
+    .response-stack {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .summary {
+      padding: 16px 18px;
+      border: 1px solid rgba(26, 32, 48, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .summary strong {
+      color: var(--ink);
+    }
+
+    .candidate-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .candidate-card {
+      padding: 16px 18px;
+      border: 1px solid rgba(26, 32, 48, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      min-width: 0;
+    }
+
+    .candidate-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .candidate-title {
+      font-weight: 700;
+      color: var(--ink);
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .candidate-score {
+      font-weight: 700;
+      color: var(--accent-strong);
+      white-space: nowrap;
+    }
+
+    .candidate-content {
+      margin: 0 0 12px;
+      color: var(--ink);
+      line-height: 1.55;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 14px;
+      font-size: 0.9rem;
+    }
+
+    .meta-grid span {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 2px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .summary,
+    .candidate-content,
+    .meta-grid,
+    .meta-grid div,
+    details.raw-json {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    details.raw-json summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--accent-strong);
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      pre {
+        min-height: 280px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a href="/api/v1/ui">Back to console</a>
+      <a href="/api/v1/ui/config">Tune retrieval config</a>
+    </div>
+
+    <section class="hero">
+      <div class="endpoint">POST /api/v1/similarity</div>
+      <h1>Similarity showcase</h1>
+      <p>
+        Try the retrieval API with a query payload and inspect the combined vector and graph-style
+        candidates returned by the service.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <div class="fields">
+          <div>
+            <label for="query-text">Query text</label>
+            <textarea id="query-text" spellcheck="false">Wireless Earbuds</textarea>
+          </div>
+          <div>
+            <label for="mode">Mode</label>
+            <select id="mode">
+              <option value="ALL">ALL</option>
+              <option value="VECTOR">VECTOR</option>
+              <option value="GRAPH">GRAPH</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="run-similarity" type="button">Run similarity</button>
+          <button id="reset-similarity" class="secondary" type="button">Reset sample</button>
+        </div>
+        <div id="status" class="status"></div>
+        <div id="timer" class="timer">Elapsed: 0.0s</div>
+        <p class="hint">
+          This page targets `/api/v1/similarity` directly and shows the raw JSON response so it is
+          easy to compare with automated tests or Swagger output.
+        </p>
+      </article>
+
+      <article class="panel">
+        <label for="response">Response</label>
+        <div class="response-stack">
+          <div id="response-summary" class="summary">Run similarity to see the strongest retrieval candidates in a readable view.</div>
+          <div id="response-candidates" class="candidate-list"></div>
+          <details class="raw-json">
+            <summary>Raw JSON response</summary>
+            <pre id="response">Click "Run similarity" to load results.</pre>
+          </details>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const defaultQueryText = "Wireless Earbuds";
+    const defaultMode = "ALL";
+
+    const queryTextInput = document.getElementById("query-text");
+    const modeInput = document.getElementById("mode");
+    const responseNode = document.getElementById("response");
+    const responseSummaryNode = document.getElementById("response-summary");
+    const responseCandidatesNode = document.getElementById("response-candidates");
+    const statusNode = document.getElementById("status");
+    const timerNode = document.getElementById("timer");
+    let timerIntervalId = null;
+    let timerStartedAt = 0;
+
+    function setStatus(message, isError = false) {
+      statusNode.textContent = message;
+      statusNode.className = isError ? "status error" : "status";
+    }
+
+    function renderElapsed(milliseconds) {
+      timerNode.textContent = `Elapsed: ${(milliseconds / 1000).toFixed(1)}s`;
+    }
+
+    function resetElapsed() {
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      timerStartedAt = 0;
+      renderElapsed(0);
+    }
+
+    function startElapsed() {
+      resetElapsed();
+      timerStartedAt = performance.now();
+      renderElapsed(0);
+      timerIntervalId = window.setInterval(() => {
+        renderElapsed(performance.now() - timerStartedAt);
+      }, 100);
+    }
+
+    function stopElapsed() {
+      if (!timerStartedAt) {
+        return 0;
+      }
+      const elapsed = performance.now() - timerStartedAt;
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      renderElapsed(elapsed);
+      timerStartedAt = 0;
+      return elapsed;
+    }
+
+    function similarityPayload() {
+      return {
+        query_text: queryTextInput.value.trim(),
+        mode: modeInput.value
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function renderSimilaritySummary(data) {
+      if (!data || !Array.isArray(data.candidates)) {
+        responseSummaryNode.innerHTML = "<strong>Response received.</strong> The payload could not be summarized, so the raw JSON is shown below.";
+        responseCandidatesNode.innerHTML = "";
+        return;
+      }
+      const candidateCount = data.candidates.length;
+      responseSummaryNode.innerHTML = candidateCount
+        ? `<strong>${candidateCount} candidate${candidateCount === 1 ? "" : "s"}</strong> returned in <strong>${escapeHtml(data.mode || "-")}</strong> mode for tenant <strong>${escapeHtml(data.tenant_id || "-")}</strong>.`
+        : `<strong>No similarity candidates found.</strong> Try another query or switch the retrieval mode.`;
+      responseCandidatesNode.innerHTML = data.candidates.map((candidate, index) => `
+        <article class="candidate-card">
+          <div class="candidate-header">
+            <div class="candidate-title">${index + 1}. ${escapeHtml(candidate.document_id || "Unknown document")}</div>
+            <div class="candidate-score">Score ${escapeHtml(candidate.score ?? "-")}</div>
+          </div>
+          <p class="candidate-content">${escapeHtml(candidate.content || "-")}</p>
+          <div class="meta-grid">
+            <div><span>Chunk</span>${escapeHtml(candidate.chunk_id || "-")}</div>
+            <div><span>Route</span>${escapeHtml(candidate.route || "-")}</div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    async function runSimilarity() {
+      const payload = similarityPayload();
+      if (!payload.query_text) {
+        setStatus("Query text is required.", true);
+        responseNode.textContent = "Enter query text and try again.";
+        responseSummaryNode.textContent = "Enter query text before running similarity.";
+        responseCandidatesNode.innerHTML = "";
+        return;
+      }
+
+      setStatus("Running similarity...");
+      startElapsed();
+      responseNode.textContent = "Loading...";
+      responseSummaryNode.textContent = "Finding the most relevant similarity candidates...";
+      responseCandidatesNode.innerHTML = "";
+
+      try {
+        const response = await fetch("/api/v1/similarity", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { raw: text };
+        }
+
+        responseNode.textContent = JSON.stringify(data, null, 2);
+        renderSimilaritySummary(data);
+        const elapsed = stopElapsed();
+        if (!response.ok) {
+          setStatus(`Similarity failed with status ${response.status} after ${(elapsed / 1000).toFixed(1)}s.`, true);
+          return;
+        }
+        setStatus(`Similarity completed with status ${response.status} in ${(elapsed / 1000).toFixed(1)}s.`);
+      } catch (error) {
+        const elapsed = stopElapsed();
+        setStatus(`Request failed: ${error.message}`, true);
+        timerNode.textContent = `Elapsed: ${(elapsed / 1000).toFixed(1)}s`;
+        responseNode.textContent = "The browser could not reach /api/v1/similarity.";
+        responseSummaryNode.textContent = "The request could not be completed.";
+        responseCandidatesNode.innerHTML = "";
+      }
+    }
+
+    document.getElementById("run-similarity").addEventListener("click", runSimilarity);
+    document.getElementById("reset-similarity").addEventListener("click", () => {
+      queryTextInput.value = defaultQueryText;
+      modeInput.value = defaultMode;
+      responseNode.textContent = 'Click "Run similarity" to load results.';
+      responseSummaryNode.textContent = "Run similarity to see the strongest retrieval candidates in a readable view.";
+      responseCandidatesNode.innerHTML = "";
+      resetElapsed();
+      setStatus("");
+    });
+    resetElapsed();
+  </script>
+</body>
+</html>

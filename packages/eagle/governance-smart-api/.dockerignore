@@ -1,0 +1,15 @@
+# Keep the build context (and image) lean and secret-free.
+.env
+.env.*
+!env.example
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+.git/
+.gitignore
+local-files/
+tests/
+README.md

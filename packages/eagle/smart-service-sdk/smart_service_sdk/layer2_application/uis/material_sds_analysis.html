@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Material SDS Analysis Demo</title>
+  <style>
+    :root {
+      --panel: rgba(255, 255, 255, 0.88);
+      --ink: #1c2430;
+      --muted: #5d6878;
+      --accent: #0f766e;
+      --accent-strong: #0b4f49;
+      --accent-soft: rgba(15, 118, 110, 0.1);
+      --line: rgba(28, 36, 48, 0.12);
+      --error: #be123c;
+      --warn: #9a3412;
+      --shadow: 0 24px 42px rgba(20, 31, 45, 0.12);
+      --required: #166534;
+      --review: #9a3412;
+      --not-required: #1d4ed8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(29, 78, 216, 0.12), transparent 24%),
+        linear-gradient(180deg, #f8f4eb 0%, #eaf0f3 100%);
+    }
+
+    .page {
+      width: min(1240px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .topbar a {
+      color: var(--accent-strong);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 62ch;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 520px) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+      min-width: 0;
+    }
+
+    .endpoint {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .materials {
+      display: grid;
+      gap: 14px;
+    }
+
+    .material-card {
+      padding: 16px;
+      border: 1px solid rgba(28, 36, 48, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    .material-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .material-title {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .fields {
+      display: grid;
+      gap: 12px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"],
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(28, 36, 48, 0.16);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.94);
+      color: inherit;
+    }
+
+    textarea {
+      min-height: 94px;
+      resize: vertical;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-top: 4px;
+      color: var(--muted);
+      font-size: 0.94rem;
+      font-weight: 700;
+    }
+
+    .toggle input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #effcf9;
+    }
+
+    button.secondary {
+      background: rgba(15, 118, 110, 0.12);
+      color: var(--accent-strong);
+    }
+
+    button.row-delete {
+      padding: 10px 14px;
+      background: rgba(190, 18, 60, 0.12);
+      color: var(--error);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 16px;
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .status.warn {
+      color: var(--warn);
+    }
+
+    .timer {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-top: 10px;
+    }
+
+    .response-stack {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .summary {
+      padding: 16px 18px;
+      border: 1px solid rgba(28, 36, 48, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .result-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .result-card {
+      padding: 16px 18px;
+      border: 1px solid rgba(28, 36, 48, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.76);
+      min-width: 0;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .result-title {
+      font-weight: 700;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .decision {
+      font-weight: 700;
+      text-transform: capitalize;
+      white-space: nowrap;
+    }
+
+    .decision.required {
+      color: var(--required);
+    }
+
+    .decision.needs_review {
+      color: var(--review);
+    }
+
+    .decision.not_required {
+      color: var(--not-required);
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 14px;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+    }
+
+    .meta-grid span,
+    .detail-block strong {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent-strong);
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .detail-block ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--ink);
+    }
+
+    .detail-block li {
+      margin-bottom: 6px;
+      line-height: 1.45;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      min-height: 180px;
+      overflow: auto;
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      border-radius: 18px;
+      background: #10181d;
+      color: #daf7ea;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    details.raw-json summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--accent-strong);
+      margin-bottom: 10px;
+    }
+
+    .summary,
+    .hint,
+    .result-card,
+    .result-title,
+    .meta-grid,
+    .meta-grid div,
+    .detail-block,
+    details.raw-json {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    @media (max-width: 920px) {
+      .layout,
+      .field-grid,
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .result-header,
+      .material-header,
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      pre {
+        min-height: 260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a href="/api/v1/ui">Back to console</a>
+      <a href="/api/v1/ui/search">Open search demo</a>
+    </div>
+
+    <section class="hero">
+      <div class="endpoint">POST /api/v1/material-sds-analysis</div>
+      <h1>Material SDS analysis showcase</h1>
+      <p>
+        Build a batch of material records, optionally enable online search per item, and inspect
+        the SDS screening decisions returned by the same JSON API external clients call.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <div id="materials" class="materials"></div>
+        <div class="actions">
+          <button id="add-material" class="secondary" type="button">Add material</button>
+          <button id="run-analysis" class="primary" type="button">Run SDS analysis</button>
+          <button id="reset-materials" class="secondary" type="button">Reset sample</button>
+        </div>
+        <div id="status" class="status"></div>
+        <div id="timer" class="timer">Elapsed: 0.0s</div>
+        <p class="hint">
+          This page sends a live batch request to `/api/v1/material-sds-analysis` and keeps the
+          raw JSON visible for fast debugging when validation or transport errors happen.
+        </p>
+      </article>
+
+      <article class="panel">
+        <label for="response">Response</label>
+        <div class="response-stack">
+          <div id="response-summary" class="summary">Run SDS analysis to see a readable batch summary and raw JSON response.</div>
+          <div id="response-results" class="result-list"></div>
+          <details class="raw-json">
+            <summary>Raw JSON response</summary>
+            <pre id="response">Click "Run SDS analysis" to load results.</pre>
+          </details>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <template id="material-card-template">
+    <section class="material-card">
+      <div class="material-header">
+        <div class="material-title"></div>
+        <button class="row-delete" type="button">Remove</button>
+      </div>
+      <div class="fields">
+        <div class="field-grid">
+          <div>
+            <label>Material name</label>
+            <input data-field="material_name" type="text">
+          </div>
+          <div>
+            <label>Material type</label>
+            <input data-field="material_type" type="text">
+          </div>
+          <div>
+            <label>Material group</label>
+            <input data-field="material_group" type="text">
+          </div>
+          <div class="toggle">
+            <input data-field="enable_online_search" type="checkbox">
+            <span>Enable online search for this material</span>
+          </div>
+        </div>
+        <div>
+          <label>Material description</label>
+          <textarea data-field="material_description" spellcheck="false"></textarea>
+        </div>
+        <div>
+          <label>Free-text description</label>
+          <textarea data-field="free_text_description" spellcheck="false"></textarea>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <script>
+    const defaultMaterials = [
+      {
+        material_name: "Industrial Solvent",
+        material_type: "raw_material",
+        material_group: "cleaning_agents",
+        material_description: "Solvent based cleaning fluid used for degreasing metal parts.",
+        free_text_description: "Highly flammable liquid with strong fumes in workshop use.",
+        enable_online_search: false
+      },
+      {
+        material_name: "Office Chair",
+        material_type: "finished_good",
+        material_group: "office_furniture",
+        material_description: "Ergonomic office seating with mesh back and aluminum base.",
+        free_text_description: "Standard furniture item for office workstations.",
+        enable_online_search: false
+      }
+    ];
+
+    const materialsNode = document.getElementById("materials");
+    const templateNode = document.getElementById("material-card-template");
+    const responseNode = document.getElementById("response");
+    const responseSummaryNode = document.getElementById("response-summary");
+    const responseResultsNode = document.getElementById("response-results");
+    const statusNode = document.getElementById("status");
+    const timerNode = document.getElementById("timer");
+    let timerIntervalId = null;
+    let timerStartedAt = 0;
+
+    function setStatus(message, kind = "") {
+      statusNode.textContent = message;
+      statusNode.className = kind ? `status ${kind}` : "status";
+    }
+
+    function renderElapsed(milliseconds) {
+      timerNode.textContent = `Elapsed: ${(milliseconds / 1000).toFixed(1)}s`;
+    }
+
+    function resetElapsed() {
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      timerStartedAt = 0;
+      renderElapsed(0);
+    }
+
+    function startElapsed() {
+      resetElapsed();
+      timerStartedAt = performance.now();
+      renderElapsed(0);
+      timerIntervalId = window.setInterval(() => {
+        renderElapsed(performance.now() - timerStartedAt);
+      }, 100);
+    }
+
+    function stopElapsed() {
+      if (!timerStartedAt) {
+        return 0;
+      }
+      const elapsed = performance.now() - timerStartedAt;
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      renderElapsed(elapsed);
+      timerStartedAt = 0;
+      return elapsed;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function materialSummaryTitle(material, index) {
+      return material.material_name?.trim() || `Material ${index + 1}`;
+    }
+
+    function createMaterialCard(material = {}) {
+      const fragment = templateNode.content.cloneNode(true);
+      const card = fragment.querySelector(".material-card");
+      const title = fragment.querySelector(".material-title");
+      const removeButton = fragment.querySelector(".row-delete");
+      const materialNameInput = fragment.querySelector('[data-field="material_name"]');
+
+      for (const [field, value] of Object.entries(material)) {
+        const fieldNode = fragment.querySelector(`[data-field="${field}"]`);
+        if (!fieldNode) {
+          continue;
+        }
+        if (fieldNode.type === "checkbox") {
+          fieldNode.checked = Boolean(value);
+        } else {
+          fieldNode.value = value ?? "";
+        }
+      }
+
+      function refreshTitle() {
+        const cards = Array.from(materialsNode.querySelectorAll(".material-card"));
+        const index = cards.indexOf(card);
+        title.textContent = materialSummaryTitle(
+          { material_name: materialNameInput.value },
+          index >= 0 ? index : cards.length
+        );
+      }
+
+      materialNameInput.addEventListener("input", refreshTitle);
+      removeButton.addEventListener("click", () => {
+        card.remove();
+        syncMaterialTitles();
+        if (!materialsNode.children.length) {
+          setStatus("Add at least one material before running SDS analysis.", "warn");
+        }
+      });
+
+      materialsNode.appendChild(fragment);
+      syncMaterialTitles();
+    }
+
+    function syncMaterialTitles() {
+      Array.from(materialsNode.querySelectorAll(".material-card")).forEach((card, index) => {
+        const title = card.querySelector(".material-title");
+        const materialName = card.querySelector('[data-field="material_name"]').value;
+        title.textContent = materialSummaryTitle({ material_name: materialName }, index);
+      });
+    }
+
+    function loadMaterials(materials) {
+      materialsNode.innerHTML = "";
+      materials.forEach((material) => createMaterialCard(material));
+      responseResultsNode.innerHTML = "";
+      responseSummaryNode.textContent = "Run SDS analysis to see a readable batch summary and raw JSON response.";
+      responseNode.textContent = 'Click "Run SDS analysis" to load results.';
+      setStatus("");
+      resetElapsed();
+    }
+
+    function collectMaterials() {
+      return Array.from(materialsNode.querySelectorAll(".material-card")).map((card) => ({
+        material_name: card.querySelector('[data-field="material_name"]').value.trim(),
+        material_type: card.querySelector('[data-field="material_type"]').value.trim(),
+        material_group: card.querySelector('[data-field="material_group"]').value.trim(),
+        material_description: card.querySelector('[data-field="material_description"]').value.trim(),
+        free_text_description: card.querySelector('[data-field="free_text_description"]').value.trim(),
+        options: {
+          enable_online_search: card.querySelector('[data-field="enable_online_search"]').checked
+        }
+      }));
+    }
+
+    function formatDecision(decision) {
+      return String(decision || "unknown").replaceAll("_", " ");
+    }
+
+    function renderList(items, emptyText) {
+      if (!Array.isArray(items) || !items.length) {
+        return `<div>${escapeHtml(emptyText)}</div>`;
+      }
+      return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+    }
+
+    function renderPills(items, emptyText) {
+      if (!Array.isArray(items) || !items.length) {
+        return `<div>${escapeHtml(emptyText)}</div>`;
+      }
+      return `<div class="pill-list">${items.map((item) => `<span class="pill">${escapeHtml(item)}</span>`).join("")}</div>`;
+    }
+
+    function renderResponseSummary(data) {
+      const results = Array.isArray(data?.results) ? data.results : [];
+      if (!results.length) {
+        responseSummaryNode.textContent = "The response did not include any SDS analysis results.";
+        responseResultsNode.innerHTML = "";
+        return;
+      }
+
+      const requiredCount = results.filter((item) => item.decision === "required").length;
+      const reviewCount = results.filter((item) => item.decision === "needs_review").length;
+      const searchedCount = results.filter((item) => item.web_search_used).length;
+
+      responseSummaryNode.innerHTML =
+        `<strong>${results.length}</strong> materials analyzed. ` +
+        `<strong>${requiredCount}</strong> marked required, ` +
+        `<strong>${reviewCount}</strong> marked needs review, and ` +
+        `<strong>${searchedCount}</strong> used online search.`;
+
+      responseResultsNode.innerHTML = results.map((item) => {
+        const decisionClass = escapeHtml(item.decision || "unknown");
+        return `
+          <article class="result-card">
+            <div class="result-header">
+              <div class="result-title">Material index ${escapeHtml(item.material_index)}</div>
+              <div class="decision ${decisionClass}">${escapeHtml(formatDecision(item.decision))}</div>
+            </div>
+            <div class="meta-grid">
+              <div>
+                <span>SDS Required</span>
+                ${item.is_sds_required ? "Yes" : "No"}
+              </div>
+              <div>
+                <span>Confidence</span>
+                ${escapeHtml(Number(item.confidence ?? 0).toFixed(2))}
+              </div>
+              <div>
+                <span>Web Search</span>
+                ${escapeHtml(item.web_search_status || "unknown")}
+              </div>
+              <div>
+                <span>Used Search</span>
+                ${item.web_search_used ? "Yes" : "No"}
+              </div>
+            </div>
+            <div class="detail-grid">
+              <div class="detail-block">
+                <strong>Hazardous Categories</strong>
+                ${renderPills(item.hazardous_categories, "No hazardous categories returned.")}
+              </div>
+              <div class="detail-block">
+                <strong>Reasons</strong>
+                ${renderList(item.reasons, "No reasons returned.")}
+              </div>
+              <div class="detail-block">
+                <strong>Evidence</strong>
+                ${renderList(item.evidence, "No evidence returned.")}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    async function runAnalysis() {
+      const materials = collectMaterials();
+      if (!materials.length) {
+        setStatus("Add at least one material before running SDS analysis.", "warn");
+        responseSummaryNode.textContent = "The request was not sent because the batch is empty.";
+        responseResultsNode.innerHTML = "";
+        responseNode.textContent = JSON.stringify({ materials: [] }, null, 2);
+        return;
+      }
+
+      const payload = { materials };
+      setStatus("Running SDS analysis...");
+      responseNode.textContent = JSON.stringify(payload, null, 2);
+      startElapsed();
+
+      try {
+        const response = await fetch("/api/v1/material-sds-analysis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+        responseNode.textContent = JSON.stringify(data, null, 2);
+        stopElapsed();
+
+        if (!response.ok) {
+          responseSummaryNode.textContent = "The backend rejected the SDS analysis request. Review the raw JSON for validation details.";
+          responseResultsNode.innerHTML = "";
+          setStatus(`Request failed with status ${response.status}.`, "error");
+          return;
+        }
+
+        renderResponseSummary(data);
+        setStatus("SDS analysis completed.");
+      } catch (error) {
+        stopElapsed();
+        responseSummaryNode.textContent = "The request could not reach the backend. The last attempted payload is shown in raw JSON.";
+        responseResultsNode.innerHTML = "";
+        setStatus(`Request failed: ${error.message}`, "error");
+      }
+    }
+
+    document.getElementById("add-material").addEventListener("click", () => {
+      createMaterialCard();
+      setStatus("");
+    });
+
+    document.getElementById("run-analysis").addEventListener("click", runAnalysis);
+    document.getElementById("reset-materials").addEventListener("click", () => {
+      loadMaterials(defaultMaterials);
+    });
+
+    loadMaterials(defaultMaterials);
+  </script>
+</body>
+</html>

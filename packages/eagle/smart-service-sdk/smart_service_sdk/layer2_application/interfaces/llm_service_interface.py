@@ -1,0 +1,6 @@
+from typing import Protocol
+
+
+class ILlmServiceClient(Protocol):
+    async def expand_terms(self, text: str) -> list[str]: ...
+    async def generate_text(self, prompt: str) -> str: ...

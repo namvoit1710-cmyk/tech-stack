@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-service-sdk"
+version = "0.1.0"
+description = "FastAPI backend for duplicate detection, search, and similarity workflows."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.116.1",
+    "uvicorn[standard]==0.35.0",
+    "pydantic==2.11.7",
+    "pydantic-settings==2.10.1",
+    "pytest==8.4.1",
+    "httpx==0.28.1",
+    "openai==2.44.0",
+    "hdbcli==2.26.18",
+    "sentence-transformers==5.1.1",
+    "spacy==3.8.14",
+    "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "bm25s==0.3.4",
+    "pdfplumber==0.11.7",
+    "openpyxl==3.1.5",
+    "python-multipart==0.0.30",
+]
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["smart_service_sdk*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+smart_service_sdk = [
+    "layer2_application/uis/*.html",
+    "deployment/sql/*.sql",
+    "deployment/seed/*.sql",
+]

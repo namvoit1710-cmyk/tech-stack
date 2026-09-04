@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Governance Import Jobs Console</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5d6675;
+      --panel: rgba(255, 255, 255, 0.9);
+      --line: rgba(23, 33, 43, 0.12);
+      --accent: #0f766e;
+      --accent-strong: #0b4f49;
+      --accent-soft: rgba(15, 118, 110, 0.08);
+      --warn: #9a3412;
+      --error: #be123c;
+      --shadow: 0 24px 46px rgba(23, 33, 43, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(154, 52, 18, 0.16), transparent 24%),
+        linear-gradient(180deg, #f8f3eb 0%, #edf0f4 100%);
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.5rem);
+    }
+
+    .hero p, .panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+      min-width: 0;
+    }
+
+    .field-label {
+      display: block;
+      margin-top: 18px;
+      font-weight: 700;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid rgba(23, 33, 43, 0.16);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.94);
+      color: inherit;
+      margin-top: 8px;
+    }
+
+    .list-shell {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(15, 118, 110, 0.16);
+    }
+
+    .list-shell h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+    }
+
+    .list-shell p {
+      color: var(--muted);
+    }
+
+    .file-id-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .file-id-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #effcf9;
+    }
+
+    .secondary {
+      background: rgba(23, 33, 43, 0.08);
+      color: var(--ink);
+    }
+
+    .ghost {
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--accent-strong);
+      border: 1px solid rgba(15, 118, 110, 0.18);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 16px;
+      font-weight: 700;
+    }
+
+    .status.warn {
+      color: var(--warn);
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .summary {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(23, 33, 43, 0.05);
+      font-size: 0.95rem;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .stack section {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.66);
+      min-width: 0;
+    }
+
+    .stack h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    pre {
+      margin: 0;
+      padding: 16px;
+      min-height: 150px;
+      overflow: auto;
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      border-radius: 16px;
+      background: #131922;
+      color: #edf3ff;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .stack h2,
+    .stack p {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .file-id-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Governance import jobs console</h1>
+      <p>
+        Build a manual list of governance upload file IDs, submit them to the import job API,
+        and inspect the accepted import request without leaving the page.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <label class="field-label" for="tenant-id">Tenant ID</label>
+        <input id="tenant-id" type="text" placeholder="default-tenant">
+
+        <section class="list-shell" aria-labelledby="file-id-list-title">
+          <h2 id="file-id-list-title">File ID list</h2>
+          <p>Add one or more upload result IDs to include in the next import job.</p>
+          <div id="file-id-list" class="file-id-list"></div>
+          <div class="actions">
+            <button id="add-file-id" class="ghost" type="button">Add file ID</button>
+          </div>
+        </section>
+
+        <div id="selection-summary" class="summary">No file IDs ready.</div>
+
+        <div class="actions">
+          <button id="start-import" class="primary" type="button">Submit import job</button>
+          <button id="reset" class="secondary" type="button">Reset</button>
+        </div>
+
+        <div id="status" class="status">Idle.</div>
+      </article>
+
+      <article class="panel">
+        <div class="stack">
+          <section>
+            <h2>Request payload</h2>
+            <pre id="request-preview">Waiting for file IDs.</pre>
+          </section>
+          <section>
+            <h2>Import response</h2>
+            <pre id="import-response">Waiting for import submission.</pre>
+          </section>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <template id="file-id-row-template">
+    <div class="file-id-row">
+      <input type="text" data-role="file-id" placeholder="gov-upload-...">
+      <button class="secondary" type="button" data-role="remove-file-id">Remove</button>
+    </div>
+  </template>
+
+  <script>
+    const fileIdList = document.getElementById("file-id-list");
+    const addFileIdButton = document.getElementById("add-file-id");
+    const tenantInput = document.getElementById("tenant-id");
+    const startButton = document.getElementById("start-import");
+    const resetButton = document.getElementById("reset");
+    const statusNode = document.getElementById("status");
+    const selectionSummary = document.getElementById("selection-summary");
+    const requestPreview = document.getElementById("request-preview");
+    const importResponse = document.getElementById("import-response");
+    const rowTemplate = document.getElementById("file-id-row-template");
+    const defaultFileIds = [
+      "019e33a5-2309-7de4-ab41-f17351df3a47_3ef5c78f-07b8-4ebc-a0a1-7c75510a62df-table_data.csv",
+      "019e209a-883f-71b8-9e72-928c9abcc193_3ef5c78f-07b8-4ebc-a0a1-7c75510a62df-table_data.csv",
+      "019e1ba3-97d0-7dfe-bf6e-ed7a7069c8bf_3ef5c78f-07b8-4ebc-a0a1-7c75510a62df-table_data.csv"
+    ];
+
+    function setStatus(message, tone = "") {
+      statusNode.textContent = message;
+      statusNode.className = tone ? `status ${tone}` : "status";
+    }
+
+    function renderJson(node, payload) {
+      node.textContent = JSON.stringify(payload, null, 2);
+    }
+
+    function collectFileIds() {
+      return Array.from(fileIdList.querySelectorAll('[data-role="file-id"]'))
+        .map((input) => input.value.trim())
+        .filter((value) => value.length > 0);
+    }
+
+    function syncPreview() {
+      const fileIds = collectFileIds();
+      const payload = { file_ids: fileIds };
+      const tenantId = tenantInput.value.trim();
+      if (tenantId) {
+        payload.tenant_id = tenantId;
+      }
+      renderJson(requestPreview, payload);
+      selectionSummary.textContent = fileIds.length
+        ? `${fileIds.length} file ID${fileIds.length === 1 ? "" : "s"} ready for import.`
+        : "No file IDs ready.";
+    }
+
+    function addFileIdRow(initialValue = "") {
+      const fragment = rowTemplate.content.cloneNode(true);
+      const row = fragment.querySelector(".file-id-row");
+      const input = fragment.querySelector('[data-role="file-id"]');
+      const removeButton = fragment.querySelector('[data-role="remove-file-id"]');
+
+      input.value = initialValue;
+      input.addEventListener("input", syncPreview);
+      removeButton.addEventListener("click", () => {
+        row.remove();
+        if (!fileIdList.children.length) {
+          addFileIdRow();
+        }
+        syncPreview();
+      });
+
+      fileIdList.appendChild(fragment);
+      syncPreview();
+      return input;
+    }
+
+    async function callJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+      return { response, data };
+    }
+
+    async function submitImport() {
+      const fileIds = collectFileIds();
+      if (!fileIds.length) {
+        setStatus("Add at least one non-empty file ID before submitting.", "error");
+        return;
+      }
+
+      const payload = { file_ids: fileIds };
+      const tenantId = tenantInput.value.trim();
+      if (tenantId) {
+        payload.tenant_id = tenantId;
+      }
+
+      renderJson(requestPreview, payload);
+      importResponse.textContent = "Submitting import job...";
+      setStatus("Submitting import job...", "warn");
+
+      try {
+        const result = await callJson("/api/v1/governance/import-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        renderJson(importResponse, result.data);
+        if (!result.response.ok) {
+          setStatus(`Import failed with ${result.response.status}.`, "error");
+          return;
+        }
+        setStatus(`Import job ${result.data.job_id} accepted for ${result.data.file_ids.length} file IDs.`);
+      } catch (error) {
+        setStatus(`Request failed: ${error.message}`, "error");
+      }
+    }
+
+    function resetAll() {
+      fileIdList.replaceChildren();
+      defaultFileIds.forEach((fileId) => addFileIdRow(fileId));
+      tenantInput.value = "";
+      requestPreview.textContent = "Waiting for file IDs.";
+      importResponse.textContent = "Waiting for import submission.";
+      syncPreview();
+      setStatus("Idle.");
+    }
+
+    addFileIdButton.addEventListener("click", () => {
+      const input = addFileIdRow();
+      input.focus();
+    });
+    tenantInput.addEventListener("input", syncPreview);
+    startButton.addEventListener("click", submitImport);
+    resetButton.addEventListener("click", resetAll);
+
+    defaultFileIds.forEach((fileId) => addFileIdRow(fileId));
+    requestPreview.textContent = "Waiting for file IDs.";
+  </script>
+</body>
+</html>

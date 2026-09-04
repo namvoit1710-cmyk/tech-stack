@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Search Demo</title>
+  <style>
+    :root {
+      --panel: rgba(255, 255, 255, 0.84);
+      --ink: #1f2830;
+      --muted: #5f6870;
+      --accent: #0f766e;
+      --accent-strong: #0b4f49;
+      --line: rgba(31, 40, 48, 0.12);
+      --error: #9f1239;
+      --shadow: 0 24px 40px rgba(18, 38, 44, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(15, 118, 110, 0.18), transparent 25%),
+        radial-gradient(circle at bottom left, rgba(202, 138, 4, 0.16), transparent 20%),
+        linear-gradient(180deg, #f8f4eb 0%, #e9ede8 100%);
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .topbar a {
+      color: var(--accent-strong);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 58ch;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+      min-width: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid rgba(31, 40, 48, 0.16);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.92);
+      color: inherit;
+    }
+
+    .table-shell {
+      overflow: auto;
+      border: 1px solid rgba(31, 40, 48, 0.12);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 560px;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(31, 40, 48, 0.1);
+      vertical-align: top;
+    }
+
+    th {
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td input,
+    td select {
+      padding: 11px 12px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--accent);
+      color: #effcf9;
+    }
+
+    button.secondary {
+      background: rgba(15, 118, 110, 0.12);
+      color: var(--accent-strong);
+    }
+
+    button.row-delete {
+      padding: 10px 14px;
+      background: rgba(159, 18, 57, 0.12);
+      color: var(--error);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .endpoint {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent-strong);
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 16px;
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .timer {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      min-height: 180px;
+      overflow: auto;
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      border-radius: 18px;
+      background: #10181d;
+      color: #daf7ea;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-top: 10px;
+    }
+
+    .response-stack {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .summary {
+      padding: 16px 18px;
+      border: 1px solid rgba(31, 40, 48, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.74);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .summary strong {
+      color: var(--ink);
+    }
+
+    .candidate-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .candidate-card {
+      padding: 16px 18px;
+      border: 1px solid rgba(31, 40, 48, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      min-width: 0;
+    }
+
+    .candidate-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .candidate-title {
+      font-weight: 700;
+      color: var(--ink);
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .candidate-score {
+      font-weight: 700;
+      color: var(--accent-strong);
+      white-space: nowrap;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 14px;
+      font-size: 0.9rem;
+    }
+
+    .meta-grid span {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 2px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .summary,
+    .hint,
+    .meta-grid,
+    .meta-grid div,
+    details.raw-json {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    details.raw-json summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--accent-strong);
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      pre {
+        min-height: 280px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a href="/api/v1/ui">Back to console</a>
+      <a href="/api/v1/ui/config">Open config page</a>
+    </div>
+
+    <section class="hero">
+      <div class="endpoint">POST /api/v1/search</div>
+      <h1>Search showcase</h1>
+      <p>
+        Build exact and fuzzy field rules, send them to the backend, and inspect the matched row
+        chunks exactly as the JSON API returns them.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <label for="search-rows">Search rows</label>
+        <div class="table-shell">
+          <table id="search-rows">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Value</th>
+                <th>Rule</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="search-rows-body"></tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button id="add-row" class="secondary" type="button">Add row</button>
+          <button id="run-search" type="button">Run search</button>
+          <button id="reset-search" class="secondary" type="button">Reset sample</button>
+        </div>
+        <div id="status" class="status"></div>
+        <div id="timer" class="timer">Elapsed: 0.0s</div>
+        <p class="hint">
+          This page calls the live `/api/v1/search` route with `fetch`, so it uses the same
+          transport contract as Swagger or any external client.
+        </p>
+      </article>
+
+      <article class="panel">
+        <label for="response">Response</label>
+        <div class="response-stack">
+          <div id="response-summary" class="summary">Run a search to see a readable summary of the best matches.</div>
+          <div id="response-candidates" class="candidate-list"></div>
+          <details class="raw-json">
+            <summary>Raw JSON response</summary>
+            <pre id="response">Click "Run search" to load results.</pre>
+          </details>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const defaultRows = [
+      { key: "Material Name", value: "Finished Product: Wireless Earbuds", rule: "exact" },
+      { key: "Material Description", value: "Wireless Earbuds", rule: "fuzzy" }
+    ];
+
+    const rowsBody = document.getElementById("search-rows-body");
+    const responseNode = document.getElementById("response");
+    const responseSummaryNode = document.getElementById("response-summary");
+    const responseCandidatesNode = document.getElementById("response-candidates");
+    const statusNode = document.getElementById("status");
+    const timerNode = document.getElementById("timer");
+    let timerIntervalId = null;
+    let timerStartedAt = 0;
+
+    function setStatus(message, isError = false) {
+      statusNode.textContent = message;
+      statusNode.className = isError ? "status error" : "status";
+    }
+
+    function renderElapsed(milliseconds) {
+      timerNode.textContent = `Elapsed: ${(milliseconds / 1000).toFixed(1)}s`;
+    }
+
+    function resetElapsed() {
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      timerStartedAt = 0;
+      renderElapsed(0);
+    }
+
+    function startElapsed() {
+      resetElapsed();
+      timerStartedAt = performance.now();
+      renderElapsed(0);
+      timerIntervalId = window.setInterval(() => {
+        renderElapsed(performance.now() - timerStartedAt);
+      }, 100);
+    }
+
+    function stopElapsed() {
+      if (!timerStartedAt) {
+        return 0;
+      }
+      const elapsed = performance.now() - timerStartedAt;
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      renderElapsed(elapsed);
+      timerStartedAt = 0;
+      return elapsed;
+    }
+
+    function renderRows(rows) {
+      rowsBody.innerHTML = rows.map((row) => `
+        <tr>
+          <td><input type="text" class="field-input" value="${escapeHtml(row.key)}" placeholder="Material Name"></td>
+          <td><input type="text" class="value-input" value="${escapeHtml(row.value)}" placeholder="Finished Product: Wireless Earbuds"></td>
+          <td>
+            <select class="rule-input">
+              <option value="exact"${row.rule === "exact" ? " selected" : ""}>exact</option>
+              <option value="fuzzy"${row.rule === "fuzzy" ? " selected" : ""}>fuzzy</option>
+            </select>
+          </td>
+          <td><button type="button" class="row-delete">Delete</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function addRow(row = { key: "", value: "", rule: "exact" }) {
+      const nextRows = currentRows();
+      nextRows.push(row);
+      renderRows(nextRows);
+    }
+
+    function currentRows() {
+      return Array.from(rowsBody.querySelectorAll("tr")).map((row) => ({
+        key: row.querySelector(".field-input").value,
+        value: row.querySelector(".value-input").value,
+        rule: row.querySelector(".rule-input").value
+      }));
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function searchPayload() {
+      const payload = [];
+      const rows = rowsBody.querySelectorAll("tr");
+      rows.forEach((row) => {
+        const key = row.querySelector(".field-input").value.trim();
+        const value = row.querySelector(".value-input").value.trim();
+        const rule = row.querySelector(".rule-input").value;
+        if (!key || !value) {
+          return;
+        }
+        payload.push({
+          key,
+          value,
+          rule
+        });
+      });
+      return payload;
+    }
+
+    function renderSearchSummary(data) {
+      if (!data || !Array.isArray(data.candidates)) {
+        responseSummaryNode.innerHTML = "<strong>Response received.</strong> The payload could not be summarized, so the raw JSON is shown below.";
+        responseCandidatesNode.innerHTML = "";
+        return;
+      }
+      const candidateCount = data.candidates.length;
+      responseSummaryNode.innerHTML = candidateCount
+        ? `<strong>${candidateCount} candidate${candidateCount === 1 ? "" : "s"}</strong> matched for tenant <strong>${escapeHtml(data.tenant_id || "-")}</strong>. The strongest field-rule match is shown first below.`
+        : `<strong>No candidates found.</strong> Try different keys, values, or relax one of the fuzzy rules.`;
+      responseCandidatesNode.innerHTML = data.candidates.map((candidate, index) => {
+        const exactMatches = Array.isArray(candidate.exact_matches) ? candidate.exact_matches.join(", ") || "-" : "-";
+        const fuzzyMatches = candidate.fuzzy_matches && typeof candidate.fuzzy_matches === "object"
+          ? Object.entries(candidate.fuzzy_matches).map(([field, score]) => `${field}: ${score}`).join(", ") || "-"
+          : "-";
+        return `
+          <article class="candidate-card">
+            <div class="candidate-header">
+              <div class="candidate-title">${index + 1}. ${escapeHtml(candidate.document_id || "Unknown document")} / ${escapeHtml(candidate.chunk_id || "Unknown chunk")}</div>
+              <div class="candidate-score">Score ${escapeHtml(candidate.score ?? "-")}</div>
+            </div>
+            <div class="meta-grid">
+              <div><span>Document</span>${escapeHtml(candidate.document_id || "-")}</div>
+              <div><span>Chunk</span>${escapeHtml(candidate.chunk_id || "-")}</div>
+              <div><span>Exact Matches</span>${escapeHtml(exactMatches)}</div>
+              <div><span>Fuzzy Matches</span>${escapeHtml(fuzzyMatches)}</div>
+            </div>
+            <p class="hint">${escapeHtml(candidate.content || "-")}</p>
+          </article>
+        `;
+      }).join("");
+    }
+
+    async function runSearch() {
+      const payload = searchPayload();
+      if (!payload.length) {
+        setStatus("Add at least one row with key and value before running search.", true);
+        responseNode.textContent = "Fill in the table and try again.";
+        responseSummaryNode.textContent = "Add at least one row before running search.";
+        responseCandidatesNode.innerHTML = "";
+        return;
+      }
+
+      setStatus("Running search...");
+      startElapsed();
+      responseNode.textContent = "Loading...";
+      responseSummaryNode.textContent = "Searching for the best exact and fuzzy field matches...";
+      responseCandidatesNode.innerHTML = "";
+
+      try {
+        const response = await fetch("/api/v1/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { raw: text };
+        }
+
+        responseNode.textContent = JSON.stringify(data, null, 2);
+        renderSearchSummary(data);
+        const elapsed = stopElapsed();
+        if (!response.ok) {
+          setStatus(`Search failed with status ${response.status} after ${(elapsed / 1000).toFixed(1)}s.`, true);
+          return;
+        }
+        setStatus(`Search completed with status ${response.status} in ${(elapsed / 1000).toFixed(1)}s.`);
+      } catch (error) {
+        const elapsed = stopElapsed();
+        setStatus(`Request failed: ${error.message}`, true);
+        timerNode.textContent = `Elapsed: ${(elapsed / 1000).toFixed(1)}s`;
+        responseNode.textContent = "The browser could not reach /api/v1/search.";
+        responseSummaryNode.textContent = "The request could not be completed.";
+        responseCandidatesNode.innerHTML = "";
+      }
+    }
+
+    document.getElementById("run-search").addEventListener("click", runSearch);
+    document.getElementById("add-row").addEventListener("click", () => {
+      addRow();
+      setStatus("");
+    });
+    document.getElementById("reset-search").addEventListener("click", () => {
+      renderRows(defaultRows);
+      responseNode.textContent = 'Click "Run search" to load results.';
+      responseSummaryNode.textContent = "Run a search to see a readable summary of the best exact and fuzzy matches.";
+      responseCandidatesNode.innerHTML = "";
+      resetElapsed();
+      setStatus("");
+    });
+    rowsBody.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || !target.classList.contains("row-delete")) {
+        return;
+      }
+      const row = target.closest("tr");
+      if (!row) {
+        return;
+      }
+      row.remove();
+      if (!rowsBody.children.length) {
+        addRow();
+      }
+      setStatus("");
+    });
+
+    renderRows(defaultRows);
+    resetElapsed();
+  </script>
+</body>
+</html>

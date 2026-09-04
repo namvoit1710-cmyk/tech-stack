@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Runtime Config Demo</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5b6675;
+      --panel: rgba(255, 255, 255, 0.87);
+      --line: rgba(23, 33, 43, 0.12);
+      --shadow: 0 26px 44px rgba(23, 33, 43, 0.12);
+      --search: #0f766e;
+      --similarity: #9a3412;
+      --error: #be123c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(154, 52, 18, 0.16), transparent 24%),
+        linear-gradient(180deg, #f8f3eb 0%, #edf0f4 100%);
+    }
+
+    .page {
+      width: min(1220px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .topbar a {
+      text-decoration: none;
+      font-weight: 700;
+      color: #233044;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 60ch;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+    }
+
+    .endpoint {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .search {
+      background: rgba(15, 118, 110, 0.1);
+      color: #0b4f49;
+    }
+
+    .similarity {
+      background: rgba(154, 52, 18, 0.1);
+      color: #7c2d12;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 1.4rem;
+    }
+
+    .panel p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .fields {
+      display: grid;
+      gap: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid rgba(23, 33, 43, 0.16);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.94);
+      color: inherit;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: white;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    button.search {
+      background: var(--search);
+    }
+
+    button.similarity {
+      background: var(--similarity);
+    }
+
+    button.ghost {
+      color: inherit;
+      background: rgba(23, 33, 43, 0.08);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 24px;
+      margin-top: 14px;
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 2px solid rgba(23, 33, 43, 0.16);
+      border-top-color: currentColor;
+      animation: spin 0.8s linear infinite;
+      display: none;
+      flex: 0 0 auto;
+    }
+
+    .spinner.visible {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    pre {
+      margin: 16px 0 0;
+      padding: 16px;
+      min-height: 180px;
+      overflow: auto;
+      border-radius: 18px;
+      background: #131922;
+      color: #edf3ff;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a href="/api/v1/ui">Back to console</a>
+      <a href="/api/v1/ui/search">Open search demo</a>
+    </div>
+
+    <section class="hero">
+      <h1>Runtime configuration showcase</h1>
+      <p>
+        Load current retrieval settings from the backend, adjust values in-place, and push updates
+        back through the same `GET` and `PUT` APIs that external clients use.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <div class="endpoint search">GET /api/v1/search/config and PUT /api/v1/search/config</div>
+        <h2>Search config</h2>
+        <p>Controls fuzzy matching defaults, result caps, and term expansion behavior.</p>
+        <div class="fields">
+          <div>
+            <label for="search-fuzzy-threshold">Fuzzy threshold</label>
+            <input id="search-fuzzy-threshold" type="number" min="0" max="1" step="0.01">
+          </div>
+          <div>
+            <label for="search-max-results">Max results</label>
+            <input id="search-max-results" type="number" min="1" step="1">
+          </div>
+          <div>
+            <label for="search-expand-terms-enabled">Expand terms enabled</label>
+            <select id="search-expand-terms-enabled">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="search" id="load-search-config" type="button">Load search config</button>
+          <button class="search" id="save-search-config" type="button" disabled>Save search config</button>
+          <button class="ghost" id="reset-search-config" type="button">Clear fields</button>
+        </div>
+        <div id="search-status" class="status"><span id="search-spinner" class="spinner" aria-hidden="true"></span><span id="search-status-text"></span></div>
+        <pre id="search-response">Click "Load search config" to fetch current values.</pre>
+      </article>
+
+      <article class="panel">
+        <div class="endpoint similarity">GET /api/v1/similarity/config and PUT /api/v1/similarity/config</div>
+        <h2>Similarity config</h2>
+        <p>Controls vector cutoffs, graph candidate breadth, and final result size.</p>
+        <div class="fields">
+          <div>
+            <label for="vector-top-k">Vector top k</label>
+            <input id="vector-top-k" type="number" min="1" step="1">
+          </div>
+          <div>
+            <label for="vector-min-score">Vector min score</label>
+            <input id="vector-min-score" type="number" min="0" max="1" step="0.01">
+          </div>
+          <div>
+            <label for="graph-seed-top-k">Graph seed top k</label>
+            <input id="graph-seed-top-k" type="number" min="1" step="1">
+          </div>
+          <div>
+            <label for="graph-neighbor-cap-per-seed">Graph neighbor cap per seed</label>
+            <input id="graph-neighbor-cap-per-seed" type="number" min="1" step="1">
+          </div>
+          <div>
+            <label for="graph-max-relation-candidates">Graph max relation candidates</label>
+            <input id="graph-max-relation-candidates" type="number" min="1" step="1">
+          </div>
+          <div>
+            <label for="graph-max-graph-chunk-candidates">Graph max graph chunk candidates</label>
+            <input id="graph-max-graph-chunk-candidates" type="number" min="1" step="1">
+          </div>
+          <div>
+            <label for="similarity-max-results">Max results</label>
+            <input id="similarity-max-results" type="number" min="1" step="1">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="similarity" id="load-similarity-config" type="button">Load similarity config</button>
+          <button class="similarity" id="save-similarity-config" type="button" disabled>Save similarity config</button>
+          <button class="ghost" id="reset-similarity-config" type="button">Clear fields</button>
+        </div>
+        <div id="similarity-status" class="status"><span id="similarity-spinner" class="spinner" aria-hidden="true"></span><span id="similarity-status-text"></span></div>
+        <pre id="similarity-response">Click "Load similarity config" to fetch current values.</pre>
+      </article>
+      <article class="card">
+        <h2>Ingest field selection (SA-1451)</h2>
+        <div class="endpoint similarity">GET /api/v1/ingest-fields/config and PUT /api/v1/ingest-fields/config</div>
+        <p class="hint">Comma-separated source field (column) names. Leave a box empty to use every field (the default). Embedding fields feed the vector text; graph-entity fields feed the knowledge graph.</p>
+        <div class="grid">
+          <label>
+            <span>Embedding fields</span>
+            <input id="ingest-embedding-fields" type="text" placeholder="Material Name, Material Description">
+          </label>
+          <label>
+            <span>Graph-entity fields</span>
+            <input id="ingest-graph-entity-fields" type="text" placeholder="Manufacturer, Material Group">
+          </label>
+        </div>
+        <div class="actions">
+          <button class="similarity" id="load-ingest-fields-config" type="button">Load field config</button>
+          <button class="similarity" id="save-ingest-fields-config" type="button" disabled>Save field config</button>
+          <button class="ghost" id="reset-ingest-fields-config" type="button">Clear fields</button>
+        </div>
+        <div id="ingest-fields-status" class="status"><span id="ingest-fields-spinner" class="spinner" aria-hidden="true"></span><span id="ingest-fields-status-text"></span></div>
+        <pre id="ingest-fields-response">Click "Load field config" to fetch current values.</pre>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    function setDisabled(id, disabled) {
+      document.getElementById(id).disabled = disabled;
+    }
+
+    function setLoading(id, loading) {
+      document.getElementById(id).className = loading ? "spinner visible" : "spinner";
+    }
+
+    function setStatus(id, message, isError = false) {
+      const node = document.getElementById(id);
+      const textNode = document.getElementById(`${id}-text`);
+      textNode.textContent = message;
+      node.className = isError ? "status error" : "status";
+    }
+
+    function renderResponse(id, payload) {
+      document.getElementById(id).textContent = JSON.stringify(payload, null, 2);
+    }
+
+    async function callJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+      return { response, data };
+    }
+
+    function numberValue(id) {
+      return Number(document.getElementById(id).value);
+    }
+
+    function fillSearchForm(data) {
+      document.getElementById("search-fuzzy-threshold").value = data.fuzzy_threshold;
+      document.getElementById("search-max-results").value = data.max_results;
+      document.getElementById("search-expand-terms-enabled").value = String(data.expand_terms_enabled);
+    }
+
+    function searchPayload() {
+      return {
+        fuzzy_threshold: numberValue("search-fuzzy-threshold"),
+        max_results: numberValue("search-max-results"),
+        expand_terms_enabled: document.getElementById("search-expand-terms-enabled").value === "true"
+      };
+    }
+
+    function clearSearchForm() {
+      document.getElementById("search-fuzzy-threshold").value = "";
+      document.getElementById("search-max-results").value = "";
+      document.getElementById("search-expand-terms-enabled").value = "true";
+      document.getElementById("search-response").textContent = 'Search config will load automatically when the page opens.';
+      setStatus("search-status", "");
+      setDisabled("save-search-config", true);
+    }
+
+    function fillSimilarityForm(data) {
+      document.getElementById("vector-top-k").value = data.vector_top_k;
+      document.getElementById("vector-min-score").value = data.vector_min_score;
+      document.getElementById("graph-seed-top-k").value = data.graph_seed_top_k;
+      document.getElementById("graph-neighbor-cap-per-seed").value = data.graph_neighbor_cap_per_seed;
+      document.getElementById("graph-max-relation-candidates").value = data.graph_max_relation_candidates;
+      document.getElementById("graph-max-graph-chunk-candidates").value = data.graph_max_graph_chunk_candidates;
+      document.getElementById("similarity-max-results").value = data.max_results;
+    }
+
+    function similarityPayload() {
+      return {
+        vector_top_k: numberValue("vector-top-k"),
+        vector_min_score: numberValue("vector-min-score"),
+        graph_seed_top_k: numberValue("graph-seed-top-k"),
+        graph_neighbor_cap_per_seed: numberValue("graph-neighbor-cap-per-seed"),
+        graph_max_relation_candidates: numberValue("graph-max-relation-candidates"),
+        graph_max_graph_chunk_candidates: numberValue("graph-max-graph-chunk-candidates"),
+        max_results: numberValue("similarity-max-results")
+      };
+    }
+
+    function clearSimilarityForm() {
+      [
+        "vector-top-k",
+        "vector-min-score",
+        "graph-seed-top-k",
+        "graph-neighbor-cap-per-seed",
+        "graph-max-relation-candidates",
+        "graph-max-graph-chunk-candidates",
+        "similarity-max-results"
+      ].forEach((id) => {
+        document.getElementById(id).value = "";
+      });
+      document.getElementById("similarity-response").textContent = 'Similarity config will load automatically when the page opens.';
+      setStatus("similarity-status", "");
+      setDisabled("save-similarity-config", true);
+    }
+
+    async function loadSearchConfig() {
+      setStatus("search-status", "Loading search config...");
+      setLoading("search-spinner", true);
+      setDisabled("save-search-config", true);
+      try {
+        const { response, data } = await callJson("/api/v1/search/config");
+        renderResponse("search-response", data);
+        if (!response.ok) {
+          setStatus("search-status", `Load failed with status ${response.status}.`, true);
+          return;
+        }
+        fillSearchForm(data);
+        setDisabled("save-search-config", false);
+        setStatus("search-status", `Loaded search config with status ${response.status}.`);
+      } catch (error) {
+        setStatus("search-status", `Request failed: ${error.message}`, true);
+      } finally {
+        setLoading("search-spinner", false);
+      }
+    }
+
+    async function saveSearchConfig() {
+      if (document.getElementById("save-search-config").disabled) {
+        setStatus("search-status", "Load search config before saving changes.", true);
+        return;
+      }
+      setStatus("search-status", "Saving search config...");
+      try {
+        const payload = searchPayload();
+        const { response, data } = await callJson("/api/v1/search/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        renderResponse("search-response", data);
+        if (!response.ok) {
+          setStatus("search-status", `Save failed with status ${response.status}.`, true);
+          return;
+        }
+        fillSearchForm(data);
+        setStatus("search-status", `Saved search config with status ${response.status}.`);
+      } catch (error) {
+        setStatus("search-status", `Request failed: ${error.message}`, true);
+      }
+    }
+
+    async function loadSimilarityConfig() {
+      setStatus("similarity-status", "Loading similarity config...");
+      setLoading("similarity-spinner", true);
+      setDisabled("save-similarity-config", true);
+      try {
+        const { response, data } = await callJson("/api/v1/similarity/config");
+        renderResponse("similarity-response", data);
+        if (!response.ok) {
+          setStatus("similarity-status", `Load failed with status ${response.status}.`, true);
+          return;
+        }
+        fillSimilarityForm(data);
+        setDisabled("save-similarity-config", false);
+        setStatus("similarity-status", `Loaded similarity config with status ${response.status}.`);
+      } catch (error) {
+        setStatus("similarity-status", `Request failed: ${error.message}`, true);
+      } finally {
+        setLoading("similarity-spinner", false);
+      }
+    }
+
+    async function saveSimilarityConfig() {
+      if (document.getElementById("save-similarity-config").disabled) {
+        setStatus("similarity-status", "Load similarity config before saving changes.", true);
+        return;
+      }
+      setStatus("similarity-status", "Saving similarity config...");
+      try {
+        const payload = similarityPayload();
+        const { response, data } = await callJson("/api/v1/similarity/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        renderResponse("similarity-response", data);
+        if (!response.ok) {
+          setStatus("similarity-status", `Save failed with status ${response.status}.`, true);
+          return;
+        }
+        fillSimilarityForm(data);
+        setStatus("similarity-status", `Saved similarity config with status ${response.status}.`);
+      } catch (error) {
+        setStatus("similarity-status", `Request failed: ${error.message}`, true);
+      }
+    }
+
+    function parseFieldList(value) {
+      return String(value || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+    }
+
+    function fillIngestFieldsForm(data) {
+      document.getElementById("ingest-embedding-fields").value = (data.embedding_fields || []).join(", ");
+      document.getElementById("ingest-graph-entity-fields").value = (data.graph_entity_fields || []).join(", ");
+      setDisabled("save-ingest-fields-config", false);
+    }
+
+    function clearIngestFieldsForm() {
+      document.getElementById("ingest-embedding-fields").value = "";
+      document.getElementById("ingest-graph-entity-fields").value = "";
+      setDisabled("save-ingest-fields-config", true);
+    }
+
+    async function loadIngestFieldsConfig() {
+      setLoading("ingest-fields-spinner", true);
+      try {
+        const { response, data } = await callJson("/api/v1/ingest-fields/config");
+        renderResponse("ingest-fields-response", data);
+        if (!response.ok) {
+          setStatus("ingest-fields-status", `Load failed with status ${response.status}.`, true);
+          return;
+        }
+        fillIngestFieldsForm(data);
+        setStatus("ingest-fields-status", `Loaded field config with status ${response.status}.`);
+      } catch (error) {
+        setStatus("ingest-fields-status", `Request failed: ${error.message}`, true);
+      } finally {
+        setLoading("ingest-fields-spinner", false);
+      }
+    }
+
+    async function saveIngestFieldsConfig() {
+      setLoading("ingest-fields-spinner", true);
+      try {
+        const payload = {
+          embedding_fields: parseFieldList(document.getElementById("ingest-embedding-fields").value),
+          graph_entity_fields: parseFieldList(document.getElementById("ingest-graph-entity-fields").value)
+        };
+        const { response, data } = await callJson("/api/v1/ingest-fields/config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        renderResponse("ingest-fields-response", data);
+        if (!response.ok) {
+          setStatus("ingest-fields-status", `Save failed with status ${response.status}.`, true);
+          return;
+        }
+        fillIngestFieldsForm(data);
+        setStatus("ingest-fields-status", `Saved field config with status ${response.status}.`);
+      } catch (error) {
+        setStatus("ingest-fields-status", `Request failed: ${error.message}`, true);
+      } finally {
+        setLoading("ingest-fields-spinner", false);
+      }
+    }
+
+    document.getElementById("load-search-config").addEventListener("click", loadSearchConfig);
+    document.getElementById("save-search-config").addEventListener("click", saveSearchConfig);
+    document.getElementById("reset-search-config").addEventListener("click", clearSearchForm);
+    document.getElementById("load-similarity-config").addEventListener("click", loadSimilarityConfig);
+    document.getElementById("save-similarity-config").addEventListener("click", saveSimilarityConfig);
+    document.getElementById("reset-similarity-config").addEventListener("click", clearSimilarityForm);
+    document.getElementById("load-ingest-fields-config").addEventListener("click", loadIngestFieldsConfig);
+    document.getElementById("save-ingest-fields-config").addEventListener("click", saveIngestFieldsConfig);
+    document.getElementById("reset-ingest-fields-config").addEventListener("click", clearIngestFieldsForm);
+
+    clearSearchForm();
+    clearSimilarityForm();
+    clearIngestFieldsForm();
+    window.addEventListener("load", () => {
+      loadSearchConfig();
+      loadSimilarityConfig();
+      loadIngestFieldsConfig();
+    });
+  </script>
+</body>
+</html>

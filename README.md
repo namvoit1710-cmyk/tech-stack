@@ -15,18 +15,23 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **HANA RAG Service** | SAP HANA-First RAG, `REAL_VECTOR`, Structured SQL Pushdown, GraphRAG-lite, Hybrid RRF Rerank, Presidio PII Masking, Smart Tools | 📖 [Xem Tài Liệu](./docs/hana-rag-service/) |
 | **BI Dashboard & Analytics**| Data Vault 2.0 (Hubs/Links/Sats), OLAP Star Schema, SAP HANA Columnar Engine, React 19 Canvas (@dnd-kit), AI Chat-to-Chart | 📖 [Xem Tài Liệu](./docs/bi-dashboard/) |
 | **File Service** | Tiered Object Storage (SSD Hot Tier + S3/SeaweedFS Cold Tier), Zero-Downtime Versioning, CSV `row_id` Canonicalization, Presigned Multipart | 📖 [Xem Tài Liệu](./docs/file-service/) |
+| **AI Eagle Platform** | Hybrid Deduplication (Exact + Fuzzy + Vector + Graph), SAP HANA REAL_VECTOR(640), Material SDS Analysis, Governance Smart API | 📖 [Xem Tài Liệu](./docs/eagle/) |
 | **Worker SDK (Package)** | Thư viện phát triển Workflow Workers (Server, Pull, Headless modes, gRPC/REST, Streaming I/O) | 📦 [Xem Mã Nguồn](./packages/worker-sdk/) |
 | **Agent SDK (Package)** | Thư viện phát triển Autonomous AI Agents (LangGraph, SAP HANA Checkpointing, HITL, Context Compaction) | 📦 [Xem Mã Nguồn](./packages/agent-sdk/) |
+| **Eagle Platform Core (Package)** | Bộ đôi Smart Service SDK & Governance Smart API phát hiện trùng lặp dữ liệu và phân tích hóa chất SDS | 📦 [Xem Mã Nguồn](./packages/eagle/) |
 | *(Mở Rộng Trong Tương Lai)* | *Data Migration Platform, Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
 ---
 
-## 📦 Mã Nguồn Các Bộ SDK (Developer Packages)
+## 📦 Mã Nguồn Các Bộ SDK & Core Packages
 
-Toàn bộ mã nguồn phát triển chính thức của các SDK hiện đã được đưa vào thư mục [`packages/`](./packages/):
+Toàn bộ mã nguồn phát triển chính thức của các SDK và gói dịch vụ lõi hiện đã được đưa vào thư mục [`packages/`](./packages/):
 
 - 🛠️ **[`packages/worker-sdk/`](./packages/worker-sdk/):** Bộ công cụ phát triển Worker cho hệ thống quy trình AI Workflow. Hỗ trợ 3 chế độ chạy (`SERVER`, `PULL`, `HEADLESS`), đa giao thức `gRPC` (:50051) & `REST HTTP`, giải quyết tham chiếu tệp qua File Service, và tối ưu ngân sách kết quả `ResultBudget`.
 - 🤖 **[`packages/agent-sdk/`](./packages/agent-sdk/):** Bộ công cụ phát triển tác nhân AI tự trị trên nền tảng **LangGraph**. Cung cấp 4 bộ dựng đồ thị (`ToolAgentBuilder`, `GraphAgentBuilder`, `FlowAgentBuilder`, `SubGraphAgentBuilder`), lưu vết trạng thái phân tán trên **SAP HANA** (`HanaCheckpointSaver`), tương tác phê duyệt Human-In-The-Loop (`HITL`), và nén ngữ cảnh thông minh qua `ContextBudgetManager`.
+- 🦅 **[`packages/eagle/`](./packages/eagle/):** Trọn bộ mã nguồn lõi của nền tảng **AI Eagle Platform** bao gồm:
+  - `smart-service-sdk`: Động cơ so khớp trùng lặp lai (Exact, Fuzzy, `REAL_VECTOR(640)`, Graph Evidence), phân tích tài liệu hóa chất SDS, và tìm kiếm tương đồng.
+  - `governance-smart-api`: Cổng API hướng caller cho các tác vụ nạp chỉ mục trùng lặp ngầm (Background Jobs), nạp tệp CSV và giao diện UI Console trực quan.
 
 ---
 
@@ -119,10 +124,37 @@ Nền tảng lưu trữ đối tượng phân tầng và quản lý phiên bản
 
 ---
 
+## 🦅 Tiêu Điểm 6: AI Eagle Platform (Smart Deduplication & Material SDS Analysis)
+
+Nền tảng phát hiện dữ liệu trùng lặp thông minh (Deduplication) và phân tích tài liệu kỹ thuật hóa chất SDS kết hợp SAP HANA Vector Engine và Graph Workspace:
+
+### Cấu Trúc Module:
+- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/eagle/01-architecture/):**
+  - [Tổng Quan & Các Khái Niệm Cốt Lõi: Bài toán trùng lặp Master Data & Đường ống so khớp lai 4 tầng](./docs/eagle/01-architecture/01-overview-and-concepts.md)
+  - [Topology Hệ Thống & Cổng Giao Tiếp: governance-smart-api (:8080) & smart-service-sdk (:8088)](./docs/eagle/01-architecture/02-system-topology.md)
+  - [Kiến Trúc Phân Tầng Clean Architecture 4 Lớp & Cơ Chế Nhúng Hợp Nhất Tiến Trình](./docs/eagle/01-architecture/03-clean-architecture-and-composition.md)
+- 🔍 **[02. Động Cơ So Khớp Trùng Lặp Lai (Duplicate Detection Engine)](./docs/eagle/02-duplicate-detection-engine/):**
+  - [Đường Ống So Khớp Lai: Exact Match, Fuzzy Match (Jaro-Winkler/Levenshtein) & Tổng Hợp Điểm](./docs/eagle/02-duplicate-detection-engine/01-hybrid-matching-pipeline.md)
+  - [Tương Đồng Vector & Nhúng Ngôn Ngữ: SAP HANA REAL_VECTOR(640) & FastEmbed bge-small-en-v1.5](./docs/eagle/02-duplicate-detection-engine/02-vector-similarity-and-embeddings.md)
+  - [Bằng Chứng Đồ Thị & Vết Quyết Định Minh Bạch: Decision Trace JSON & Audit Trail](./docs/eagle/02-duplicate-detection-engine/03-graph-evidence-and-decision-trace.md)
+  - [Mở Rộng Từ Khóa Bằng LLM: LLM Term Expansion & Cơ Chế Ngắt Mạch Circuit Breaker](./docs/eagle/02-duplicate-detection-engine/04-llm-term-expansion.md)
+- 🕸️ **[03. Đồ Thị Tri Thức & Lưu Trữ SAP HANA (Knowledge Graph & RAG)](./docs/eagle/03-knowledge-graph-and-rag/):**
+  - [Mô Hình Dữ Liệu SAP HANA: Schema các bảng AE_RAG_DOCUMENTS, CHUNKS, ENTITIES, RELATIONS](./docs/eagle/03-knowledge-graph-and-rag/01-sap-hana-ae-data-model.md)
+  - [Đồ Thị Tri Thức AE_GRAPH_WORKSPACE & Trích Xuất Thực Thể Tự Động Bằng spaCy](./docs/eagle/03-knowledge-graph-and-rag/02-graph-workspace-and-mentions.md)
+- 🧪 **[04. Phân Tích Dữ Liệu An Toàn Hóa Chất (Material SDS Analysis)](./docs/eagle/04-material-sds-analysis/):**
+  - [Động Cơ Phân Tích Bảng Dữ Liệu Hóa Chất (Safety Data Sheet - SDS) Chuẩn Quốc Tế GHS](./docs/eagle/04-material-sds-analysis/01-material-sds-analysis-engine.md)
+  - [Làm Sạch, Làm Giàu Dữ Liệu & Động Cơ AI Gợi Ý Luật Quản Trị Dữ Liệu Tối Ưu](./docs/eagle/04-material-sds-analysis/02-cleansing-enrichment-and-rule-suggestions.md)
+- 💼 **[05. Cổng Quản Trị & Giao Diện Điều Khiển (Governance Smart API)](./docs/eagle/05-governance-smart-api/):**
+  - [Nhập Dữ Liệu Chỉ Mục Ngầm: Background Jobs Khối Lượng Lớn & Polling Trạng Thái](./docs/eagle/05-governance-smart-api/01-request-driven-duplicate-import.md)
+  - [Nạp Tệp Trực Tiếp & Giao Diện Quản Trị Trực Quan In-App UI Console (/ui)](./docs/eagle/05-governance-smart-api/02-csv-upload-and-inline-console.md)
+
+---
+
 ## 🛠️ Nguyên Tắc Thiết Kế Cốt Lõi (Core Principles)
 
 1. **Clean Architecture:** Tách biệt tuyệt đối giữa tầng nghiệp vụ Domain/Application và tầng hạ tầng Frameworks/Drivers.
-2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, Data Vault, Star Schema và File Metadata tập trung trong SAP HANA để đảm bảo toàn vẹn ACID và RBAC.
-3. **Auditability & Traceability:** Data Vault 2.0 và File Versioning đảm bảo dữ liệu lịch sử bất biến và kiểm toán 100%.
+2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, Data Vault, Star Schema, File Metadata và chỉ mục Eagle tập trung trong SAP HANA để đảm bảo toàn vẹn ACID và RBAC.
+3. **Auditability & Traceability:** Data Vault 2.0, File Versioning và Decision Trace của AI Eagle đảm bảo dữ liệu lịch sử bất biến và kiểm toán 100%.
 4. **Interactive & AI-Augmented Analytics:** Biểu đồ tương tác lọc chéo mượt mà kết hợp trợ lý AI Copilot chuyển đổi ngôn ngữ tự nhiên thành biểu đồ trong 5 giây.
 5. **High-Performance Tiered Storage:** Đệm đĩa cứng SSD cục bộ giúp phản hồi API trong vài mili-giây, kết hợp lưu trữ lâu dài bền vững trên Cloud S3 / SeaweedFS.
+6. **Multi-Model Intelligence:** Kết hợp đồng thời Exact rules, Fuzzy text algorithms, Dense Vectors (`REAL_VECTOR(640)`), và Graph Workspaces để giải quyết bài toán chất lượng dữ liệu với độ chính xác tuyệt đối.

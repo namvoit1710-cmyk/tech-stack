@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buyer Recommendation Demo</title>
+  <style>
+    :root {
+      --panel: rgba(255, 255, 255, 0.88);
+      --ink: #18222b;
+      --muted: #5e6a78;
+      --accent: #0f766e;
+      --accent-strong: #0b4f49;
+      --accent-soft: rgba(15, 118, 110, 0.1);
+      --line: rgba(24, 34, 43, 0.12);
+      --shadow: 0 24px 42px rgba(16, 30, 36, 0.14);
+      --error: #b91c1c;
+      --empty: #1d4ed8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 24%),
+        radial-gradient(circle at bottom right, rgba(29, 78, 216, 0.12), transparent 24%),
+        linear-gradient(180deg, #f7f4ed 0%, #e8eef2 100%);
+    }
+
+    .page {
+      width: min(1260px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .topbar a {
+      color: var(--accent-strong);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 68ch;
+      line-height: 1.55;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 480px) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+      min-width: 0;
+    }
+
+    .endpoint {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .fields {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    textarea,
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid rgba(24, 34, 43, 0.16);
+      border-radius: 16px;
+      padding: 14px 16px;
+      font: inherit;
+      background: rgba(255, 255, 255, 0.94);
+      color: inherit;
+    }
+
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+    }
+
+    .field-note,
+    .hint,
+    .summary-note {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: #f0fdfa;
+    }
+
+    button.secondary {
+      background: rgba(15, 118, 110, 0.12);
+      color: var(--accent-strong);
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 16px;
+      font-weight: 700;
+    }
+
+    .status.error {
+      color: var(--error);
+    }
+
+    .timer {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .response-stack {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .summary-card,
+    .empty-state,
+    .recommendation-card,
+    .evidence-card,
+    .query-preview,
+    .notice {
+      border: 1px solid rgba(24, 34, 43, 0.1);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.76);
+      padding: 16px 18px;
+      min-width: 0;
+    }
+
+    .summary-card {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .query-preview code {
+      display: block;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92rem;
+      color: var(--accent-strong);
+    }
+
+    .top-recommendation,
+    .recommendation-list,
+    .evidence-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .recommendation-card.featured {
+      border-color: rgba(15, 118, 110, 0.24);
+      background: linear-gradient(180deg, rgba(240, 253, 250, 0.96) 0%, rgba(255, 255, 255, 0.82) 100%);
+    }
+
+    .recommendation-header,
+    .evidence-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .recommendation-title,
+    .evidence-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(11, 79, 73, 0.08);
+      color: var(--accent-strong);
+      font-size: 0.9rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .recommendation-meta,
+    .evidence-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px 12px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .recommendation-meta span,
+    .evidence-meta span {
+      display: block;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 3px;
+    }
+
+    .evidence-snippet {
+      margin: 0 0 10px;
+      line-height: 1.55;
+      color: var(--ink);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .empty-state {
+      color: var(--empty);
+      line-height: 1.55;
+    }
+
+    details.raw-json summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--accent-strong);
+      margin-bottom: 10px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      min-height: 180px;
+      overflow: auto;
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      border-radius: 18px;
+      background: #121723;
+      color: #d7f8f4;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 960px) {
+      .layout,
+      .field-grid,
+      .recommendation-meta,
+      .evidence-meta {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a href="/api/v1/ui">Back to console</a>
+      <a href="/api/v1/ui/similarity">Open similarity demo</a>
+    </div>
+
+    <section class="hero">
+      <div class="endpoint">POST /api/v1/similarity</div>
+      <h1>Buyer recommendation</h1>
+      <p>
+        This demo uses Plant, Division, Material Group, and optional material context to query
+        historically similar records, then derives Buyer or Purchasing Group recommendations in
+        the browser from similarity evidence. Confidence is inferred from retrieval evidence and
+        historical indexed patterns, not from a trained model probability.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <div class="fields">
+          <div class="field-grid">
+            <div>
+              <label for="plant">Plant</label>
+              <input id="plant" type="text" value="1000">
+            </div>
+            <div>
+              <label for="division">Division</label>
+              <input id="division" type="text" value="INDUSTRIAL">
+            </div>
+          </div>
+          <div>
+            <label for="material-group">Material Group</label>
+            <input id="material-group" type="text" value="SCH40_FASTENERS">
+            <p class="field-note">Plant, Division, and Material Group are required because buyer routing should follow these business signals.</p>
+          </div>
+          <div>
+            <label for="material-description">Material Description</label>
+            <textarea id="material-description" spellcheck="false">Stainless steel hex bolt for schedule 40 industrial pipe fastening</textarea>
+          </div>
+          <div>
+            <label for="vendor">Vendor or Manufacturer</label>
+            <input id="vendor" type="text" value="Acme Industrial Fasteners">
+          </div>
+          <div class="query-preview">
+            <label for="query-preview">Composed query text</label>
+            <code id="query-preview">Build a query to preview what will be sent.</code>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="run-recommendation" class="primary" type="button">Recommend buyer</button>
+          <button id="reset-form" class="secondary" type="button">Reset sample</button>
+        </div>
+        <div id="status" class="status"></div>
+        <div id="timer" class="timer">Elapsed: 0.0s</div>
+        <p class="hint">
+          This page is for Buyer/Purchasing Group recommendation only. It does not introduce
+          workflow routing or approval logic, and it depends on buyer-related fields being present
+          in similarity candidate metadata.
+        </p>
+      </article>
+
+      <article class="panel">
+        <div class="response-stack">
+          <div id="response-summary" class="summary-card">
+            Run the request to see Buyer/Purchasing Group recommendations with derived confidence,
+            supporting evidence, and the untouched similarity JSON.
+          </div>
+          <div class="notice">
+            Buyer extraction scans likely metadata keys such as `buyer`, `buyer_group`,
+            `purchasing_group`, `purchasing group`, `pgrp`, and `ekgrp`. If those are not present
+            in indexed similarity metadata, the page will show evidence but no grouped buyer
+            recommendation.
+          </div>
+          <div id="top-recommendation" class="top-recommendation"></div>
+          <div id="recommendation-list" class="recommendation-list"></div>
+          <div id="evidence-list" class="evidence-list"></div>
+          <details class="raw-json">
+            <summary>Raw JSON response</summary>
+            <pre id="response">Click "Recommend buyer" to load results.</pre>
+          </details>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const defaultFields = {
+      plant: "1000",
+      division: "INDUSTRIAL",
+      materialGroup: "SCH40_FASTENERS",
+      materialDescription: "Stainless steel hex bolt for schedule 40 industrial pipe fastening",
+      vendor: "Acme Industrial Fasteners"
+    };
+
+    const buyerFieldKeys = [
+      "buyer",
+      "buyer_group",
+      "buyer group",
+      "purchasing_group",
+      "purchasing group",
+      "pgrp",
+      "ekgrp"
+    ];
+
+    const plantInput = document.getElementById("plant");
+    const divisionInput = document.getElementById("division");
+    const materialGroupInput = document.getElementById("material-group");
+    const materialDescriptionInput = document.getElementById("material-description");
+    const vendorInput = document.getElementById("vendor");
+    const queryPreviewNode = document.getElementById("query-preview");
+    const responseNode = document.getElementById("response");
+    const responseSummaryNode = document.getElementById("response-summary");
+    const topRecommendationNode = document.getElementById("top-recommendation");
+    const recommendationListNode = document.getElementById("recommendation-list");
+    const evidenceListNode = document.getElementById("evidence-list");
+    const statusNode = document.getElementById("status");
+    const timerNode = document.getElementById("timer");
+    let timerIntervalId = null;
+    let timerStartedAt = 0;
+
+    function setStatus(message, isError = false) {
+      statusNode.textContent = message;
+      statusNode.className = isError ? "status error" : "status";
+    }
+
+    function renderElapsed(milliseconds) {
+      timerNode.textContent = `Elapsed: ${(milliseconds / 1000).toFixed(1)}s`;
+    }
+
+    function resetElapsed() {
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      timerStartedAt = 0;
+      renderElapsed(0);
+    }
+
+    function startElapsed() {
+      resetElapsed();
+      timerStartedAt = performance.now();
+      renderElapsed(0);
+      timerIntervalId = window.setInterval(() => {
+        renderElapsed(performance.now() - timerStartedAt);
+      }, 100);
+    }
+
+    function stopElapsed() {
+      if (!timerStartedAt) {
+        return 0;
+      }
+      const elapsed = performance.now() - timerStartedAt;
+      if (timerIntervalId) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+      renderElapsed(elapsed);
+      timerStartedAt = 0;
+      return elapsed;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function composeQueryText() {
+      const parts = [];
+      const plant = plantInput.value.trim();
+      const division = divisionInput.value.trim();
+      const materialGroup = materialGroupInput.value.trim();
+      const materialDescription = materialDescriptionInput.value.trim();
+      const vendor = vendorInput.value.trim();
+
+      if (plant) {
+        parts.push(`Plant: ${plant}`);
+      }
+      if (division) {
+        parts.push(`Division: ${division}`);
+      }
+      if (materialGroup) {
+        parts.push(`Material Group: ${materialGroup}`);
+      }
+      if (materialDescription) {
+        parts.push(`Material Description: ${materialDescription}`);
+      }
+      if (vendor) {
+        parts.push(`Vendor: ${vendor}`);
+      }
+      return parts.join("\n");
+    }
+
+    function updateQueryPreview() {
+      const queryText = composeQueryText();
+      queryPreviewNode.textContent = queryText || "Plant, Division, and Material Group are required before a query can be sent.";
+    }
+
+    function buildPayload() {
+      return {
+        query_text: composeQueryText(),
+        mode: "ALL"
+      };
+    }
+
+    function findBuyerField(fields) {
+      if (!fields || typeof fields !== "object") {
+        return "";
+      }
+      for (const [key, value] of Object.entries(fields)) {
+        const normalizedKey = String(key).trim().toLowerCase();
+        if (!buyerFieldKeys.includes(normalizedKey)) {
+          continue;
+        }
+        const normalizedValue = String(value ?? "").trim();
+        if (normalizedValue) {
+          return normalizedValue;
+        }
+      }
+      return "";
+    }
+
+    function extractBuyerValue(candidate) {
+      const metadata = candidate && typeof candidate.metadata === "object" && candidate.metadata ? candidate.metadata : {};
+
+      if (Array.isArray(metadata.search_rows)) {
+        for (const row of metadata.search_rows) {
+          const rowFields = row && typeof row === "object" ? row.fields : null;
+          const value = findBuyerField(rowFields);
+          if (value) {
+            return value;
+          }
+        }
+      }
+
+      const fieldsValue = findBuyerField(metadata.fields);
+      if (fieldsValue) {
+        return fieldsValue;
+      }
+
+      return findBuyerField(metadata);
+    }
+
+    function truncateContent(content) {
+      const normalized = String(content ?? "").trim();
+      if (normalized.length <= 220) {
+        return normalized || "(no content)";
+      }
+      return `${normalized.slice(0, 217)}...`;
+    }
+
+    function confidenceFromEvidence(topScore, supportCount) {
+      if (topScore >= 0.9 || (topScore >= 0.82 && supportCount >= 3)) {
+        return "High";
+      }
+      if (topScore >= 0.72 || supportCount >= 2) {
+        return "Medium";
+      }
+      return "Low";
+    }
+
+    function groupRecommendations(candidates) {
+      const grouped = new Map();
+      for (const candidate of candidates) {
+        const buyerValue = extractBuyerValue(candidate);
+        if (!buyerValue) {
+          continue;
+        }
+        const recommendationKey = buyerValue.toLowerCase();
+        if (!grouped.has(recommendationKey)) {
+          grouped.set(recommendationKey, {
+            buyerValue,
+            topScore: Number(candidate.score || 0),
+            candidates: []
+          });
+        }
+        const recommendation = grouped.get(recommendationKey);
+        recommendation.candidates.push(candidate);
+        recommendation.topScore = Math.max(recommendation.topScore, Number(candidate.score || 0));
+      }
+
+      return Array.from(grouped.values())
+        .map((recommendation) => {
+          const candidatesForRecommendation = recommendation.candidates
+            .slice()
+            .sort((left, right) => Number(right.score || 0) - Number(left.score || 0));
+          const supportCount = candidatesForRecommendation.length;
+          const topScore = recommendation.topScore;
+          return {
+            ...recommendation,
+            candidates: candidatesForRecommendation,
+            supportCount,
+            confidence: confidenceFromEvidence(topScore, supportCount)
+          };
+        })
+        .sort((left, right) => {
+          if (right.topScore !== left.topScore) {
+            return right.topScore - left.topScore;
+          }
+          if (right.supportCount !== left.supportCount) {
+            return right.supportCount - left.supportCount;
+          }
+          return left.buyerValue.localeCompare(right.buyerValue);
+        });
+    }
+
+    function reasoningForRecommendation(recommendation) {
+      return [
+        `Matched to ${Number(recommendation.topScore).toFixed(4)} similarity with historical Plant/Division/Material Group assignment evidence.`,
+        `Supported by ${recommendation.supportCount} similar indexed record${recommendation.supportCount === 1 ? "" : "s"} with the same Purchasing Group.`,
+        `Best evidence document: ${recommendation.candidates[0]?.document_id || "-"}`
+      ];
+    }
+
+    function renderSummary(data, recommendations) {
+      const candidateCount = Array.isArray(data.candidates) ? data.candidates.length : 0;
+      if (!candidateCount) {
+        responseSummaryNode.innerHTML = `
+          <strong>No similarity candidates returned.</strong>
+          The API request succeeded, but there was no historical evidence to transform into a Buyer or Purchasing Group recommendation.
+        `;
+        return;
+      }
+
+      if (!recommendations.length) {
+        responseSummaryNode.innerHTML = `
+          <strong>${candidateCount} similarity candidates returned.</strong>
+          None of them exposed buyer-related metadata fields, so the page cannot group them into a Buyer or Purchasing Group recommendation yet.
+        `;
+        return;
+      }
+
+      responseSummaryNode.innerHTML = `
+        <strong>${recommendations.length} buyer recommendation group(s) found.</strong>
+        The page grouped ${candidateCount} similarity candidates into Buyer or Purchasing Group recommendations and derived confidence from the strongest historical evidence.
+      `;
+    }
+
+    function renderTopRecommendation(recommendations) {
+      topRecommendationNode.innerHTML = "";
+      if (!recommendations.length) {
+        return;
+      }
+      const [top] = recommendations;
+      const reasons = reasoningForRecommendation(top);
+      topRecommendationNode.innerHTML = `
+        <div class="recommendation-card featured">
+          <div class="recommendation-header">
+            <div class="recommendation-title">Top Buyer/Purchasing Group recommendation: ${escapeHtml(top.buyerValue)}</div>
+            <div class="score-badge">Confidence ${escapeHtml(top.confidence)}</div>
+          </div>
+          <div class="recommendation-meta">
+            <div><span>Supporting matches</span>${top.supportCount}</div>
+            <div><span>Best similarity</span>${Number(top.topScore).toFixed(4)}</div>
+            <div><span>Best chunk</span>${escapeHtml(top.candidates[0]?.chunk_id || "-")}</div>
+          </div>
+          <p class="summary-note">${escapeHtml(reasons[0])}</p>
+          <p class="summary-note">${escapeHtml(reasons[1])}</p>
+        </div>
+      `;
+    }
+
+    function renderRecommendationList(recommendations) {
+      recommendationListNode.innerHTML = "";
+      if (!recommendations.length) {
+        recommendationListNode.innerHTML = `
+          <div class="empty-state">
+            Similarity evidence was found, but the indexed candidate metadata did not expose buyer-related values in searchable fields, metadata fields, or direct keys such as <code>buyer</code>, <code>purchasing_group</code>, <code>pgrp</code>, or <code>ekgrp</code>.
+          </div>
+        `;
+        return;
+      }
+
+      recommendationListNode.innerHTML = recommendations.map((recommendation, index) => `
+        <div class="recommendation-card">
+          <div class="recommendation-header">
+            <div class="recommendation-title">#${index + 1} ${escapeHtml(recommendation.buyerValue)}</div>
+            <div class="score-badge">Confidence ${escapeHtml(recommendation.confidence)}</div>
+          </div>
+          <div class="recommendation-meta">
+            <div><span>Supporting matches</span>${recommendation.supportCount}</div>
+            <div><span>Best similarity</span>${Number(recommendation.topScore).toFixed(4)}</div>
+            <div><span>Best document</span>${escapeHtml(recommendation.candidates[0]?.document_id || "-")}</div>
+          </div>
+          <p class="summary-note">${escapeHtml(reasoningForRecommendation(recommendation)[0])}</p>
+        </div>
+      `).join("");
+    }
+
+    function renderEvidence(recommendations, fallbackCandidates) {
+      evidenceListNode.innerHTML = "";
+      if (!recommendations.length) {
+        const evidence = Array.isArray(fallbackCandidates) ? fallbackCandidates.slice(0, 3) : [];
+        if (!evidence.length) {
+          return;
+        }
+        evidenceListNode.innerHTML = evidence.map((candidate, index) => `
+          <div class="evidence-card">
+            <div class="evidence-header">
+              <div class="evidence-title">Evidence candidate #${index + 1}</div>
+              <div class="score-badge">Similarity ${Number(candidate.score || 0).toFixed(4)}</div>
+            </div>
+            <p class="evidence-snippet">${escapeHtml(truncateContent(candidate.content))}</p>
+            <div class="evidence-meta">
+              <div><span>Document ID</span>${escapeHtml(candidate.document_id || "-")}</div>
+              <div><span>Chunk ID</span>${escapeHtml(candidate.chunk_id || "-")}</div>
+              <div><span>Route</span>${escapeHtml(candidate.route || "-")}</div>
+            </div>
+          </div>
+        `).join("");
+        return;
+      }
+
+      evidenceListNode.innerHTML = recommendations.map((recommendation) => {
+        const reason = reasoningForRecommendation(recommendation)[1];
+        const evidenceCards = recommendation.candidates.slice(0, 3).map((candidate, index) => `
+          <div class="evidence-card">
+            <div class="evidence-header">
+              <div class="evidence-title">${escapeHtml(recommendation.buyerValue)} evidence #${index + 1}</div>
+              <div class="score-badge">Similarity ${Number(candidate.score || 0).toFixed(4)}</div>
+            </div>
+            <p class="evidence-snippet">${escapeHtml(truncateContent(candidate.content))}</p>
+            <div class="evidence-meta">
+              <div><span>Document ID</span>${escapeHtml(candidate.document_id || "-")}</div>
+              <div><span>Chunk ID</span>${escapeHtml(candidate.chunk_id || "-")}</div>
+              <div><span>Route</span>${escapeHtml(candidate.route || "-")}</div>
+            </div>
+            <p class="summary-note">${escapeHtml(reason)}</p>
+          </div>
+        `).join("");
+        return `<div class="evidence-list">${evidenceCards}</div>`;
+      }).join("");
+    }
+
+    async function runRecommendation() {
+      const plant = plantInput.value.trim();
+      const division = divisionInput.value.trim();
+      const materialGroup = materialGroupInput.value.trim();
+      if (!plant || !division || !materialGroup) {
+        setStatus("Plant, Division, and Material Group are required to build a buyer recommendation query.", true);
+        return;
+      }
+
+      const payload = buildPayload();
+      setStatus("Requesting historical similarity evidence...");
+      responseNode.textContent = "Loading...";
+      topRecommendationNode.innerHTML = "";
+      recommendationListNode.innerHTML = "";
+      evidenceListNode.innerHTML = "";
+      startElapsed();
+
+      try {
+        const response = await fetch("/api/v1/similarity", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (error) {
+          throw new Error(`Expected JSON response but received: ${text}`);
+        }
+
+        responseNode.textContent = JSON.stringify(data, null, 2);
+        if (!response.ok) {
+          throw new Error(data.detail || `Request failed with status ${response.status}`);
+        }
+
+        const recommendations = groupRecommendations(Array.isArray(data.candidates) ? data.candidates : []);
+        renderSummary(data, recommendations);
+        renderTopRecommendation(recommendations);
+        renderRecommendationList(recommendations);
+        renderEvidence(recommendations, data.candidates);
+
+        const elapsed = stopElapsed();
+        setStatus(`Loaded ${recommendations.length} buyer recommendation group(s) from similarity evidence in ${(elapsed / 1000).toFixed(1)}s.`);
+      } catch (error) {
+        stopElapsed();
+        responseSummaryNode.innerHTML = `
+          <strong>Request failed.</strong>
+          Check the raw response and request inputs, then try again.
+        `;
+        recommendationListNode.innerHTML = "";
+        evidenceListNode.innerHTML = "";
+        setStatus(error instanceof Error ? error.message : "Request failed.", true);
+        responseNode.textContent = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    function resetForm() {
+      plantInput.value = defaultFields.plant;
+      divisionInput.value = defaultFields.division;
+      materialGroupInput.value = defaultFields.materialGroup;
+      materialDescriptionInput.value = defaultFields.materialDescription;
+      vendorInput.value = defaultFields.vendor;
+      responseNode.textContent = 'Click "Recommend buyer" to load results.';
+      responseSummaryNode.textContent = "Run the request to see Buyer/Purchasing Group recommendations with derived confidence, supporting evidence, and the untouched similarity JSON.";
+      topRecommendationNode.innerHTML = "";
+      recommendationListNode.innerHTML = "";
+      evidenceListNode.innerHTML = "";
+      setStatus("");
+      resetElapsed();
+      updateQueryPreview();
+    }
+
+    document.getElementById("run-recommendation").addEventListener("click", runRecommendation);
+    document.getElementById("reset-form").addEventListener("click", resetForm);
+
+    [plantInput, divisionInput, materialGroupInput, materialDescriptionInput, vendorInput].forEach((input) => {
+      input.addEventListener("input", updateQueryPreview);
+    });
+
+    resetForm();
+  </script>
+</body>
+</html>

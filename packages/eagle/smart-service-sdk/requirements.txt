@@ -1,0 +1,15 @@
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+pydantic-settings==2.10.1
+pytest==8.4.1
+httpx==0.28.1
+openai==2.44.0
+hdbcli==2.26.18
+sentence-transformers==5.1.1
+spacy==3.8.14
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+bm25s==0.3.4
+pdfplumber==0.11.7
+openpyxl==3.1.5
+python-multipart==0.0.30
