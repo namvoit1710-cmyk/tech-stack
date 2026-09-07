@@ -1,0 +1,72 @@
+{
+  "rules": [
+    {
+      "rule_id": "550e8400-e29b-41d4-a716-446655440000",
+      "rule_name": "Check Unique ID",
+      "description": "Ensure ID column contains unique values",
+      "type": "unique",
+      "status": "active",
+      "params": {
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "rule_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "rule_name": "Check Unique Full Name",
+      "description": "Ensure combination of First Name and Last Name is unique",
+      "type": "set_unique",
+      "status": "active",
+      "params": {
+        "columns": [
+          "first_name",
+          "last_name"
+        ]
+      }
+    },
+    {
+      "rule_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c7",
+      "rule_name": "Check VIP Tier Logic",
+      "description": "If {cols[0]} > 1000, {cols[1]} must be VIP",
+      "type": "expression",
+      "status": "active",
+      "keywords": [
+        [
+          "total_order",
+          "customer_level"
+        ],
+        [
+          "amount",
+          "tier"
+        ]
+      ],
+      "params": {
+        "columns": [
+          "total_order",
+          "customer_level"
+        ],
+        "expression": "pl.when(pl.col(cols[0]).cast(pl.Float64, strict=False) > 1000).then(pl.col(cols[1]).str.strip_chars().str.to_uppercase() == 'VIP').otherwise(True)"
+      }
+    },
+    {
+      "rule_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c0",
+      "rule_name": "Validate Email",
+      "description": "{cols[0]} must be a valid email address",
+      "type": "expression",
+      "status": "active",
+      "keywords": [
+        "email",
+        "user_email",
+        "contact_mail",
+        "admin_email"
+      ],
+      "params": {
+        "columns": [
+          "email"
+        ],
+        "expression": "pl.col(cols[0]).str.contains(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$')"
+      }
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+name: data-factory
+
+buildContexts:
+  libs: ../../../../libs
+
+# The HANA credential DF needs for a migration, and for any rule that reads a
+# reference corpus. Bound by the platform on every deploy, so the secret lives in
+# CloudFoundry and never in this repo - resolve_password() finds it in VCAP_SERVICES
+# and reports credentialSource "service-binding".
+#
+# It is a *user-provided* instance because the source HANA is in us10 while these
+# apps run in br10, and a managed instance cannot be bound across regions. Create it
+# once per org:
+#
+#   cf create-user-provided-service smdg-hana-simplemdg-prd -p \
+#     '{"host":"<host>","port":"443","user":"<RT user>","password":"<secret>","schema":"SIMPLEMDG_PRD"}'
+#
+# `host` and `user` must match what the payload names: _vcap_password() matches on
+# both before it hands the password over, so one DF can serve several sources.
+#
+# tenant-2 needs its own key. CONFIG_TIER is literally 'tenant-2' there and deploy.yml
+# resolves with `.[$tier] // []`, so without it the app is pushed with NO bindings and
+# says nothing about it.
+services:
+  dev:
+    - smdg-hana-simplemdg-prd
+  qas:
+    - smdg-hana-simplemdg-prd
+  tenant-2:
+    - smdg-hana-simplemdg-prd
+
+memory:
+  dev: 9072M
+  qas: 9072M
+
+disk:
+  dev: 9072M
+  qas: 9072M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  APP_MODE:
+    dev: "REST"
+    qas: "REST"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVICE_PORT:
+    dev: 8000
+    qas: 8000
+
+  DB_ECHO:
+    dev: "false"
+    qas: "false"
+  DATABASE_URL:
+    dev: sqlite+aiosqlite:////tmp/app.db
+    qas: sqlite+aiosqlite:////tmp/app.db
+  MAX_FILE_SIZE:
+    dev: 100
+    qas: 100
+  BATCH_SIZE:
+    dev: 500000
+    qas: 500000
+  FILE_SERVER_URL:
+    dev: https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com/api/v1
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com/api/v1
+  FILE_SERVICE_USE_PRESIGNED_UPLOAD_FOR_LARGE:
+    dev: "True"
+    qas: "True"
+  FILE_SERVICE_PRESIGNED_UPLOAD_MIN_SIZE_MB:
+    dev: 100
+    qas: 100
+  PERFORMANCE_PROFILING_ENABLED:
+    dev: "false"
+    qas: "false"
+
+  # Migration connection pool. DF_POOL_MAX is NOT a concurrency limit - a job that
+  # finds the pool empty dials its own connection and never waits. It bounds how many
+  # stay parked once a burst is over, so size it to steady-state concurrency, not peak;
+  # uncapped, 40 concurrent jobs left 40 idle sessions on a shared database.
+  # An idle connection was measured being reset at ~26 min, so the TTL stays under it.
+  DF_POOL_MAX:
+    dev: "4"
+    qas: "4"
+  DF_POOL_IDLE_SEC:
+    dev: "1200"
+    qas: "1200"
+
+  # Admission control. Memory, not connections, is what runs out first: every job
+  # holds its columns in a Polars frame inside this container, and an OOM fails every
+  # migration running at that moment, not just the one that tipped it over. Over the
+  # ceiling a job waits at the door (status WAITING) and is then refused with a reason.
+  DF_MEMORY_CEILING_PCT:
+    dev: "80"
+    qas: "80"
+  DF_ADMIT_WAIT_SEC:
+    dev: "120"
+    qas: "120"

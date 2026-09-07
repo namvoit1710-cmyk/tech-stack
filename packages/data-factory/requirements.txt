@@ -1,0 +1,25 @@
+fastapi==0.119.1
+uvicorn[standard]==0.38.0
+pydantic==2.12.3
+pydantic-settings==2.11.0
+python-multipart==0.0.20
+sqlalchemy==2.0.44
+aiosqlite==0.22.1
+alembic==1.17.1
+polars==1.38.1
+# SAP HANA client. The data-migration path reads IH's virtual table
+# directly; every other DF path is unaffected and the import is lazy.
+hdbcli==2.26.18
+# polars delegates .xlsx reading to fastexcel and writing to xlsxwriter.
+# Neither is a polars dependency, so without them read_excel raises at
+# runtime -- which is how the deployed image shipped unable to open a
+# workbook while every local test passed.
+fastexcel==0.19.0
+xlsxwriter==3.2.9
+requests==2.32.5
+pytest==9.0.2
+pytest-asyncio==1.3.0
+httpx==0.28.1
+pytest-cov==7.0.0
+psutil==6.1.0
+mcp[cli]==1.27.0

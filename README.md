@@ -16,10 +16,12 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **BI Dashboard & Analytics**| Data Vault 2.0 (Hubs/Links/Sats), OLAP Star Schema, SAP HANA Columnar Engine, React 19 Canvas (@dnd-kit), AI Chat-to-Chart | 📖 [Xem Tài Liệu](./docs/bi-dashboard/) |
 | **File Service** | Tiered Object Storage (SSD Hot Tier + S3/SeaweedFS Cold Tier), Zero-Downtime Versioning, CSV `row_id` Canonicalization, Presigned Multipart | 📖 [Xem Tài Liệu](./docs/file-service/) |
 | **AI Eagle Platform** | Hybrid Deduplication (Exact + Fuzzy + Vector + Graph), SAP HANA REAL_VECTOR(640), Material SDS Analysis, Governance Smart API | 📖 [Xem Tài Liệu](./docs/eagle/) |
+| **Data Factory Platform** | High-Throughput Migration Engine, Polars SIMD Vectorized, Adaptive Batching (cgroups v1/v2), 126+ Rule Difficulty Router, SAP Delivery Tables | 📖 [Xem Tài Liệu](./docs/data-factory/) |
 | **Worker SDK (Package)** | Thư viện phát triển Workflow Workers (Server, Pull, Headless modes, gRPC/REST, Streaming I/O) | 📦 [Xem Mã Nguồn](./packages/worker-sdk/) |
 | **Agent SDK (Package)** | Thư viện phát triển Autonomous AI Agents (LangGraph, SAP HANA Checkpointing, HITL, Context Compaction) | 📦 [Xem Mã Nguồn](./packages/agent-sdk/) |
 | **Eagle Platform Core (Package)** | Bộ đôi Smart Service SDK & Governance Smart API phát hiện trùng lặp dữ liệu và phân tích hóa chất SDS | 📦 [Xem Mã Nguồn](./packages/eagle/) |
-| *(Mở Rộng Trong Tương Lai)* | *Data Migration Platform, Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
+| **Data Factory Core (Package)** | Nền tảng di trú, chuẩn hóa và kiểm tra dữ liệu lớn (Migration, Validation, Transformation, Schema Mapping) | 📦 [Xem Mã Nguồn](./packages/data-factory/) |
+| *(Mở Rộng Trong Tương Lai)* | *Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
 ---
 
@@ -32,6 +34,11 @@ Toàn bộ mã nguồn phát triển chính thức của các SDK và gói dịc
 - 🦅 **[`packages/eagle/`](./packages/eagle/):** Trọn bộ mã nguồn lõi của nền tảng **AI Eagle Platform** bao gồm:
   - `smart-service-sdk`: Động cơ so khớp trùng lặp lai (Exact, Fuzzy, `REAL_VECTOR(640)`, Graph Evidence), phân tích tài liệu hóa chất SDS, và tìm kiếm tương đồng.
   - `governance-smart-api`: Cổng API hướng caller cho các tác vụ nạp chỉ mục trùng lặp ngầm (Background Jobs), nạp tệp CSV và giao diện UI Console trực quan.
+- 🏭 **[`packages/data-factory/`](./packages/data-factory/):** Nền tảng Data Factory Engine hiệu năng cao cho dữ liệu lớn:
+  - `layer1_domain`: Mô hình dữ liệu di trú (`JobStatus`, `MigrationPlan`, `ValidationRule`, `FieldMapping`).
+  - `layer2_application`: Các động cơ nghiệp vụ lõi (`data_migration`, `data_validation`, `data_transformation`, `schema_transform`, `bundle`, `reference_data`, `rule_management`).
+  - `layer3_adapters`: Bộ điều khiển REST Controller và SSE Event Streams cho tiến độ thời gian thực.
+  - `layer4_frameworks`: Bộ thích ứng cgroups v1/v2 tự động chia mẻ bộ nhớ (`AdaptiveBatchSizeManager`), Polars SIMD Vectorized engine, SAP HANA Reader & Delivery table writer.
 
 ---
 
@@ -150,11 +157,36 @@ Nền tảng phát hiện dữ liệu trùng lặp thông minh (Deduplication) v
 
 ---
 
+## 🏭 Tiêu Điểm 7: Data Factory Platform (High-Throughput Migration & Rule Engine)
+
+Nền tảng di trú, chuẩn hóa và kiểm tra chất lượng dữ liệu lớn chuyên sâu cho SAP S/4HANA theo mô hình **"HTTP as Trigger, Database as Delivery"** với khả năng xử lý hàng triệu bản ghi:
+
+### Cấu Trúc Module:
+- 🏛️ **[01. Kiến Trúc Tổng Thể](./docs/data-factory/01-architecture/):**
+  - [Tổng Quan & Các Khái Niệm Cốt Lõi: Mô hình Trigger-Delivery, Hai Bảng Đích DF_REPORT & DF_CB](./docs/data-factory/01-architecture/01-overview-and-concepts.md)
+  - [Topology Mạng & Cổng Giao Tiếp: Cổng HTTP :8000, Server-Sent Events (SSE) & XSUAA](./docs/data-factory/01-architecture/02-system-topology.md)
+  - [Kiến Trúc Phân Tầng Clean Architecture 4 Lớp & Quy Tắc Phụ Thuộc](./docs/data-factory/01-architecture/03-clean-architecture-and-layers.md)
+- 🚀 **[02. Động Cơ Di Trú Dữ Liệu (Data Migration Engine)](./docs/data-factory/02-data-migration-engine/):**
+  - [Khởi Tạo Tác Vụ & Tính Bất Khả Trùng Lặp (Idempotency) Với HTTP 202 Accepted](./docs/data-factory/02-data-migration-engine/01-job-dispatch-and-idempotency.md)
+  - [Cơ Chế Bàn Giao Dữ Liệu Bằng Hai Bảng Vật Lý SAP HANA: DF_REPORT_<job_id> & DF_CB_<job_id>](./docs/data-factory/02-data-migration-engine/02-delivery-tables-and-reporting.md)
+  - [Theo Dõi Tiến Độ Thời Gian Thực Bằng Server-Sent Events (SSE) & Giao Thức Progress JSON](./docs/data-factory/02-data-migration-engine/03-sse-events-and-progress-tracking.md)
+- 🎯 **[03. Bộ Máy Kiểm Tra & Danh Mục Quy Tắc (Validation & Rule Engine)](./docs/data-factory/03-validation-and-rule-engine/):**
+  - [Danh Mục 126+ Quy Tắc Kiểm Tra Chất Lượng Dữ Liệu Sản Xuất Chuẩn Doanh Nghiệp](./docs/data-factory/03-validation-and-rule-engine/01-validation-rules-catalog.md)
+  - [Bộ Định Tuyến Độ Khó Quy Tắc 3 Cấp Độ (Rule Difficulty Router): Simple, Medium, Hard](./docs/data-factory/03-validation-and-rule-engine/02-rule-difficulty-router.md)
+- 🔄 **[04. Động Cơ Chuyển Đổi Dữ Liệu (Transformation Engine)](./docs/data-factory/04-transformation-engine/):**
+  - [Biến Đổi Cột & Biến Đổi Dòng: SIMD Vectorized Polars vs Row Transformer Callback Engine](./docs/data-factory/04-transformation-engine/01-row-and-column-transformations.md)
+  - [Ánh Xạ Cấu Trúc Dữ Liệu Đích (Schema Transformation): Đổi tên, Ép kiểu, Bổ sung trường SAP](./docs/data-factory/04-transformation-engine/02-schema-transformation.md)
+- ⚡ **[05. Hiệu Năng & Khả Năng Chịu Tải (Performance & Resilience)](./docs/data-factory/05-performance-and-resilience/):**
+  - [Kích Thước Mẻ Thích Ứng (Adaptive Batching) Tự Động Thăm Dò cgroups v1/v2 Chống OOM-Killed](./docs/data-factory/05-performance-and-resilience/01-adaptive-batching-and-cgroups.md)
+  - [Cơ Chế Giải Mã Chứng Thư Dùng Một Lần (Single-Use Resolve-Token) Bảo Mật Tuyệt Đối](./docs/data-factory/05-performance-and-resilience/02-credential-resolution-and-security.md)
+
+---
+
 ## 🛠️ Nguyên Tắc Thiết Kế Cốt Lõi (Core Principles)
 
 1. **Clean Architecture:** Tách biệt tuyệt đối giữa tầng nghiệp vụ Domain/Application và tầng hạ tầng Frameworks/Drivers.
-2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, Data Vault, Star Schema, File Metadata và chỉ mục Eagle tập trung trong SAP HANA để đảm bảo toàn vẹn ACID và RBAC.
-3. **Auditability & Traceability:** Data Vault 2.0, File Versioning và Decision Trace của AI Eagle đảm bảo dữ liệu lịch sử bất biến và kiểm toán 100%.
+2. **HANA as System of Record:** Lưu trữ dữ liệu gốc, vectors, Data Vault, Star Schema, File Metadata, chỉ mục Eagle và bảng di trú Data Factory tập trung trong SAP HANA để đảm bảo toàn vẹn ACID và RBAC.
+3. **Auditability & Traceability:** Data Vault 2.0, File Versioning, Decision Trace của AI Eagle và bảng báo cáo lỗi `DF_REPORT_<job_id>` của Data Factory đảm bảo dữ liệu kiểm toán 100%.
 4. **Interactive & AI-Augmented Analytics:** Biểu đồ tương tác lọc chéo mượt mà kết hợp trợ lý AI Copilot chuyển đổi ngôn ngữ tự nhiên thành biểu đồ trong 5 giây.
 5. **High-Performance Tiered Storage:** Đệm đĩa cứng SSD cục bộ giúp phản hồi API trong vài mili-giây, kết hợp lưu trữ lâu dài bền vững trên Cloud S3 / SeaweedFS.
-6. **Multi-Model Intelligence:** Kết hợp đồng thời Exact rules, Fuzzy text algorithms, Dense Vectors (`REAL_VECTOR(640)`), và Graph Workspaces để giải quyết bài toán chất lượng dữ liệu với độ chính xác tuyệt đối.
+6. **Multi-Model Intelligence & Vectorized Engine:** Kết hợp đồng thời Exact rules, Fuzzy text algorithms, Dense Vectors (`REAL_VECTOR(640)`), Graph Workspaces và Polars SIMD Vectorized Column Engine để giải quyết bài toán chất lượng dữ liệu với độ chính xác và tốc độ tối đa.

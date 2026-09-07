@@ -1,0 +1,85 @@
+import pytest
+from unittest.mock import patch, MagicMock
+import polars as pl
+import os
+import tempfile
+from app.layer3_adapters.infrastructure.storage.file_reader_service import PolarsFileReader
+from app.layer3_adapters.infrastructure.storage.http_upload_service import HttpFileUpload
+from app.layer3_adapters.infrastructure.odata.odata_parser_service import ODataParser
+from app.layer3_adapters.infrastructure.logging.standard import StandardLogger
+try:
+    from app.layer3_adapters.infrastructure.monitoring.profiler import HighAccuracyProfiler, PROFILER
+except ImportError:
+    PROFILER = None
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_file_reader_generate_url():
+    reader = PolarsFileReader()
+    with patch("requests.get") as mock_get:
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {"url": "http://signed-url.com"}
+        
+        url = reader.generate_presigned_url("test-file")
+        assert url == "http://signed-url.com"
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_file_reader_read_csv():
+    reader = PolarsFileReader()
+    # FIX: Patch requests.get instead of internal method
+    with patch("requests.get") as mock_get:
+        mock_get.return_value.__enter__.return_value.status_code = 200
+        mock_get.return_value.__enter__.return_value.iter_content.return_value = [b"a,b\n1,2"]
+        
+        with patch.object(reader, "generate_presigned_url", return_value="http://fake.url"):
+             df = await reader.read_file_from_cloud("f.csv", "csv")
+             assert len(df) == 1
+             assert df.columns == ["a", "b"]
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_http_upload():
+    uploader = HttpFileUpload()
+    with patch("requests.get") as mock_get, patch("requests.put") as mock_put:
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {"url": "http://upload-here.com"}
+        mock_put.return_value.status_code = 200
+        
+        # FIX: Close temp file before using path (Windows Lock)
+        tf = tempfile.NamedTemporaryFile(delete=False)
+        tf.write(b"content")
+        tf.close()
+        try:
+            url = await uploader.upload_file_to_s3(tf.name)
+            assert "download" in url
+        finally:
+            if os.path.exists(tf.name):
+                os.unlink(tf.name)
+
+@pytest.mark.unit
+def test_odata_parser():
+    parser = ODataParser()
+    df = pl.DataFrame({"age": [10, 20, 30], "name": ["a", "b", "c"]})
+    
+    res = parser.parse_odata_query(df, "$filter=age gt 15")
+    assert len(res) == 2
+    
+    res = parser.parse_odata_query(df, "$orderby=age desc")
+    assert res["age"][0] == 30
+    
+    res = parser.parse_odata_query(df, "$select=name")
+    assert res.columns == ["name"]
+
+@pytest.mark.unit
+def test_logger():
+    l = StandardLogger()
+    l.info("Test log")
+
+@pytest.mark.unit
+def test_profiler_singleton():
+    if PROFILER:
+        tid = PROFILER.start_monitoring()
+        assert isinstance(tid, str)
+        stats = PROFILER.stop_monitoring(tid)
+        assert isinstance(stats, list)

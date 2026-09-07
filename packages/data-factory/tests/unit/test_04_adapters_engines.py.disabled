@@ -1,0 +1,60 @@
+import pytest
+import polars as pl
+from unittest.mock import AsyncMock, MagicMock
+from app.layer3_adapters.infrastructure.transform.polars_transform_adapter import PolarsTransformationAdapter
+from app.layer3_adapters.infrastructure.validation.polars_validation_adapter import PolarsValidationAdapter
+from app.layer1_domain.entities.transform_entity import TransformRule
+from app.layer1_domain.entities.validation_entity import ValidationRule
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_transform_adapter_success(mock_logger):
+    adapter = PolarsTransformationAdapter(mock_logger)
+    data = pl.DataFrame([{"age": 15}, {"age": 20}])
+    
+    rules = [
+        TransformRule(
+            rule_name="Calc Adult", 
+            type="expression", 
+            params={"column_dest": "is_adult", "expression": "pl.col('age') >= 18"}
+        )
+    ]
+    
+    result, df = await adapter.transform_data(data, rules)
+    
+    # FIX: Check total_rows instead of non-existent 'success' field
+    assert result.total_rows == 2 
+    assert "is_adult" in df.columns
+    assert df["is_adult"][1] is True
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_transform_adapter_drop_columns(mock_logger):
+    adapter = PolarsTransformationAdapter(mock_logger)
+    data = pl.DataFrame([{"A": 1, "B": 2}])
+    rules = [TransformRule(rule_name="Drop B", type="drop_columns", params={"columns_to_drop": ["B"]})]
+    
+    result, df = await adapter.transform_data(data, rules)
+    assert "B" not in df.columns
+    assert "A" in df.columns
+
+class DummyStreamer:
+    def batches(self, batch_size):
+        yield pl.DataFrame({"email": ["test@test.com", None, ""]})
+    def cleanup(self): pass
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_validation_adapter_streaming(mock_logger, mock_file_upload):
+    adapter = PolarsValidationAdapter(mock_logger, mock_file_upload)
+    
+    rules = [
+        ValidationRule(rule_name="ReqEmail", type="required", params={"columns": ["email"]})
+    ]
+    
+    streamer = DummyStreamer()
+    result = await adapter.validate_streaming(streamer, rules)
+    
+    assert result.total_rows == 3
+    assert result.invalid_rows == 2
+    assert result.valid_rows == 1

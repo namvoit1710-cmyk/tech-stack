@@ -1,0 +1,6 @@
+from typing import Protocol
+
+
+class IIdGenerator(Protocol):
+    def generate(self) -> str: ...
+    def generate(self) -> str: ...

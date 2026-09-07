@@ -1,0 +1,36 @@
+import pytest
+import polars as pl
+from app.layer3_adapters.infrastructure.validation.rule_handlers import RuleFactory
+from app.layer1_domain.entities.validation_entity import ValidationRule
+
+@pytest.mark.unit
+def test_rule_factory_and_required_handler():
+    factory = RuleFactory()
+    handler = factory.get_handler("required")
+    assert handler is not None
+    
+    rule = ValidationRule(rule_name="ReqCheck", type="required", params={"columns": ["email"]})
+    exprs = handler.parse_rule(rule, "alias_0")
+    
+    assert len(exprs) == 1
+    assert "alias_0_email" in str(exprs[0])
+
+@pytest.mark.unit
+def test_expression_handler():
+    factory = RuleFactory()
+    handler = factory.get_handler("expression")
+    
+    rule = ValidationRule(rule_name="ExprCheck", type="expression", params={"expression": "pl.col('age') > 18"})
+    exprs = handler.parse_rule(rule, "alias_expr")
+    
+    assert len(exprs) == 1
+    # Check if the output expression has the alias
+    assert "alias_expr" in str(exprs[0])
+
+@pytest.mark.unit
+def test_regex_handler():
+    factory = RuleFactory()
+    handler = factory.get_handler("regex")
+    rule = ValidationRule(rule_name="Reg", type="regex", params={"column": "email", "pattern": "^.*@.*$"})
+    exprs = handler.parse_rule(rule, "alias_reg")
+    assert len(exprs) == 1
