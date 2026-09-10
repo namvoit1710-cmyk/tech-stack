@@ -21,6 +21,7 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **Agent SDK (Package)** | Thư viện phát triển Autonomous AI Agents (LangGraph, SAP HANA Checkpointing, HITL, Context Compaction) | 📦 [Xem Mã Nguồn](./packages/agent-sdk/) |
 | **Eagle Platform Core (Package)** | Bộ đôi Smart Service SDK & Governance Smart API phát hiện trùng lặp dữ liệu và phân tích hóa chất SDS | 📦 [Xem Mã Nguồn](./packages/eagle/) |
 | **Data Factory Core (Package)** | Nền tảng di trú, chuẩn hóa và kiểm tra dữ liệu lớn (Migration, Validation, Transformation, Schema Mapping) | 📦 [Xem Mã Nguồn](./packages/data-factory/) |
+| **Agent Registry (Package)** | Dịch vụ đăng ký, quản lý danh mục và điều phối quyền truy cập Agent (Agent Catalog, Capabilities, Discovery, RBAC) | 📦 [Xem Mã Nguồn](./packages/agent-registry/) |
 | *(Mở Rộng Trong Tương Lai)* | *Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
 ---
@@ -39,6 +40,10 @@ Toàn bộ mã nguồn phát triển chính thức của các SDK và gói dịc
   - `layer2_application`: Các động cơ nghiệp vụ lõi (`data_migration`, `data_validation`, `data_transformation`, `schema_transform`, `bundle`, `reference_data`, `rule_management`).
   - `layer3_adapters`: Bộ điều khiển REST Controller và SSE Event Streams cho tiến độ thời gian thực.
   - `layer4_frameworks`: Bộ thích ứng cgroups v1/v2 tự động chia mẻ bộ nhớ (`AdaptiveBatchSizeManager`), Polars SIMD Vectorized engine, SAP HANA Reader & Delivery table writer.
+- 📋 **[`packages/agent-registry/`](./packages/agent-registry/):** Dịch vụ đăng ký và quản lý Agent:
+  - Đăng ký và khám phá danh mục Agent (Agent Catalog & Capability Discovery).
+  - Quản lý phân quyền và kiểm soát truy cập (RBAC, API Key, Token Authentication).
+  - Kiến trúc Clean Architecture 4 lớp với FastAPI, SQLAlchemy ORM, Alembic migrations.
 
 ---
 

@@ -1,0 +1,50 @@
+name: agent-registry
+buildContext: ..
+# Sibling/external local deps installed from requirements.txt, exposed as named
+# Docker build contexts (consumed by `COPY --from=<name>` in the Dockerfile):
+#   agent-sdk -> the editable dep `-e ../../agent/agent-sdk`
+#   mcp       -> agent-sdk's nested dep `simplemdg-mcp @ file:../../../../libs/mcp/python`
+# Paths are resolved relative to this deployment/ directory.
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 512M
+  qas: 1024M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  API_CORS_ORIGINS:
+    dev: ["*"]
+    qas: ["*"]
+  APP_PORT:
+    dev: 8002
+    qas: 8002
+  FETCH_CURRENT_USER_INFO_URL:
+    dev: "https://smdg-ai-dev-profile-management.cfapps.br10.hana.ondemand.com/api/v1/users/me"
+    qas: "https://smdg-ai-qas-profile-management.cfapps.br10.hana.ondemand.com/api/v1/users/me"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  FETCH_WORKFLOW_URL:
+    dev: "https://smdg-ai-dev-ai-workflow-control-plane-dev.cfapps.br10.hana.ondemand.com/api/v1/workflows/{workflow_id}"
+    qas: "https://smdg-ai-qas-ai-workflow-control-plane-qas.cfapps.br10.hana.ondemand.com/api/v1/workflows/{workflow_id}"
+  DEFAULT_MODEL:
+    dev: "gpt-4"
+    qas: "gpt-4"
+  DEFAULT_PROVIDER:
+    dev: "openai"
+    qas: "openai"
+  DEFAULT_TEMPERATURE:
+    dev: 0.7
+    qas: 0.7
+  FETCH_CURRENT_USER_GROUPS_URL:
+    dev: "https://smdg-ai-dev-profile-management.cfapps.br10.hana.ondemand.com/api/v1/users/me/groups"
+    qas: "https://smdg-ai-qas-profile-management.cfapps.br10.hana.ondemand.com/api/v1/users/me/groups"
+  FETCH_CURRENT_USER_GROUPS_DETAILS_URL:
+    dev: "https://smdg-ai-dev-profile-management.cfapps.br10.hana.ondemand.com/api/v1/user-groups/{group_id}"
+    qas: "https://smdg-ai-qas-profile-management.cfapps.br10.hana.ondemand.com/api/v1/user-groups/{group_id}"
