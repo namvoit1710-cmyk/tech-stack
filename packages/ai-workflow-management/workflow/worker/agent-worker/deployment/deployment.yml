@@ -1,0 +1,83 @@
+name: worker-agent-worker
+buildContext: ..
+buildContexts:
+  worker-sdk: ../../worker-sdk
+  json_csv_streamer: ../../../libs/json-csv-streamer
+
+memory:
+  dev: 128M
+  qas: 128M
+
+http2: false
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  WORKER_CHUNKED_OUTPUT_ENABLED:
+    dev: "true"
+    qas: "true"
+  APP_NAME:
+    dev: "Agent Worker"
+    qas: "Agent Worker"
+  WORKER_TYPE:
+    dev: "agent"
+    qas: "agent"
+  WORKER_NAME:
+    dev: "AI Agent"
+    qas: "AI Agent"
+  WORKER_DESCRIPTION:
+    dev: "Integrates with AI providers (OpenAI) for chat completions."
+    qas: "Integrates with AI providers (OpenAI) for chat completions."
+  WORKER_NODE_CLASS:
+    dev: "TECHNICAL"
+    qas: "TECHNICAL"
+  WORKER_ICON:
+    dev: "Bot"
+    qas: "Bot"
+  WORKER_COLOR:
+    dev: "#8B5CF6"
+    qas: "#8B5CF6"
+  WORKER_TAGS:
+    dev: "ai,agent,llm,openai"
+    qas: "ai,agent,llm,openai"
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  LOG_LEVEL:
+    dev: DEBUG
+    qas: INFO
+  SERVER_HOST:
+    dev: "0.0.0.0"
+    qas: "0.0.0.0"
+  SERVER_PORT:
+    dev: 35000
+    qas: 35000
+  PROXY_URL:
+    dev: https://smdg-ai-dev-worker-agent-worker.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-worker-agent-worker-qas.cfapps.br10.hana.ondemand.com
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-worker-executor-qas.cfapps.br10.hana.ondemand.com
+  FILE_SERVICE_URL:
+    dev: https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+
+
+services:
+  dev:
+    - workflow-control-plane-db
+    - simplemdg-event-core-2
+  qas:
+    - wio-workflow-control-plane-db
+    - simplemdg-logging
+    - wio-orchestrator-management-001  # tenant-2 mirrors dev. CONFIG_TIER is literally 'tenant-2' there, and
+  # deploy.yml resolves services with `.[$tier] // []` — without this key
+  # the app is pushed with NO bindings (no HANA, no Event Mesh).
+  tenant-2:
+    - workflow-control-plane-db
+    - simplemdg-event-core-2

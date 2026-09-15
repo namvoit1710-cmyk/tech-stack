@@ -15,6 +15,7 @@ Thư mục này chứa mã nguồn hoàn chỉnh của các bộ SDK cốt lõi 
 | **Eagle Platform (`eagle`)** | Trọn bộ mã nguồn lõi của AI Eagle gồm `smart-service-sdk` (so khớp trùng lặp lai Exact/Fuzzy/Vector/Graph, phân tích hóa chất SDS) và `governance-smart-api` (cổng import dữ liệu ngầm và Web UI Console). | [`packages/eagle`](./eagle/) |
 | **Data Factory (`data-factory`)** | Nhà máy xử lý và di chuyển dữ liệu lớn (Data Migration, Validation & Transformation Engine) tối ưu bằng nhân vector Polars, hỗ trợ 126+ quy tắc sản xuất, xuất xưởng bảng trực tiếp trên SAP HANA (`DF_REPORT_<id>` & `DF_CB_<id>`) và Adaptive Batching theo cgroups Linux container. | [`packages/data-factory`](./data-factory/) |
 | **Agent Registry (`agent-registry`)** | Dịch vụ đăng ký, quản lý danh mục và điều phối quyền truy cập Agent (Agent Catalog, Capabilities, Discovery, RBAC, Clean Architecture 4 lớp). | [`packages/agent-registry`](./agent-registry/) |
+| **AI Workflow Management (`ai-workflow-management`)** | Nền tảng điều phối quy trình AI cốt lõi (Workflow Control Plane Service, Worker Executor Service, 15+ Workers, Protocol Buffers, Clean Architecture 4 lớp). | [`packages/ai-workflow-management`](./ai-workflow-management/) |
 
 ---
 

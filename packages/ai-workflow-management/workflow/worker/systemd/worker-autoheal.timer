@@ -1,0 +1,19 @@
+# Chay worker-autoheal.service moi 30 giay.
+#
+# 30s la de PHAT HIEN nhanh, khong phai de dung lai nhanh: healthcheck cua worker
+# da can 3 lan that bai lien tiep cach nhau 60s truoc khi Docker danh dau
+# `unhealthy`, nen mot lan mang chop khong the gay restart. Timer nay chi quyet
+# dinh do tre GIUA luc bi danh dau va luc duoc dung lai.
+[Unit]
+Description=Periodically restart unhealthy Docker containers
+Requires=worker-autoheal.service
+
+[Timer]
+# Chay lan dau 60s sau khi may khoi dong — de docker va cac container kip len,
+# neu khong lan quet dau tien se chay luc chua co gi.
+OnBootSec=60s
+OnUnitActiveSec=30s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+-- SA-2605 backfill REMOVED.
+--
+-- The section-only model is cut over via a clean RESET (see
+-- 068_reset_environment_and_binding.sql) rather than migrating the existing
+-- SA-2365/2450 data forward. Environments, section schemas and bindings are
+-- re-created by the operator after the cutover (environment values were exported
+-- beforehand). Backfilling the old data forward risked deploy failures and stale
+-- rows, so it is intentionally not run.
+--
+-- This file is kept (comment-only, no executable statements) to preserve the
+-- migration sequence + ledger entry; the runner records it and executes nothing.

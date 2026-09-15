@@ -1,0 +1,197 @@
+@startuml component_overview
+' ===========================================================================
+' Diagram 9: Component Architecture Overview
+' Shows the key components and their relationships in the orchestration engine.
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam componentStyle rectangle
+skinparam packageBorderColor SAP_GRAY
+skinparam packageBackgroundColor #FFFFFF
+skinparam noteBorderColor SAP_GOLD
+skinparam noteBackgroundColor #FFFDE7
+
+title **Orchestration Engine — Component Architecture**
+
+package "Layer 3: Adapters (HTTP)" as L3 {
+    [REST Controllers] as REST SAP_PURPLE
+}
+
+package "Layer 2: Application (Use Cases)" as L2 {
+    [StartRunUseCase] as UC_START SAP_BLUE
+    [CompleteTaskUseCase] as UC_COMPLETE SAP_BLUE
+    [ResumePendingTaskUseCase] as UC_RESUME SAP_BLUE
+    [FailTaskUseCase] as UC_FAIL SAP_BLUE
+    [CancelRunUseCase] as UC_CANCEL SAP_BLUE
+}
+
+package "Layer 1: Domain (Engine Core)" as L1 {
+
+    package "Orchestration Engine" as EngPkg {
+        [OrchestrationEngine] as OE SAP_BLUE
+        note bottom of OE
+          Core coordinator.
+          Entry points:
+          - orchestrate_start()
+          - orchestrate_continue()
+          - orchestrate_execute_node()
+          - orchestrate_loop_iteration()
+          Key methods:
+          - _exec_uniform()
+          - _route_to_successors()
+          - check_run_completion()
+          - maybe_enqueue_loop_iteration()
+        end note
+    }
+
+    package "Node Handlers (16 types)" as HandlerPkg {
+        [TaskNodeHandler] as H_TASK SAP_GREEN
+        [ConditionNodeHandler] as H_COND SAP_GREEN
+        [SwitchNodeHandler] as H_SWITCH SAP_GREEN
+        [LoopNodeHandler] as H_LOOP SAP_GREEN
+        [ParallelNodeHandler] as H_PAR SAP_GREEN
+        [MergeNodeHandler] as H_MERGE SAP_GREEN
+        [TriggerNodeHandler] as H_TRIG SAP_GREEN
+        [WorkflowNodeHandler] as H_WF SAP_GREEN
+        [ComputeNodeHandler] as H_COMP SAP_GREEN
+        [InputNodeHandler] as H_INPUT SAP_GREEN
+        [HumanActionNodeHandler] as H_HA SAP_GREEN
+        [DataEditNodeHandler] as H_DE SAP_GREEN
+        [FileUploadNodeHandler] as H_FU SAP_GREEN
+        [LoopExitNodeHandler] as H_EXIT SAP_GREEN
+        [LoopContinueNodeHandler] as H_CONT SAP_GREEN
+    }
+
+    [NodeHandlerRegistry] as REG SAP_GREEN
+
+    package "Dispatcher" as DispPkg {
+        [compute_fanout()] as FANOUT SAP_GREEN
+        note bottom of FANOUT
+          Pure function.
+          Port filtering +
+          cascade-skip BFS +
+          predecessor readiness +
+          deterministic event IDs.
+        end note
+    }
+
+    package "Loop Driver" as LoopPkg {
+        [EventDrivenLoopDriver] as LOOP_DRV SAP_GREEN
+        note bottom of LOOP_DRV
+          initialize_loop()
+          iteration_complete()
+          run_loop() (inline)
+          initialize_loop_queued()
+          is_iteration_done() (BFS)
+        end note
+    }
+
+    [SuccessorProcessor] as SP SAP_GREEN
+    [TaskFactory] as TF SAP_GREEN
+    [VariableResolver] as VR SAP_BLUE
+    [ConditionEvaluator] as CE SAP_BLUE
+
+    package "Projector" as ProjPkg {
+        [apply_event()] as PROJ SAP_BLUE
+        [rebuild_run_state()] as REBUILD SAP_BLUE
+    }
+}
+
+package "Layer 4: Frameworks (Infrastructure)" as L4 {
+
+    package "Event Publishing Chain" as PubPkg {
+        [EventLogAppendingPublisher] as PUB_LOG SAP_NAVY
+        [RealtimeBroadcastingPublisher] as PUB_RT SAP_NAVY
+        [EnrichingEventPublisher] as PUB_ENR SAP_NAVY
+        [Backend Publisher\n(Console/Kafka/EventMesh)] as PUB_BE SAP_NAVY
+    }
+
+    package "Persistence" as PersistPkg {
+        [RunRepository] as R_RUN SAP_TEAL
+        [TaskRepository] as R_TASK SAP_TEAL
+        [WorkflowRepository] as R_WF SAP_TEAL
+        [EventLogRepository\n(Memory/SQLite/HANA)] as R_LOG SAP_TEAL
+    }
+
+    package "Orchestration Queue" as QueuePkg {
+        [OrchestrationQueue\n(Memory/Broker)] as OQ SAP_RED
+        [OrchestrationWorker] as OW SAP_RED
+    }
+
+    package "Realtime Delivery" as RTPkg {
+        [Broker Topic\n**realtime.events**\n(keyed by root_run_id)] as RT_TOPIC SAP_RED
+        [SocketIORealtimeConsumer\n(lane queues)] as SIOC SAP_GOLD
+        [PushGatewayRealtimeConsumer] as PGC SAP_GOLD
+    }
+
+    [Socket.IO Server] as SIO SAP_GOLD
+    [Push Gateway] as PG SAP_GOLD
+}
+
+cloud "External Workers\n(HTTP/Agent/Wait/...)" as WORKERS SAP_GOLD
+
+' --- Relationships ---
+
+REST --> UC_START
+REST --> UC_COMPLETE
+REST --> UC_RESUME
+
+UC_START --> OE
+UC_COMPLETE --> OE
+UC_RESUME --> OE
+UC_FAIL --> OE
+UC_CANCEL --> OE
+
+UC_START ..> OQ : enqueue actions
+UC_COMPLETE ..> OQ : enqueue actions
+UC_RESUME ..> OQ : enqueue actions
+
+OW --> OE : dispatch actions
+OQ --> OW : dequeue
+
+OE --> REG : get handler
+REG --> HandlerPkg
+
+OE --> SP : process successors
+SP --> FANOUT : compute_fanout()
+
+OE --> LOOP_DRV : loop lifecycle
+H_LOOP --> LOOP_DRV : delegate
+
+OE --> TF : create tasks
+OE --> VR : resolve variables
+OE --> CE : evaluate conditions
+
+OE --> PUB_LOG : **[1]** publish events
+PUB_LOG --> R_LOG : **[2]** append
+PUB_LOG --> PUB_RT : **[3]** delegate
+PUB_RT --> PUB_ENR : **[4]** delegate
+PUB_ENR --> PUB_BE : **[5]** enrich + publish
+PUB_RT --> RT_TOPIC : **[6]** publish envelope\n{event_type, rooms, payload}\nkey=root_run_id
+RT_TOPIC --> SIOC : **[7a]** on_message
+RT_TOPIC --> PGC : **[7b]** on_message
+SIOC --> SIO : **[8a]** emit(event, room)
+PGC --> PG : **[8b]** POST /pushgateway/send
+
+OE --> R_RUN : save/fetch runs
+OE --> R_TASK : save/fetch tasks
+
+PROJ --> R_LOG : replay
+REBUILD --> PROJ
+
+OE ..> WORKERS : dispatch TASK nodes
+WORKERS ..> UC_COMPLETE : report completion
+
+@enduml

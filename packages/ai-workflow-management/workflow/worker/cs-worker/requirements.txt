@@ -1,0 +1,5 @@
+# The SDK, installed editable from the sibling package (same as log-worker/claude-worker).
+-e ../worker-sdk
+
+# The nodes themselves use only the standard library. Anything added here must ALSO be
+# added to the Dockerfile's pip install — the image does not read this file.

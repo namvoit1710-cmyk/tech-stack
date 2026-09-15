@@ -1,0 +1,144 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "options": [
+            {
+              "id": "all",
+              "value": "Wait All"
+            },
+            {
+              "id": "any",
+              "value": "Wait Any"
+            },
+            {
+              "id": "n_of_m",
+              "value": "Wait N"
+            }
+          ],
+          "placeholder": "Select merge strategy"
+        },
+        "fieldControl": "SelectControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Merge Strategy",
+          "required": true
+        }
+      },
+      "key": "merge_strategy",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "n_of_m",
+          "fieldKey": "merge_strategy",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "1",
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Wait Count"
+        }
+      },
+      "key": "wait_count",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "3600",
+          "type": "number",
+          "value": 3600
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Timeout (seconds)"
+        }
+      },
+      "key": "timeout_seconds",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "options": [
+            {
+              "id": "fail",
+              "value": "Fail"
+            },
+            {
+              "id": "partial",
+              "value": "Partial"
+            }
+          ],
+          "placeholder": "Select on branch failure"
+        },
+        "fieldControl": "SelectControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "On Branch Failure"
+        }
+      },
+      "key": "on_branch_failure",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true,
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Branches Received"
+        }
+      },
+      "key": "branches_received",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "SwitchControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Completed"
+        }
+      },
+      "key": "completed",
+      "outputType": "boolean"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "SwitchControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Timed Out"
+        }
+      },
+      "key": "timed_out",
+      "outputType": "boolean"
+    }
+  ]
+}

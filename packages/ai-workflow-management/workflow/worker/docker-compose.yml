@@ -1,0 +1,60 @@
+# Build + run BOTH SMDG workers (log-worker + claude-worker) in one shot.
+# Portable — Linux server, WSL, or Docker Desktop. Use Compose v2 (`docker compose`).
+#
+#     cd .../workflow/worker
+#     docker compose build               # build both images
+#     docker compose up -d                # start both, detached
+#     docker compose logs -f              # follow both logs
+#     docker compose ps                   # status
+#     docker compose down                 # stop both
+#     docker compose up -d log-worker     # (start just one)
+#
+# The build context for both is THIS dir (worker/) — they share the sibling worker-sdk.
+# Credentials are env-first: each service reads its own worker's ./.env (nothing is
+# mounted from the host), so to deploy on a Linux server just ship these two files:
+#     log-worker/.env      (LOG_WORKER_CLIENT_ID/_SECRET (+_QAS), CLS_URL/USERNAME/PASSWORD)
+#     claude-worker/.env   (CLAUDE_WORKER_GITHUB_PAT, _GITLAB_PAT, _CLAUDE_CLI_TOKEN)
+services:
+  log-worker:
+    build:
+      context: .
+      dockerfile: log-worker/Dockerfile
+    image: log-worker:local
+    container_name: log-worker
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    env_file:
+      - log-worker/.env
+    environment:
+      APP_MODE: PULL
+      WORKER_TENANT: ""
+      REGISTRY_URL: https://smdg-ai-tenant-1-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+      # Left at one-at-a-time: WORKER_MAX_CONCURRENT is unset, so the gate defaults to 1
+      # and the loop leases exactly what it can start. This worker's handlers are short
+      # HTTP fetches; raise both together if that stops being true.
+      LEASE_MAX_BATCH: "1"
+    restart: unless-stopped
+
+  claude-worker:
+    build:
+      context: .
+      dockerfile: claude-worker/Dockerfile
+    image: claude-worker:local
+    container_name: claude-worker
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    env_file:
+      - claude-worker/.env
+    environment:
+      APP_MODE: PULL
+      WORKER_TENANT: ""
+      REGISTRY_URL: https://smdg-ai-tenant-1-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+      # Run up to 3 tasks at once (SDK WorkerConcurrency gate). Keep this <= the number
+      # of comma-separated CLAUDE_WORKER_CLAUDE_CLI_TOKEN values — concurrent runs share
+      # that pool. See claude-worker/docker-compose.yml for the full rationale.
+      WORKER_MAX_CONCURRENT: "3"
+      LEASE_MAX_BATCH: "3"
+      CLAUDE_WORKER_TRACE: /tmp/claude-worker-trace.log
+    restart: unless-stopped

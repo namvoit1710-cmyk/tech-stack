@@ -1,0 +1,6 @@
+from typing import Protocol
+
+
+class IDatabaseConnection(Protocol):
+    def execute_query(self, sql: str, params: tuple = ()) -> list[dict]: ...
+    def execute_write(self, sql: str, params: tuple = ()) -> None: ...

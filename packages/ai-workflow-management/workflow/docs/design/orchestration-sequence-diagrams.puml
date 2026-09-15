@@ -1,0 +1,1614 @@
+' =============================================================================
+' Workflow Orchestration Engine — Sequence Diagrams
+' =============================================================================
+' Contains 10 diagrams covering the core execution flows.
+'
+' SYNC vs ASYNC convention used throughout:
+'   -> (solid arrow)       = synchronous call (same call stack, blocking)
+'   ->> (solid arrow)      = synchronous return
+'   -[#BB0000]>            = ASYNC handoff (queue enqueue, fire-and-forget)
+'   -[#BB0000]>>           = ASYNC dequeue / callback arrival
+'   ...                    = time gap (process boundary, user wait)
+'
+' Color assignments:
+'   Engine / Core services  = SAP_BLUE (#0070F2)
+'   Handlers                = SAP_GREEN (#107E3E)
+'   External / Workers      = SAP_GOLD (#E9730C)
+'   User / Actor            = SAP_PURPLE (#7C5CCC)
+'   Queue                   = SAP_RED (#BB0000)
+'   Database / Repos        = SAP_TEAL (#049F9A)
+'   Publisher / Realtime    = SAP_NAVY (#002A5E)
+'
+' ASYNC BOUNDARY markers use red-colored dividers to clearly show
+' where the call stack breaks and execution continues in a different
+' process/context.
+' =============================================================================
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 1: Start Run → Entry Node Dispatch
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml start_run_flow
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+!define SAP_ASYNC_BG #FFF0E0
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam actor {
+    BackgroundColor SAP_PURPLE
+    BorderColor SAP_PURPLE
+    FontColor SAP_GRAY_DARK
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    BoxBackgroundColor SAP_WHITE
+    BoxBorderColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title Start Run Flow\n<size:10><color:#BB0000>Red arrows = ASYNC boundary (queue handoff)</color> | <color:#354A5F>Dark arrows = SYNC (same call stack)</color></size>
+
+actor "API Client" as api
+participant "StartRunUseCase" as uc SAP_BLUE
+participant "DAGPreparer" as dag SAP_GREEN
+participant "RunRepo" as repo SAP_TEAL
+participant "EventPublisher" as pub SAP_NAVY
+participant "OrchestrationQueue" as queue SAP_RED
+participant "OrchestrationWorker" as worker SAP_RED
+participant "OrchestrationEngine" as engine SAP_BLUE
+
+== SYNC: API Request Handling (single call stack) ==
+
+api -> uc : execute(workflow_id, input)
+activate uc
+
+uc -> uc : Fetch & validate workflow
+uc -> dag : prepare(workflow)
+activate dag
+dag --> uc : DAGInfo (edge_map, entry_nodes, leaf_nodes)
+deactivate dag
+
+uc -> uc : Create WorkflowRun (status=CREATED)
+uc -> uc : Store input as CSV file
+uc -> uc : Transition to RUNNING
+
+uc -> repo : save(run)
+activate repo
+deactivate repo
+
+uc -> pub : publish run.started
+activate pub
+deactivate pub
+
+uc -[#BB0000]> queue : enqueue(StartRunAction)
+activate queue
+note right of queue #FFF0E0
+  **ASYNC BOUNDARY**
+  API response returns immediately.
+  Engine processes later via worker.
+end note
+deactivate queue
+
+uc --> api : return run_id
+deactivate uc
+
+== ~~~ ASYNC BOUNDARY ~~~ (queue decouples request from orchestration) ==
+
+... Worker polls queue (different async context) ...
+
+worker -[#BB0000]>> queue : dequeue()
+activate worker
+activate queue
+queue --> worker : StartRunAction(run_id)
+deactivate queue
+
+== SYNC: Engine Orchestration (single call stack under run lock) ==
+
+worker -> engine : orchestrate_start(run_id)
+activate engine
+
+engine -> engine : Acquire run lock
+engine -> engine : Validate DAG
+
+engine -> engine : handle_entry_nodes(entry_node_ids)
+note over engine
+  **SYNC loop** — for each entry node:
+  Route by type (BUILTIN/PENDING/TASK).
+  BUILTIN: invoke handler + recurse.
+  PENDING: invoke handler + save (pauses).
+  TASK: resolve input + dispatch to worker.
+end note
+
+engine -> engine : check_run_completion()
+engine -> engine : drain_events()
+
+deactivate engine
+deactivate worker
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 2: BUILTIN Node — Inline Mode (fully synchronous)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml builtin_node_inline
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title BUILTIN Node — Inline Mode (CONDITION, SWITCH, COMPUTE, MERGE, PARALLEL, TRIGGER)\n<size:10>**Entire flow is SYNCHRONOUS** — single recursive call stack, no queue involved</size>
+
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "NodeHandler" as handler SAP_GREEN
+participant "TaskFactory" as tf SAP_TEAL
+participant "EventPublisher" as pub SAP_NAVY
+
+== SYNC: All within dispatch_or_handle_task (recursive, max depth 100) ==
+
+engine -> engine : dispatch_or_handle_task(task)
+activate engine
+
+engine -> engine : Buffer task.dispatched event\n(EventCollector, not yet published)
+
+engine -> handler : invoke_handler(node, run, ...,\ncurrent_scope_stack=task.scope_stack)
+activate handler
+note over handler
+  **SYNC** — handler runs inline.
+  scope_stack contextvar set before call,
+  reset in finally block after call.
+  Handler reads run.context, evaluates
+  expressions, returns result.
+end note
+handler --> engine : NodeHandlerResult\n(tasks, events, state_updates,\ntaken_edge_ports)
+deactivate handler
+
+engine -> engine : Apply state_updates\n  -> run.context.variables
+engine -> engine : Apply loop_state_updates\n  -> run.context.loop_state
+engine -> engine : Mark task COMPLETED
+engine -> engine : Buffer task.completed event
+
+engine -> pub : emit edge.traversed events\n(published IMMEDIATELY, not buffered)
+activate pub
+deactivate pub
+
+group SYNC recursion [For each successor task from handler result]
+  engine -> engine : dispatch_or_handle_task(successor)\n**[SYNC recursive call, same stack]**
+  note right of engine
+    Successor may be BUILTIN (recurse again),
+    PENDING (save + pause), or TASK (dispatch).
+    Max recursion depth = 100.
+  end note
+end
+
+engine -> engine : drain_events()\n  IMMEDIATE -> NORMAL -> TERMINAL\n  (publishes all buffered events)
+
+deactivate engine
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 3: BUILTIN Node — Queued Mode (async via queue)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml builtin_node_queued
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title BUILTIN Node — Queued Mode\n<size:10><color:#BB0000>Red arrows = ASYNC (queue handoff)</color> | <color:#354A5F>Dark arrows = SYNC</color> — **No recursion**: each node is a separate queue action</size>
+
+participant "OrchestrationWorker" as worker SAP_RED
+participant "OrchestrationQueue" as queue SAP_RED
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "NodeHandler" as handler SAP_GREEN
+participant "EventPublisher" as pub SAP_NAVY
+
+== ASYNC: Worker dequeues action ==
+
+worker -[#BB0000]>> queue : dequeue()
+activate worker
+activate queue
+queue --> worker : ExecuteNodeAction(run_id, task_id)
+deactivate queue
+
+== SYNC: Engine processes single node (under run lock) ==
+
+worker -> engine : orchestrate_execute_node(run_id, task_id)
+activate engine
+
+engine -> engine : Acquire run lock
+engine -> engine : Predecessor-readiness guard (Fix B)\n  **SYNC check** — defers if predecessors not done
+
+engine -> engine : _exec_builtin_queued(task, node, run, ...)
+
+engine -> engine : Buffer task.dispatched event
+
+engine -> handler : invoke_handler(node, run, ...,\ncurrent_scope_stack=task.scope_stack)
+activate handler
+note over handler
+  **SYNC** — same as inline mode.
+  Handler runs, returns result.
+end note
+handler --> engine : NodeHandlerResult
+deactivate handler
+
+engine -> engine : Apply state_updates
+engine -> engine : Mark task COMPLETED
+
+group ASYNC successor dispatch [For each successor — enqueued, NOT recursed]
+  engine -[#BB0000]> queue : enqueue(ExecuteNodeAction)\n**[ASYNC: each successor is a\nseparate queue action]**
+  activate queue
+  note right of queue #FFF0E0
+    **KEY DIFFERENCE from inline:**
+    Successors are NOT executed now.
+    They will be dequeued and processed
+    independently by the worker.
+  end note
+  deactivate queue
+end
+
+engine -> pub : publish events (SYNC)
+activate pub
+deactivate pub
+
+engine -> engine : maybe_enqueue_loop_iteration(task, run)\n  **SYNC** — if inside loop body, may enqueue\n  LoopIterationAction (ASYNC)
+engine -> engine : Save run
+engine -> engine : check_run_completion()
+
+deactivate engine
+deactivate worker
+
+== ~~~ ASYNC BOUNDARY ~~~ (successor processed in next worker cycle) ==
+
+... Worker dequeues next ExecuteNodeAction ...
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 4: TASK Node — Worker Dispatch (two ASYNC boundaries)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml task_node_flow
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title TASK Node — Worker Dispatch & Completion\n<size:10><color:#BB0000>Red = ASYNC</color> | <color:#354A5F>Dark = SYNC</color> — **Two ASYNC boundaries**: dispatch to worker + completion callback</size>
+
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "VariableResolver" as vr SAP_GREEN
+participant "EventPublisher" as pub SAP_NAVY
+participant "WorkerExecutor\n(port 8004)" as executor SAP_GOLD
+participant "Worker\n(HTTP/Agent/Wait)" as worker SAP_GOLD
+participant "CompleteTaskUseCase" as ctuc SAP_BLUE
+participant "OrchestrationQueue" as queue SAP_RED
+
+== SYNC: Dispatch Phase (engine call stack) ==
+
+engine -> engine : dispatch_or_handle_task(task)\n[TASK branch]
+activate engine
+
+engine -> vr : resolve(node.input_binding)
+activate vr
+note over vr
+  **SYNC** — resolves $.node_id.field
+  expressions from run.context.variables.
+  May call file service (async I/O but
+  same call stack via await).
+end note
+vr --> engine : resolved_input
+deactivate vr
+
+engine -> engine : Convert to CSV if needed
+engine -> engine : Mark task RUNNING
+engine -> engine : Record stage
+
+engine -> pub : task.dispatched (IMMEDIATE, published now)
+activate pub
+deactivate pub
+
+engine -[#BB0000]> executor : dispatch task (HTTP POST)\n**[ASYNC BOUNDARY #1]**
+note right of executor #FFF0E0
+  **Engine returns here.**
+  Task is now owned by the
+  worker-executor service.
+  Engine call stack ends.
+end note
+
+deactivate engine
+
+== ~~~ ASYNC BOUNDARY #1 ~~~ (task executes on external worker) ==
+
+... Worker-executor routes to registered worker ...
+
+executor -> worker : POST /api/v1/execute
+activate executor
+activate worker
+note over worker
+  **Worker runs independently**
+  (HTTP request, AI agent call,
+  wait timer, data mapping, etc.)
+  Duration: milliseconds to hours.
+end note
+worker --> executor : result (output data)
+deactivate worker
+deactivate executor
+
+== ~~~ ASYNC BOUNDARY #2 ~~~ (completion callback to control plane) ==
+
+executor -[#BB0000]> ctuc : POST /api/v1/complete-task\n(run_id, task_id, output)\n**[ASYNC BOUNDARY #2]**
+
+== SYNC: Completion Phase (use case call stack) ==
+
+activate ctuc
+
+ctuc -> ctuc : Mark task COMPLETED
+ctuc -> ctuc : Apply output_mapping / output_binding
+ctuc -> ctuc : Store output as CSV file
+ctuc -> ctuc : Update run.context.variables
+
+ctuc -> pub : task.completed (SYNC publish)
+activate pub
+deactivate pub
+
+ctuc -> pub : context.updated (SYNC publish)
+activate pub
+deactivate pub
+
+ctuc -> ctuc : maybe_enqueue_loop_iteration(task, run)\n  **SYNC** — may enqueue LoopIterationAction
+
+ctuc -[#BB0000]> queue : enqueue(ContinueRunAction)\n**[ASYNC: successor processing\nhappens in next worker cycle]**
+activate queue
+deactivate queue
+
+deactivate ctuc
+
+== ~~~ ASYNC BOUNDARY #3 ~~~ (successor processing via queue) ==
+
+... Worker dequeues ContinueRunAction ...
+note over engine
+  orchestrate_continue(run_id, task_id)
+  -> process_and_dispatch_successors
+  -> enqueue next node actions
+end note
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 5: PENDING Node — Pause / Resume (user-driven ASYNC gap)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml pending_node_flow
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam actor {
+    BackgroundColor SAP_PURPLE
+    BorderColor SAP_PURPLE
+    FontColor SAP_GRAY_DARK
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title PENDING Node — INPUT / HUMAN_ACTION / DATA_EDIT / FILE_UPLOAD\n<size:10><color:#BB0000>Red = ASYNC</color> | <color:#7C5CCC>Purple = USER ACTION (unbounded wait)</color> | <color:#354A5F>Dark = SYNC</color></size>
+
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "NodeHandler" as handler SAP_GREEN
+participant "TaskRepo" as repo SAP_TEAL
+participant "EventPublisher" as pub SAP_NAVY
+actor "User" as user
+participant "ResumePending\nTaskUseCase" as ruc SAP_BLUE
+participant "OrchestrationQueue" as queue SAP_RED
+
+== SYNC: Pause Phase (engine call stack) ==
+
+engine -> engine : dispatch_or_handle_task(task)\n[PENDING branch]
+activate engine
+
+engine -> handler : invoke_handler(node, run, ...)
+activate handler
+note over handler
+  **SYNC** — handler creates
+  pending task(s) with status=PENDING.
+  No external I/O.
+end note
+handler --> engine : NodeHandlerResult\n(pending tasks, events)
+deactivate handler
+
+engine -> repo : save pending tasks (SYNC)
+activate repo
+deactivate repo
+
+engine -> pub : task.dispatched (IMMEDIATE, published now)
+activate pub
+deactivate pub
+
+engine -> pub : handler events (IMMEDIATE, published now)\n  e.g. input.requested, human_action.requested
+activate pub
+deactivate pub
+
+note over engine #FFF0E0
+  **RUN PAUSES HERE**
+  Engine call stack ENDS.
+  No successors dispatched.
+  No drain_events — events already
+  published IMMEDIATELY above.
+end note
+
+deactivate engine
+
+== ~~~ USER-DRIVEN ASYNC BOUNDARY ~~~ (seconds to days) ==
+
+... Waiting for user action (UI, API call, webhook) ...
+... Duration: seconds, minutes, hours, or days ...
+
+user -[#7C5CCC]> ruc : submit(run_id, task_id, user_input)\n**[USER-INITIATED — unbounded wait]**
+
+== SYNC: Resume Phase (use case call stack) ==
+
+activate ruc
+
+ruc -> ruc : Mark task COMPLETED
+ruc -> ruc : Update run.context.variables\nwith user-provided data
+
+ruc -> pub : task.completed (SYNC publish)
+activate pub
+deactivate pub
+
+ruc -> ruc : maybe_enqueue_loop_iteration(task, run)
+
+ruc -[#BB0000]> queue : enqueue(ContinueRunAction)\n**[ASYNC: successor processing\nhappens in next worker cycle]**
+activate queue
+deactivate queue
+
+deactivate ruc
+
+== ~~~ ASYNC BOUNDARY ~~~ (successor processing via queue) ==
+
+... Worker dequeues ContinueRunAction ...
+note over engine
+  orchestrate_continue(run_id, task_id)
+  -> process_and_dispatch_successors
+end note
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 6: LOOP Node — Inline Mode (fully synchronous iteration)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml loop_inline_flow
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title LOOP Node — Event-Driven, Inline Mode (EVENT_DRIVEN_LOOP=true, queue=None)\n<size:10>**Entire flow is SYNCHRONOUS** — driver.run_loop drives all iterations in one call stack</size>
+
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "EventDrivenLoopDriver" as driver SAP_GREEN
+participant "EventPublisher" as pub SAP_NAVY
+
+== SYNC: All within dispatch_or_handle_task → driver.run_loop ==
+
+engine -> engine : dispatch_or_handle_task(task)\n[LOOP + driver, queue=None]
+activate engine
+
+engine -> engine : Mark loop task COMPLETED
+engine -> engine : Buffer task.completed event
+
+engine -> driver : run_loop(loop_node, loop_task, run, ...)\n**[SYNC call — driver drives entire loop]**
+activate driver
+
+driver -> driver : initialize_loop()\n  Resolve items, build loop_state,\n  derive invocation_id
+
+driver -> pub : LoopStarted (SYNC publish via inject)
+activate pub
+deactivate pub
+
+driver -> pub : LoopIterationStarted(iter=0) (SYNC)
+activate pub
+deactivate pub
+
+group SYNC iteration loop [While iterations remain AND NOT break_requested]
+
+  driver -> driver : _dispatch_iteration_body(iter=N)\n  Set task.scope_stack =\n  [LoopScope(iter=N, invocation_id=...)]
+
+  driver -> engine : enqueue_or_dispatch(body_task)\n**[SYNC — falls through to\ndispatch_or_handle_task recursively]**
+  note over engine
+    **SYNC recursion** — body task
+    executes inline (BUILTIN handlers
+    recurse, TASK nodes dispatch to
+    workers, PENDING nodes pause).
+    When this call returns, body is done.
+  end note
+
+  driver -> pub : LoopIterationCompleted(iter=N) (SYNC)
+  activate pub
+  deactivate pub
+
+  driver -> driver : Check break_requested\n  Re-evaluate condition (if condition loop)
+
+  driver -> pub : LoopIterationStarted(iter=N+1) (SYNC)
+  activate pub
+  deactivate pub
+
+end
+
+driver -> pub : LoopCompleted(reason) (SYNC)
+activate pub
+deactivate pub
+
+driver -> engine : enqueue_or_dispatch(exit_task)\n**[SYNC — exit task dispatched inline]**
+
+deactivate driver
+
+engine -> engine : Save run
+engine -> engine : drain_events()
+
+deactivate engine
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 7: LOOP Node — Queued Mode (async iteration via LoopIterationAction)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml loop_queued_flow
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title LOOP Node — Event-Driven, Queued Mode (EVENT_DRIVEN_LOOP=true, queue!=None)\n<size:10><color:#BB0000>Red = ASYNC (queue handoff)</color> | <color:#354A5F>Dark = SYNC</color> — **Each iteration is a separate ASYNC cycle**</size>
+
+participant "OrchestrationWorker" as worker SAP_RED
+participant "OrchestrationQueue" as queue SAP_RED
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "EventDrivenLoopDriver" as driver SAP_GREEN
+participant "LoopNodeHandler" as handler SAP_GREEN
+participant "EventPublisher" as pub SAP_NAVY
+
+== SYNC: Loop Initialization (engine call stack) ==
+
+engine -> engine : dispatch_or_handle_task(task)\n[LOOP + driver + queue]
+activate engine
+
+engine -> engine : Mark loop task COMPLETED
+
+engine -> driver : initialize_loop_queued(...)\n**[SYNC call]**
+activate driver
+
+driver -> driver : initialize_loop()\n  Resolve items, build loop_state
+driver -> driver : Init iter_progress = {} on loop_state
+
+driver -> pub : LoopStarted + LoopIterationStarted(0)
+activate pub
+deactivate pub
+
+driver -[#BB0000]> queue : enqueue(ExecuteNodeAction)\n  [body task 0]\n**[ASYNC: body runs later]**
+activate queue
+deactivate queue
+
+deactivate driver
+
+engine -> engine : Save run
+
+note over engine #FFF0E0
+  **Engine RETURNS here.**
+  Loop initialization is done.
+  Body task 0 will be processed
+  asynchronously by the worker.
+end note
+
+deactivate engine
+
+== ~~~ ASYNC BOUNDARY ~~~ (body task 0 processed by worker) ==
+
+... Worker dequeues and processes body task 0 ...
+... (could be BUILTIN, TASK, or PENDING — see other diagrams) ...
+
+== SYNC: Body Completion Hook (runs at end of body task processing) ==
+
+engine -> engine : maybe_enqueue_loop_iteration\n  (completed_task, run)
+activate engine
+
+note over engine
+  **SYNC gate checks:**
+  1. queue != None? yes
+  2. driver != None? yes
+  3. task.scope_stack has invocation_id? yes
+  4. Loop is active? yes
+end note
+
+engine -> engine : Record node_id in iter_progress[0]
+engine -> engine : Sweep skipped_nodes into progress
+engine -> engine : is_iteration_done() — runtime BFS\n  (SYNC — walks dag_info.edge_map)
+
+alt BFS says iteration 0 is complete
+  engine -[#BB0000]> queue : enqueue(LoopIterationAction)\n**[ASYNC: iteration boundary\nprocessed in next worker cycle]**
+  activate queue
+  deactivate queue
+else Still waiting for more body nodes
+  note over engine
+    No action. Hook will fire again
+    when next body node completes.
+  end note
+end
+
+deactivate engine
+
+== ~~~ ASYNC BOUNDARY ~~~ (iteration boundary) ==
+
+... Worker dequeues LoopIterationAction ...
+
+worker -[#BB0000]>> queue : dequeue()
+activate worker
+activate queue
+queue --> worker : LoopIterationAction\n(run_id, task_id, loop_node_id, iter=0)
+deactivate queue
+
+== SYNC: Iteration Boundary Processing (under run lock) ==
+
+worker -> engine : orchestrate_loop_iteration(...)
+activate engine
+
+engine -> engine : Acquire run lock
+engine -> engine : Build synthetic completed task\n  (represents iteration 0 result)
+engine -> engine : Reconstruct scope_stack from loop_state
+
+engine -> handler : invoke_handler(iteration_complete)\n**[SYNC — delegates to driver]**
+activate handler
+handler -> driver : driver.iteration_complete()
+activate driver
+driver --> handler : NodeHandlerResult\n  (events, next body tasks or exit)
+deactivate driver
+handler --> engine : NodeHandlerResult
+deactivate handler
+
+engine -> engine : Apply loop_state_updates
+
+== SYNC: Iter-boundary cleanup ==
+
+engine -> engine : iter_progress.pop(0)\n  (drop finished iteration bucket)
+
+alt More iterations (completed < total)
+  engine -> engine : iter_progress[1] = []\n  (init next iteration bucket)
+  engine -> engine : BFS iterate_body_subgraph()\n  Wipe body nodes from\n  completed_nodes + skipped_nodes\n  **[SYNC — enables re-execution]**
+
+  engine -[#BB0000]> queue : enqueue(ExecuteNodeAction)\n  [next body task]\n**[ASYNC: next iteration starts]**
+  activate queue
+  deactivate queue
+else All iterations done (or break)
+  engine -> pub : LoopCompleted(reason) (SYNC)
+  activate pub
+  deactivate pub
+
+  engine -[#BB0000]> queue : enqueue(ExecuteNodeAction)\n  [exit task]\n**[ASYNC: post-loop continues]**
+  activate queue
+  deactivate queue
+end
+
+engine -> engine : Save run
+engine -> engine : check_run_completion()
+
+deactivate engine
+deactivate worker
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 8: WORKFLOW (Child Run) Node — sync init, async child execution
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml workflow_node_flow
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title WORKFLOW Node — Child Run\n<size:10><color:#354A5F>Dark = SYNC</color> — Child init is SYNC but child completion is **ASYNC** (child runs independently)</size>
+
+participant "OrchestrationEngine\n(parent context)" as parent SAP_BLUE
+participant "WorkflowNodeHandler" as handler SAP_GREEN
+participant "EventPublisher" as pub SAP_NAVY
+participant "OrchestrationEngine\n(child context)" as child SAP_BLUE
+
+== SYNC: Parent dispatches child (same call stack) ==
+
+parent -> parent : dispatch_or_handle_task(task)\n[WORKFLOW branch]
+activate parent
+
+parent -> handler : invoke_handler()
+activate handler
+handler --> parent : NodeHandlerResult\n(requires_child_run=true, state_updates)
+deactivate handler
+
+parent -> parent : _start_child_workflow(child_wf_id, parent_run)\n**[SYNC — child created in same call stack]**
+parent -> parent : Create child WorkflowRun\n  root_run_id = parent.root_run_id\n  parent_run_id = parent.id
+
+parent -> pub : ChildRunStarted (SYNC)
+activate pub
+deactivate pub
+
+parent -> parent : handle_entry_nodes() for child\n**[SYNC — child entry nodes processed\nin same call stack as parent]**
+
+note over parent #FFF0E0
+  **Parent task stays RUNNING**
+  Parent WORKFLOW task is NOT completed.
+  It will complete when the child run
+  reaches a terminal state.
+  Parent call stack ends here.
+end note
+
+deactivate parent
+
+== ~~~ ASYNC BOUNDARY ~~~ (child executes independently) ==
+
+... Child run processes its own DAG nodes ...
+... (same engine, same patterns, separate run lock) ...
+... Duration depends on child workflow complexity ...
+
+activate child
+
+child -> child : Execute DAG nodes...\n  (BUILTIN / TASK / PENDING / nested LOOP)
+child -> child : check_run_completion()\n  -> child transitions to COMPLETED
+
+child -> pub : ChildRunCompleted (SYNC)
+activate pub
+deactivate pub
+
+note over child
+  **SYNC callback** — child's
+  check_run_completion finds the
+  parent task and marks it COMPLETED.
+  Then processes parent's successors.
+end note
+
+child -> parent : Mark parent WORKFLOW task COMPLETED\n  + process_and_dispatch_successors\n  **[SYNC — in child's call stack]**
+
+deactivate child
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 9: CONDITION / SWITCH Branching (fully synchronous)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml condition_branch_flow
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title CONDITION / SWITCH Branching\n<size:10>**Entire flow is SYNCHRONOUS** — evaluation + skip cascade + dispatch in one call stack</size>
+
+participant "SuccessorProcessor" as sp SAP_BLUE
+participant "ConditionNodeHandler" as handler SAP_GREEN
+participant "ConditionEvaluator" as eval SAP_GREEN
+participant "VariableResolver" as vr SAP_GREEN
+participant "compute_fanout" as fanout SAP_TEAL
+participant "TaskFactory" as tf SAP_TEAL
+participant "EventPublisher" as pub SAP_NAVY
+
+== SYNC: All within SuccessorProcessor.process() ==
+
+sp -> sp : process(completed_task, run, ...)
+activate sp
+
+sp -> sp : Source is CONDITION\n  -> _evaluate_branching_node()
+
+sp -> handler : invoke_handler(node, run, ...)
+activate handler
+
+handler -> eval : evaluate(expression, run.context)
+activate eval
+
+eval -> vr : resolve(operands)\n  e.g. $.previous_node.status
+activate vr
+vr --> eval : resolved values
+deactivate vr
+
+eval --> handler : true / false
+deactivate eval
+
+handler -> handler : Set taken_edge_ports\n  (e.g. {"condition_true": "out_true"})
+handler -> handler : Emit EdgeTraversed\n  for taken branch\n  **[handler emits its own edges —\n  engine skips edge emission for\n  CONDITION/SWITCH types]**
+
+handler --> sp : NodeHandlerResult\n  (taken_edge_ports, skipped_node_ids)
+deactivate handler
+
+sp -> fanout : compute_fanout(edges, taken_ports, ...)\n  -> FanoutAction for taken branch\n  -> SkipAction for untaken branch
+activate fanout
+fanout --> sp : FanoutDecision
+deactivate fanout
+
+== SYNC: Skip Propagation (BFS cascade) ==
+
+group SYNC skip cascade [For each untaken branch]
+  sp -> sp : BFS collect_downstream_nodes_to_skip()\n  **[SYNC — walks DAG; only skips if\n  ALL predecessors are skipped;\n  merge-point nodes with live\n  incoming paths stay active]**
+
+  loop For each skipped node
+    sp -> pub : TaskSkipped event\n  (deterministic event_id)
+    activate pub
+    deactivate pub
+  end
+end
+
+== SYNC: Taken Branch Dispatch ==
+
+sp -> tf : create_task(taken_target_node, run)\n  **[SYNC — inherits scope_stack\n  from contextvar if set]**
+activate tf
+tf --> sp : task
+deactivate tf
+
+sp -> sp : Continue processing taken branch\n  (may recurse into next BUILTIN)
+
+deactivate sp
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 10: Event Publication Chain (synchronous decorator pipeline)
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml event_publication_chain
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam actor {
+    BackgroundColor SAP_PURPLE
+    BorderColor SAP_PURPLE
+    FontColor SAP_GRAY_DARK
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title Event Publication Chain — Decorator Pipeline\n<size:10>**Entire chain is SYNCHRONOUS** — decorators wrap each other; event flows through all layers in one await</size>
+
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "EventCollector\n(contextvar)" as collector SAP_GREEN
+participant "EventLogAppending\nPublisher" as logpub SAP_TEAL
+participant "EnrichingPublisher" as enrich SAP_GREEN
+participant "RealtimeBroadcasting\nPublisher" as realtime SAP_NAVY
+participant "BackendPublisher\n(Kafka/EventMesh/Console)" as backend SAP_GOLD
+participant "SocketIOConsumer" as sio SAP_NAVY
+actor "Frontend" as frontend
+
+== SYNC: Buffer Phase (events collected, not yet published) ==
+
+engine -> collector : emit(topic, event)\n  **[SYNC — appends to in-memory list\n  in contextvar-scoped collector.\n  Event is NOT published yet.\n  Categorized: IMMEDIATE/NORMAL/TERMINAL]**
+activate engine
+activate collector
+deactivate collector
+
+note over engine
+  Multiple emit() calls happen during
+  handler invocation + successor processing.
+  Events accumulate in the collector.
+end note
+
+== SYNC: Drain Phase (all events published in priority order) ==
+
+engine -> engine : drain_events()
+
+engine -> collector : flush()\n  Order: IMMEDIATE -> NORMAL -> TERMINAL
+activate collector
+
+note over collector
+  **SYNC iteration** — for each
+  collected event in priority order,
+  calls the publisher chain below.
+end note
+
+collector -> logpub : publish(topic, event)
+activate logpub
+
+logpub -> logpub : Append to event log\n  (shadow write-ahead)\n  **[SYNC I/O — memory/SQLite/HANA]**
+
+logpub -> enrich : publish(topic, event)
+activate enrich
+
+enrich -> enrich : Set root_run_id, depth\n  on event payload
+
+enrich -> realtime : publish(topic, event)
+activate realtime
+
+realtime -> realtime : Extract run_id, workflow_id
+realtime -> realtime : Normalize topic -> dot notation\n  e.g. "taskdispatched" -> "task.dispatched"
+
+realtime -> sio : emit to Socket.IO rooms\n  run:{run_id}, workflow:{workflow_id}\n  **[SYNC — puts on asyncio.Queue;\n  consumer drains independently]**
+activate sio
+
+realtime -> backend : publish(topic, event)\n  **[SYNC await — Kafka/EventMesh\n  or Console.log]**
+activate backend
+backend -> backend : Write to message bus
+deactivate backend
+
+sio -> frontend : Socket.IO push (realtime)\n  **[ASYNC — WebSocket to browser;\n  consumer drains its queue\n  independently of the engine]**
+deactivate sio
+
+deactivate realtime
+deactivate enrich
+deactivate logpub
+deactivate collector
+deactivate engine
+
+@enduml
+
+
+' ─────────────────────────────────────────────────────────────────────────────
+' Diagram 11: Full Orchestration Lifecycle — SYNC vs ASYNC Overview
+' Shows the complete flow from StartRun through a multi-node workflow
+' with BUILTIN, TASK, and PENDING nodes, highlighting which steps are
+' synchronous (same process/call-stack) and which are asynchronous
+' (decoupled via queue, HTTP callback, or user action).
+' ─────────────────────────────────────────────────────────────────────────────
+@startuml orchestration_sync_async_overview
+
+!define SAP_BLUE #0070F2
+!define SAP_DARK_BLUE #0054B8
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_ORANGE #F58B00
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY_DARK #354A5F
+!define SAP_GRAY_MEDIUM #6A6D70
+!define SAP_GRAY_LIGHT #D1E0EE
+!define SAP_WHITE #FFFFFF
+!define SAP_BG_LIGHT #F5F6F7
+
+skinparam backgroundColor SAP_BG_LIGHT
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam participant {
+    BackgroundColor SAP_BLUE
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_WHITE
+    RoundCorner 8
+}
+skinparam actor {
+    BackgroundColor SAP_PURPLE
+    BorderColor SAP_PURPLE
+    FontColor SAP_GRAY_DARK
+}
+skinparam sequence {
+    ArrowColor SAP_GRAY_DARK
+    ArrowFontColor SAP_GRAY_MEDIUM
+    ArrowFontSize 10
+    LifeLineBorderColor SAP_GRAY_MEDIUM
+    LifeLineBackgroundColor SAP_GRAY_LIGHT
+    BoxBackgroundColor SAP_WHITE
+    BoxBorderColor SAP_GRAY_LIGHT
+    DividerBackgroundColor SAP_GRAY_LIGHT
+    DividerBorderColor SAP_GRAY_MEDIUM
+    GroupBackgroundColor SAP_WHITE
+    GroupBorderColor SAP_BLUE
+    GroupHeaderFontColor SAP_NAVY
+}
+skinparam note {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_ORANGE
+    FontColor SAP_WHITE
+}
+
+title Full Orchestration Lifecycle — SYNC vs ASYNC\n<size:10><color:#354A5F>Dark = SYNC (same process, blocking)</color> | <color:#BB0000>Red = ASYNC via OrchestrationQueue</color> | <color:#E9730C>Orange = ASYNC via Messaging Bus + HTTP</color> | <color:#7C5CCC>Purple = User action</color></size>
+
+actor "API Client" as api
+participant "StartRunUseCase /\nCompleteTaskUseCase /\nResumePendingUseCase" as usecase SAP_BLUE
+
+box "Orchestration Queue\n(single queue, single consumer)" #FFEEEE
+  participant "OrchestrationQueue\n(Memory / Kafka)" as queue SAP_RED
+  participant "OrchestrationWorker" as worker SAP_RED
+end box
+
+participant "OrchestrationEngine" as engine SAP_BLUE
+participant "NodeHandler\n(13 handlers)" as handler SAP_GREEN
+
+box "External Systems" #FFF5E0
+  participant "Messaging Bus\n(Kafka / EventMesh)" as bus SAP_GOLD
+  participant "WorkerExecutor\n(port 8004)" as executor SAP_GOLD
+  participant "Worker\n(HTTP/Agent/Wait)" as extworker SAP_GOLD
+end box
+
+actor "User" as user
+
+== 1. API starts a run ==
+
+api -> usecase : POST /start-run
+activate usecase
+usecase -> usecase : Create WorkflowRun\nValidate, prepare DAG
+usecase -[#BB0000]> queue : enqueue(StartRunAction)
+usecase --> api : 202 { run_id }
+deactivate usecase
+
+note over queue #FFF0E0
+  **ASYNC BOUNDARY**
+  API returned. Run is "RUNNING"
+  but no node has executed yet.
+end note
+
+== 2. Engine processes entry nodes ==
+
+... OrchestrationWorker dequeues ...
+
+worker -[#BB0000]>> queue : dequeue()
+activate worker
+queue --> worker : StartRunAction
+
+worker -> engine : orchestrate_start(run_id)
+activate engine
+
+engine -> engine : handle_entry_nodes()
+
+note over engine
+  Engine looks at each entry node
+  and routes by type. Let's say
+  entry node is a **TRIGGER** (BUILTIN).
+end note
+
+engine -> handler : invoke_handler(TRIGGER)
+activate handler
+handler --> engine : NodeHandlerResult(successors=[CONDITION_1])
+deactivate handler
+engine -> engine : Mark TRIGGER completed
+
+engine -[#BB0000]> queue : enqueue(ExecuteNodeAction(CONDITION_1))
+note right of queue #FFF0E0
+  Successor is NOT executed now.
+  It goes back to the queue.
+end note
+
+deactivate engine
+deactivate worker
+
+== 3. Engine processes BUILTIN node (CONDITION) ==
+
+... OrchestrationWorker dequeues ...
+
+worker -[#BB0000]>> queue : dequeue()
+activate worker
+queue --> worker : ExecuteNodeAction(CONDITION_1)
+
+worker -> engine : orchestrate_execute_node(CONDITION_1)
+activate engine
+
+engine -> engine : _exec_builtin_queued()
+
+engine -> handler : invoke_handler(CONDITION)
+activate handler
+note over handler
+  **SYNC** — evaluates expression
+  against run.context.variables.
+  Determines: true branch taken,
+  false branch skipped.
+end note
+handler --> engine : NodeHandlerResult\n(successors=[HTTP_TASK_1],\nskipped=[COMPUTE_2])
+deactivate handler
+
+engine -> engine : Mark CONDITION completed\nCascade-skip false branch
+
+engine -[#BB0000]> queue : enqueue(ExecuteNodeAction(HTTP_TASK_1))
+
+engine -> engine : check_run_completion()
+
+deactivate engine
+deactivate worker
+
+== 4. Engine processes TASK node (dispatches to external worker) ==
+
+... OrchestrationWorker dequeues ...
+
+worker -[#BB0000]>> queue : dequeue()
+activate worker
+queue --> worker : ExecuteNodeAction(HTTP_TASK_1)
+
+worker -> engine : orchestrate_execute_node(HTTP_TASK_1)
+activate engine
+
+engine -> engine : _exec_task_queued()
+engine -> engine : Resolve input variables
+engine -> engine : Mark task RUNNING
+
+engine -[#E9730C]> bus : publish task.dispatched\n(contains resolved_input,\nworker_type, task_id)
+note right of bus #FFF0E0
+  **DIFFERENT ASYNC MECHANISM**
+  This does NOT go to OrchestrationQueue.
+  It goes to the **Messaging Bus**
+  (Kafka / EventMesh / Console).
+  The WorkerExecutor service (port 8004)
+  is subscribed to this topic.
+end note
+
+deactivate engine
+deactivate worker
+
+note over engine #FFF0E0
+  **Engine is DONE with this node.**
+  It will NOT touch this task again
+  until the worker calls back with
+  the result. Engine is free to
+  process other queue actions.
+end note
+
+== 5. External worker executes (separate service, separate process) ==
+
+... WorkerExecutor picks up task from messaging bus ...
+
+bus -[#E9730C]>> executor : consume task.dispatched
+activate executor
+
+executor -> extworker : POST /api/v1/execute
+activate extworker
+note over extworker
+  **External execution**
+  (milliseconds to hours)
+  HTTP request, AI agent call,
+  wait timer, data mapping...
+end note
+extworker --> executor : result { output }
+deactivate extworker
+
+executor -[#E9730C]> usecase : POST /complete-task\n(run_id, task_id, output)\n**[HTTP callback to control plane]**
+deactivate executor
+
+== 6. Completion triggers successor calculation ==
+
+activate usecase
+usecase -> usecase : Mark task COMPLETED\nStore output, update variables
+usecase -> usecase : maybe_enqueue_loop_iteration()
+
+usecase -[#BB0000]> queue : enqueue(ContinueRunAction)
+note right of queue #FFF0E0
+  **Back to OrchestrationQueue.**
+  Engine will calculate successors
+  in the next worker cycle.
+end note
+
+deactivate usecase
+
+== 7. Engine calculates and dispatches next node ==
+
+... OrchestrationWorker dequeues ...
+
+worker -[#BB0000]>> queue : dequeue()
+activate worker
+queue --> worker : ContinueRunAction
+
+worker -> engine : orchestrate_continue(run_id, task_id)
+activate engine
+
+engine -> engine : process_and_dispatch_successors()
+
+note over engine
+  **SYNC** — SuccessorProcessor walks
+  edges, evaluates CONDITION/SWITCH
+  inline, cascade-skips, creates tasks.
+end note
+
+alt Next node is BUILTIN
+  engine -[#BB0000]> queue : enqueue(ExecuteNodeAction(next))\n  -> back to step 3
+else Next node is TASK
+  engine -[#BB0000]> queue : enqueue(ExecuteNodeAction(next))\n  -> back to step 4
+else Next node is PENDING (INPUT)
+  engine -> engine : _exec_pending_queued()\nSave PENDING task, publish events
+  note over engine #FFF0E0
+    **Run PAUSES.**
+    No more queue actions.
+    Waiting for user.
+  end note
+else No more successors (leaf reached)
+  engine -> engine : check_run_completion()\n  -> Run status = COMPLETED
+end
+
+deactivate engine
+deactivate worker
+
+== 8. (If PENDING) User submits input ==
+
+... seconds / minutes / hours / days ...
+
+user -[#7C5CCC]> usecase : POST /resume-pending-task\n(run_id, task_id, user_input)
+activate usecase
+usecase -> usecase : Mark task COMPLETED
+usecase -[#BB0000]> queue : enqueue(ContinueRunAction)\n  -> back to step 7
+deactivate usecase
+
+@enduml

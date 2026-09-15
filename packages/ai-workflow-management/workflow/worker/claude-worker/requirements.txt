@@ -1,0 +1,7 @@
+-e ../worker-sdk
+httpx
+# claude_repro drives a real browser; needs `playwright install chromium` too
+playwright
+pytest
+pytest-asyncio
+pytest-cov

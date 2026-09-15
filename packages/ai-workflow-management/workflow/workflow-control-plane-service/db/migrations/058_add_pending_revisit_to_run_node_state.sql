@@ -1,0 +1,66 @@
+-- Migration: give pending_revisits a column of its own in AIW_RUN_NODE_STATE.
+--
+-- Design + every measurement: solace/specs/wcp-node-output-storage-redesign.md
+-- sections 13 and 15. Amends migration 055. The table is still EMPTY -- nothing
+-- reads or writes it yet -- which is why this is an ALTER now rather than a data
+-- migration later.
+--
+-- ============================================================================
+-- Why STATE cannot carry it
+-- ============================================================================
+--
+-- Migration 055 says this table "replaces completed_nodes, skipped_nodes,
+-- node_visits, pending_revisits and last_output_ports", and gave it
+-- STATE NVARCHAR(24), VISITS INTEGER and LAST_OUTPUT_PORT. Four of the five fit.
+-- pending_revisits does not, because it is NOT mutually exclusive with the other
+-- two STATE values -- it is the opposite:
+--
+--     SA-846 Mode A. A node completes, so it enters completed_nodes. THEN a
+--     taken edge arrives while its latest task has already started. Instead of
+--     dropping the arrival, check_run_completion records the node in
+--     pending_revisits and drains it once the node quiesces.
+--
+-- So the normal shape of a pending revisit is a node that is completed AND
+-- pending -- exactly the pair one STATE column cannot express. Encoding it as a
+-- third STATE value would erase the completion. Encoding both as a delimited
+-- string would put a list inside a scalar column, which is the shape this whole
+-- redesign exists to remove.
+--
+-- ============================================================================
+-- Why this is a DROP CONTEXT gate and not housekeeping
+-- ============================================================================
+--
+-- The section 13 audit recorded node_visits and pending_revisits as "covered by
+-- migration 055". That is true of the DDL and false of the code: grepping the
+-- service for AIW_RUN_NODE_STATE returns only doc comments -- there has never
+-- been a writer, and the table holds 0 rows on tenant-1. Meanwhile neither field
+-- appears anywhere in run_projection.py, so neither is rebuildable from
+-- AIW_EVENT_LOG.
+--
+-- DROP CONTEXT therefore destroys both, and neither fails loudly:
+--
+--   node_visits      -- TaskFactory.create_task mints {run}-{node}-v{n} from it
+--                       (task_factory.py:77). Lose the counter and a cycle's
+--                       second iteration re-mints v0, so every event id derived
+--                       from the task id collides with the first iteration's and
+--                       is swallowed by the (run_id, event_id) dedupe.
+--   pending_revisits -- a deferred arrival that is dropped simply never fires.
+--                       The node does not re-run and nothing reports it.
+--
+-- Same class of field as loop_state, same treatment (migrations 056/057).
+--
+-- ============================================================================
+-- INTEGER, not a boolean
+-- ============================================================================
+--
+-- HANA has BOOLEAN, but every other flag in this schema is an INTEGER 0/1
+-- (AIW_WORKFLOW_RUNS.IS_TEST is written as "1 if run.is_test else 0"), and the
+-- hdbcli driver round-trips integers without dialect surprises. Consistency with
+-- the eleven tables already here beats the marginally better type.
+--
+-- NOT NULL DEFAULT 0 so the column is safe to add without touching rows (there
+-- are none) and so a writer that forgets it degrades to "not pending" -- the
+-- state a node is in 99% of the time -- rather than to NULL, which every
+-- comparison would then have to special-case.
+
+ALTER TABLE "AIW_RUN_NODE_STATE" ADD ("PENDING_REVISIT" INTEGER NOT NULL DEFAULT 0);

@@ -1,0 +1,47 @@
+syntax = "proto3";
+package workflow.v1;
+
+
+import "google/protobuf/struct.proto";
+import "workflow/v1/common.proto";
+
+// Served by Worker Executor, called by Control Plane.
+// Replaces HTTP POST /api/v1/tasks/execute.
+service TaskDispatchService {
+  // Unary: dispatch a task and block until it completes.
+  rpc DispatchTask(DispatchTaskRequest) returns (DispatchTaskResponse);
+
+  // Server-streaming: dispatch a task and receive progress updates until completion.
+  rpc DispatchTaskStream(DispatchTaskRequest) returns (stream TaskProgressEvent);
+}
+
+message DispatchTaskRequest {
+  string task_id = 1;
+  string run_id = 2;
+  string node_id = 3;
+  string worker_type = 4;
+  google.protobuf.Struct input = 5;
+  google.protobuf.Struct node_config = 6;
+  string idempotency_key = 7;
+}
+
+message DispatchTaskResponse {
+  string task_id = 1;
+  string run_id = 2;
+  TaskStatus status = 3;
+  string output_reference = 4;
+  google.protobuf.Struct output_metadata = 5;
+  int64 execution_time_ms = 6;
+  string error_message = 7;
+}
+
+message TaskProgressEvent {
+  string task_id = 1;
+  // "progress", "completed", "failed"
+  string event_type = 2;
+  // 0.0 – 1.0
+  float progress_pct = 3;
+  string message = 4;
+  // Carries the final result payload when event_type="completed".
+  google.protobuf.Struct data = 5;
+}

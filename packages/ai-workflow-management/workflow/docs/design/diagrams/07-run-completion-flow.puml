@@ -1,0 +1,113 @@
+@startuml run_completion_flow
+' ===========================================================================
+' Diagram 7: Run Completion Detection & Terminal Transitions
+' Covers: check_run_completion → COMPLETED / FAILED / PENDING
+'         including child workflow callbacks
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+skinparam activityDiamondBackgroundColor #FFFDE7
+skinparam activityDiamondBorderColor SAP_GOLD
+
+title **Run Completion Detection**\n(check_run_completion)
+
+start
+
+:Guard: run.status not in\n{COMPLETED, CANCELLED};
+
+:Compute state:
+- completed_nodes (set)
+- skipped_nodes (set)
+- leaf_nodes (DAG sinks)
+- latest task per node;
+
+:Check task timeouts:
+mark tasks with timeout_at < now
+as FAILED;
+
+if (Any task FAILED\n(latest per node,\nexcluding skipped)?) then (yes)
+
+    :run.status = **FAILED**
+    run.completed_at = now;
+
+    :save(run);
+    :drop_run_resolver_cache(run.id);
+
+    :publish **RunFailed** event;
+    :publish callback to\nagent/webhook;
+
+    if (parent_run exists?) then (yes)
+        :_fail_parent_tracking_task()
+        - Find parent's WORKFLOW task
+        - Mark parent task FAILED
+        - Enqueue ContinueRunAction
+          for parent run;
+    endif
+
+    stop
+
+elseif (All leaf_nodes covered\nby completed ∪ skipped\nAND no active tasks\n(RUNNING/READY/RETRYING)?) then (yes)
+
+    :run.status = **COMPLETED**
+    run.completed_at = now;
+
+    :Build output_data from\nleaf node outputs;
+
+    :save(run);
+    :drop_run_resolver_cache(run.id);
+
+    :publish **RunCompleted** event;
+    :publish callback to\nagent/webhook;
+
+    if (parent_run exists?) then (yes)
+        :_complete_parent_tracking_task()
+        - Find parent's WORKFLOW task
+        - Set task output = child output
+        - Mark parent task COMPLETED
+        - Enqueue ContinueRunAction
+          for parent run;
+
+        note right
+          This triggers the parent
+          workflow to advance past
+          the WORKFLOW node that
+          spawned this child.
+        end note
+    endif
+
+    stop
+
+elseif (All active tasks\nare PENDING?) then (yes)
+
+    :run.status = **PENDING**
+    (waiting for user input);
+
+    :save(run);
+
+    stop
+
+else (no — still running)
+
+    :No state change
+    (active tasks in progress);
+
+    stop
+
+endif
+
+@enduml

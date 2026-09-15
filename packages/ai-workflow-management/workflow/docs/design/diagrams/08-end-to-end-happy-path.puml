@@ -1,0 +1,125 @@
+@startuml end_to_end_happy_path
+' ===========================================================================
+' Diagram 8: End-to-End Happy Path
+' A complete workflow: TRIGGER → TASK → CONDITION → (TASK | skip) → complete
+' Shows the full lifecycle from start to completion.
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **End-to-End Happy Path**\nTRIGGER → TASK → CONDITION → TASK(true) | skip(false)
+
+actor "API Client" as C SAP_PURPLE
+participant "StartRunUseCase" as SU SAP_BLUE
+participant "Queue" as Q SAP_RED
+participant "Engine" as OE SAP_BLUE
+participant "Handlers" as NH SAP_GREEN
+participant "SuccessorProcessor" as SP SAP_GREEN
+participant "Worker" as WK SAP_GOLD
+participant "CompleteTask\nUseCase" as CU SAP_BLUE
+participant "Publisher" as EP SAP_NAVY
+
+== 1. Start Run ==
+
+C -> SU : start_run(workflow_id, input)
+SU -> EP : RunStarted
+SU -[SAP_RED]> Q : StartRunAction
+SU --> C : run_id
+
+== 2. Entry Node: TRIGGER ==
+
+Q -[SAP_RED]>> OE : StartRunAction
+OE -> NH : TRIGGER.handle()
+NH --> OE : completion_mode="immediate"
+OE -> OE : completed_nodes += {trigger}
+OE -> OE : _route_to_successors()
+OE -[SAP_RED]> Q : ExecuteNodeAction(task_1)
+
+== 3. TASK Node: Dispatch to Worker ==
+
+Q -[SAP_RED]>> OE : ExecuteNodeAction(task_1)
+OE -> NH : TASK.handle()
+NH --> OE : completion_mode="dispatched"\nresolved_input={...}
+OE -> OE : task_1.status = RUNNING
+OE -> EP : TaskDispatched
+
+== 4. Worker Executes & Reports Back ==
+
+... worker processes task ...
+
+WK -> CU : complete_task(task_1,\noutput_ref)
+CU -> CU : task_1.status = COMPLETED\nstore output to variables
+CU -> EP : TaskCompleted
+CU -[SAP_RED]> Q : ContinueRunAction(task_1)
+
+== 5. Successor: CONDITION Node ==
+
+Q -[SAP_RED]>> OE : ContinueRunAction(task_1)
+OE -> SP : process(task_1)
+SP --> OE : successor = condition_node
+OE -[SAP_RED]> Q : ExecuteNodeAction(cond_task)
+
+Q -[SAP_RED]>> OE : ExecuteNodeAction(cond_task)
+OE -> NH : CONDITION.handle()
+NH -> NH : evaluate expression\nagainst variables
+NH --> OE : completion_mode="immediate"\ntaken_edge_ports=\n{"e_true": "then"}
+
+OE -> OE : _route_to_successors()
+note right
+  Follow "then" edge only.
+  Cascade-skip "else" branch
+  via BFS.
+end note
+
+OE -> EP : EdgeTraversed(→ task_true)
+OE -> EP : TaskSkipped(else_branch)
+OE -[SAP_RED]> Q : ExecuteNodeAction(task_2)
+
+== 6. True-Branch TASK Executes ==
+
+Q -[SAP_RED]>> OE : ExecuteNodeAction(task_2)
+OE -> NH : TASK.handle()
+NH --> OE : completion_mode="dispatched"
+OE -> EP : TaskDispatched
+
+... worker processes task_2 ...
+
+WK -> CU : complete_task(task_2, output)
+CU -> EP : TaskCompleted
+CU -[SAP_RED]> Q : ContinueRunAction(task_2)
+
+== 7. Run Completion ==
+
+Q -[SAP_RED]>> OE : ContinueRunAction(task_2)
+OE -> SP : process(task_2)
+SP --> OE : no successors (leaf node)
+
+OE -> OE : check_run_completion()
+note right
+  All leaf nodes covered:
+  - task_2 = COMPLETED
+  - else_branch = SKIPPED
+  No active tasks.
+  → run.status = COMPLETED
+end note
+
+OE -> EP : **RunCompleted**
+OE -> EP : callback (if configured)
+
+@enduml

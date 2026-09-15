@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "json-csv-streamer"
+version = "0.2.0"
+description = "Streaming JSON-array -> CSV artifacts for SMDG-AI claim-check (SA-1905)"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[tool.maturin]
+module-name = "json_csv_streamer"
+features = ["pyo3/extension-module"]

@@ -1,0 +1,147 @@
+-- Migration: give loop_state a home outside AIW_WORKFLOW_RUNS.CONTEXT.
+--
+-- Design + every measurement: solace/specs/wcp-node-output-storage-redesign.md
+-- sections 13 and 15 (smdg-ai-hub). Companion to migration 055. Additive --
+-- nothing reads or writes this table yet.
+--
+-- ============================================================================
+-- WHY this table has to exist at all
+-- ============================================================================
+--
+-- The projector, not the CONTEXT column, is the read path -- bootstrap.py:319
+-- says the projector "has been authoritative in prod since Phase 1b", and
+-- orchestration_engine.py:405 takes view.variables and only falls back to
+-- run.context.variables when the view is None. So most of CONTEXT is already
+-- rebuildable from AIW_EVENT_LOG and safe to drop.
+--
+-- An audit of all 12 RunContext fields against ProjectedRunState found exactly
+-- ONE that is neither event-sourced nor derivable, and is therefore DESTROYED
+-- by DROP CONTEXT: loop_state. Grepping run_projection.py, rebuild.py and
+-- run_context/ for it returns zero hits, and IRunContextView has no property
+-- for it. node_visits and pending_revisits are the same class of field but
+-- migration 055 already covers them via AIW_RUN_NODE_STATE, and current_node
+-- gets an ALTER at cutover.
+--
+-- So: this table is the last blocker on DROP CONTEXT. It is a CORRECTNESS
+-- gate, not a volume win -- see the priority note at the bottom.
+--
+-- ============================================================================
+-- WHY it is one row per loop and not one row per iteration
+-- ============================================================================
+--
+-- The sealed design proposed (RUN_ID, NODE_ID, ITERATION, ITEM_REF, STATE,
+-- UPDATED_AT). Two things were wrong with it. First, loop_state is keyed per
+-- LOOP NODE, not per iteration (event_driven_loop_driver.py:274), and carries
+-- 17 keys of mixed shape -- three scalars per iteration would drop most of them
+-- and break every loop. Second, the per-iteration row was justified by the
+-- argument that completed_iterations grows without bound, so folding it into
+-- one JSON column would rewrite it on every iteration and reproduce the O(n^2)
+-- amplification this whole redesign exists to remove.
+--
+-- That second argument was derived from the code and is contradicted by the
+-- data. Every LoopStarted event ever written to this tenant -- 23 of them,
+-- across 6,060 runs -- reports:
+--
+--     nesting depth   0 for all 23      (no nested loop has ever run)
+--     total           p50 4, MAX 100, none above 100, none unbounded
+--     parallelism     {1,2,3,4,5,30,50,100}, max 100
+--     loop_type       23/23 "collection" (no count, no condition loops)
+--     loop nodes/run  1, always
+--
+-- completed_iterations therefore tops out around 100 integers -- roughly 600
+-- bytes. The unbounded axis does not exist. A per-iteration table would be
+-- built for a workload that has never occurred.
+--
+-- ============================================================================
+-- The three growth classes, and the column each one gets
+-- ============================================================================
+--
+-- Decomposing loop_state by key over the 200 heaviest runs (4 of which carry a
+-- loop_state at all, 4.01 MB total):
+--
+--   A. fixed and small -- the 13 scalars (total, mode, invocation_id,
+--      condition, counter_variable, parallelism, current_index,
+--      next_dispatch_index, loop_type, enclosing_scope_stack, invocation_id,
+--      continue_requested, break_requested):
+--          426 BYTES across all 4 loops -- about 107 B each.
+--      -> STATE_JSON.
+--
+--   B. bounded and already pruned -- iter_progress and iter_failed_nodes:
+--          105 BYTES across all 4 loops.
+--      loop_iteration_driver.py:424-427 pops the finished iteration's bucket,
+--      so these are bounded by min(total, parallelism), itself bounded by
+--      max_iterations (default 10000, loop.py:89).
+--      -> PROGRESS_JSON, together with completed_iterations/failed_iterations.
+--
+--   C. payload -- iteration_results 65.0% and items 35.0%:
+--          4.01 MB. Two keys are 99.99% of all loop_state ever stored.
+--      -> ITEMS_REF and RESULTS_REF. Pointers only, never the values.
+--
+-- ============================================================================
+-- STATE_JSON NVARCHAR(5000) is an ENFORCEMENT, not a fit
+-- ============================================================================
+--
+-- Class A measures ~107 bytes, so 5000 is 45x headroom. The cap is not there to
+-- hold the data -- it is there so that re-inlining items or iteration_results
+-- FAILS LOUDLY instead of silently restoring the megabytes. Same device as the
+-- OUTPUT_METADATA_V2 cap: OUTPUT_METADATA was NCLOB, and that is how 654 KB of
+-- payload ended up in a column named metadata.
+--
+-- PROGRESS_JSON stays NCLOB on purpose. Class B is bounded, but bounded by a
+-- user-configurable value -- capping a legitimately variable field is how you
+-- break a valid workload rather than catch a bug.
+--
+-- ============================================================================
+-- The key is (RUN_ID, NODE_ID) because the runtime key is
+-- ============================================================================
+--
+-- derive_invocation_id() returns a different id for each outer iteration of a
+-- nested loop -- its own docstring calls that "the critical property" -- while
+-- run.context.loop_state is keyed by node id alone. That looks like an aliasing
+-- bug waiting for nested parallel loops. Measured nesting depth is 0 across all
+-- 23 invocations, so it has never happened.
+--
+-- INVOCATION_ID is therefore stored as a COLUMN, not promoted into the key. A
+-- table key richer than the runtime key would mint rows nothing can address. If
+-- nested parallel loops ever land, the fix belongs in the runtime.
+--
+-- ============================================================================
+-- This table alone is not enough -- two runtime changes go with it
+-- ============================================================================
+--
+-- 1. items must always be a ref. Measured: 3 of 4 are inline lists, 1 is
+--    already a file_ref. The lazy path exists -- item_at() reads a single row
+--    through OData when items is a file_ref and never downloads the collection.
+--
+-- 2. The iteration_results spill gate is on the wrong axis. WORKER_CHUNKED_
+--    OUTPUT_ENABLED is TRUE on tenant-1 (verified with cf env -- the repo
+--    default is false and deployment.yml does not set it, so cf set-env does),
+--    which means _spill_enabled() is on and spilling is ACTIVE. But the gate is
+--    len(window) >= 1000 while the largest loop ever run has total = 100. It
+--    does not "rarely fire" -- it CANNOT fire, by 10x, across the entire
+--    population, while each entry measures around 650 KB. That is a COUNT
+--    threshold on a SIZE problem: precisely the defect that made
+--    keeps_inline_output ignore SIZE and produce SA-1949 and SA-1951, one layer
+--    up. The gate has to count bytes.
+--
+-- ============================================================================
+-- Priority, so nobody mistakes this for the big win
+-- ============================================================================
+--
+-- Loops are rare: 23 loops across 6,060 runs, and only 4 of the 200 heaviest
+-- runs carry any loop_state. The 74.7%-of-context figure quoted in the design
+-- is ONE outlier run, not a trend. This table unblocks DROP CONTEXT. The volume
+-- win is elsewhere -- dropping the node.name alias from state_updates is 50% of
+-- 397 MB.
+CREATE COLUMN TABLE "AIW_RUN_LOOP_STATE" (
+    "RUN_ID"        NVARCHAR(1024) NOT NULL,
+    "NODE_ID"       NVARCHAR(128)  NOT NULL,
+    "INVOCATION_ID" NVARCHAR(64)   NOT NULL DEFAULT '',
+    "STATE_JSON"    NVARCHAR(5000) NOT NULL DEFAULT '{}',
+    "ITEMS_REF"     NVARCHAR(128),
+    "RESULTS_REF"   NVARCHAR(128),
+    "PROGRESS_JSON" NCLOB,
+    "TOTAL"         INTEGER        NOT NULL DEFAULT 0,
+    "UPDATED_AT"    NVARCHAR(64),
+    PRIMARY KEY ("RUN_ID", "NODE_ID")
+);

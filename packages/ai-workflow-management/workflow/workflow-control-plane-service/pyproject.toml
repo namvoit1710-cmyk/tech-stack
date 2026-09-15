@@ -1,0 +1,44 @@
+# Tooling config only (test discovery stays governed by pytest.ini).
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["build"]
+
+[tool.ruff.lint]
+# ANN = flake8-annotations (every function needs a return type, every arg a type).
+# UP006/UP035 = prefer PEP 585 builtin generics (list[...] over typing.List).
+select = ["ANN", "UP006", "UP035"]
+# ANN401 permits explicit `Any` where a payload is genuinely dynamic.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.importlinter]
+root_package = "app"
+
+# Layer 1 is pure domain (imports nothing from outer layers). Interfaces are
+# allowed to live in layer1_domain/interfaces (pure Protocols).
+[[tool.importlinter.contracts]]
+name = "Layer 1 (domain) imports nothing from outer layers"
+type = "forbidden"
+source_modules = ["app.layer1_domain"]
+forbidden_modules = [
+    "app.layer2_application",
+    "app.layer3_adapters",
+    "app.layer4_frameworks",
+]
+
+# Layer 2 is pure application (no adapters/frameworks imports — use interfaces).
+[[tool.importlinter.contracts]]
+name = "Layer 2 (application) imports nothing from adapters/frameworks"
+type = "forbidden"
+source_modules = ["app.layer2_application"]
+forbidden_modules = [
+    "app.layer3_adapters",
+    "app.layer4_frameworks",
+]

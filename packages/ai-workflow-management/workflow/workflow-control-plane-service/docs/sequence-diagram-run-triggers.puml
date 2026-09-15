@@ -1,0 +1,373 @@
+@startuml
+!$PRIMARY = "#0070F2"
+!$DARK = "#1B2B3A"
+!$ASYNC = "#F0AB00"
+!$NOTE_BG = "#E8F0FE"
+!$NOTE_BORDER = "#0070F2"
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowColor $DARK
+skinparam sequenceLifeLineBorderColor $DARK
+skinparam participantBackgroundColor $PRIMARY
+skinparam participantFontColor #FFFFFF
+skinparam participantBorderColor #0054B6
+skinparam noteBackgroundColor $NOTE_BG
+skinparam noteBorderColor $NOTE_BORDER
+skinparam dividerBackgroundColor #F5F5F5
+skinparam dividerFontColor $DARK
+skinparam sequenceGroupBackgroundColor #FAFAFA
+
+title **1. Start Run — Async via Queue**
+
+actor Client
+participant "RunController" as RC
+participant "StartRunUseCase" as UC
+database "Repos\n(Run/Workflow)" as RR
+participant "StageRecorder" as SR
+participant "EventPublisher" as EP
+queue "OrchestrationQueue\n(Kafka / Memory)" as Q $ASYNC
+participant "OrchestrationWorker" as OW $ASYNC
+participant "OrchestrationEngine" as OE $ASYNC
+participant "NodeHandler" as NH $ASYNC
+participant "WorkerExecutor\n(External)" as WE $ASYNC
+
+== Synchronous — HTTP Request ==
+
+Client -> RC : POST /api/runs\n{workflow_id, input_data}
+activate RC
+RC -> UC : execute(StartRunCommand)
+activate UC
+
+UC -> RR : get_workflow(id) + DAGValidator.validate()
+UC -> RR : create WorkflowRun(PENDING)\nseed context: input, workflow, run metadata
+UC -> RR : run.status = RUNNING, save(run)
+UC -> SR : record("run.created")\nrecord("run.started")
+UC -> EP : publish(**RunStarted**)
+UC -[#F0AB00]> Q : enqueue(**StartRunAction**(run_id))
+
+UC --> RC : StartRunResult(id, status="RUNNING")
+deactivate UC
+RC --> Client : **200 OK** {run_id, status: "RUNNING"}
+deactivate RC
+
+note over Client : Response returned **immediately**\nNo waiting for orchestration
+
+== Asynchronous — Background Worker ==
+
+Q -[#F0AB00]> OW : dequeue() -> StartRunAction
+activate OW
+OW -> OE : orchestrate_start(run_id)
+activate OE
+
+OE -> RR : load run, workflow, dag_info
+OE -> OE : handle_entry_nodes()
+
+loop for each reachable node (recursive)
+  OE -> NH : handle(node, run, dag_info, ...)
+
+  alt **BUILTIN** (Condition, Switch, Parallel, Merge, Loop, Compute, Trigger)
+    NH --> OE : NodeHandlerResult
+    OE -> OE : execute inline, mark completed\nrecurse enqueue ExecuteNodeAction → _exec_uniform()
+  else **TASK**
+    NH --> OE : Task(status=RUNNING)
+    OE -> EP : publish(**TaskDispatched**)
+    OE -[#999999]> WE : dispatch task (fire & forget)
+    note right : Awaits worker callback\n(separate HTTP request)
+  else **PENDING** (Input, HumanAction, FileUpload, DataEdit)
+    NH --> OE : Task(status=PENDING)
+    OE -> RR : save(pending_task)
+    OE -> EP : publish(**InputRequested**)
+    note right #FFE0B2 : Workflow **pauses**\non this branch
+  end
+end
+
+OE -> OE : check_run_completion()
+OE -> RR : save(run)
+deactivate OE
+deactivate OW
+
+@enduml
+
+@startuml
+!$PRIMARY = "#0070F2"
+!$DARK = "#1B2B3A"
+!$ASYNC = "#F0AB00"
+!$NOTE_BG = "#E8F0FE"
+!$NOTE_BORDER = "#0070F2"
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowColor $DARK
+skinparam sequenceLifeLineBorderColor $DARK
+skinparam participantBackgroundColor $PRIMARY
+skinparam participantFontColor #FFFFFF
+skinparam participantBorderColor #0054B6
+skinparam noteBackgroundColor $NOTE_BG
+skinparam noteBorderColor $NOTE_BORDER
+skinparam dividerBackgroundColor #F5F5F5
+skinparam dividerFontColor $DARK
+
+title **2. Complete Task — Worker Callback (Async via Queue)**
+
+participant "WorkerExecutor\n(External)" as WE
+participant "RunController" as RC
+participant "CompleteTaskUseCase" as UC
+database "Repos\n(Task/Run)" as RR
+participant "DataStoreService" as DS
+participant "StageRecorder" as SR
+participant "EventPublisher" as EP
+queue "OrchestrationQueue" as Q $ASYNC
+participant "OrchestrationWorker" as OW $ASYNC
+participant "OrchestrationEngine" as OE $ASYNC
+
+== Synchronous — HTTP Request ==
+
+WE -> RC : POST /runs/{run_id}/tasks/{task_id}/complete\n{output_reference, output_metadata}
+activate RC
+RC -> UC : execute(CompleteTaskCommand)
+activate UC
+
+UC -> RR : task.status = COMPLETED\ntask.output_ref, task.completed_at
+UC -> SR : record("task.completed")
+
+group Build & store output
+  UC -> UC : build task_output envelope
+  UC -> UC : apply output_mapping (node definition)
+  UC -> UC : apply output_binding (node config)
+  UC -> UC : extract _artifacts
+  UC -> DS : store_data(node_id, task_output) -> CSV file_ref
+  UC -> UC : attach worker artifacts to file_ref
+end
+
+UC -> RR : run.context.variables[node_id] = file_ref\nsave(run)
+UC -> EP : publish(**TaskCompleted**)
+UC -> EP : publish(**ContextUpdated**)
+UC -[#F0AB00]> Q : enqueue(**ContinueRunAction**(run_id, task_id))
+UC --> RC : {completed: true}
+deactivate UC
+RC --> WE : **200 OK**
+deactivate RC
+
+== Asynchronous — Background Worker ==
+
+Q -[#F0AB00]> OW : dequeue() -> ContinueRunAction
+activate OW
+OW -> OE : orchestrate_continue(run_id, task_id)
+activate OE
+OE -> RR : load run (with updated context), task, workflow
+OE -> OE : process_successors(completed_task)
+OE -> EP : publish(**EdgeTraversed** events)
+OE -> OE : enqueue ExecuteNodeAction → _exec_uniform()\nfor each successor
+OE -> OE : check_run_completion()
+OE -> RR : save(run)
+deactivate OE
+deactivate OW
+
+@enduml
+
+@startuml
+!$PRIMARY = "#0070F2"
+!$DARK = "#1B2B3A"
+!$ASYNC = "#F0AB00"
+!$NOTE_BG = "#E8F0FE"
+!$NOTE_BORDER = "#0070F2"
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowColor $DARK
+skinparam sequenceLifeLineBorderColor $DARK
+skinparam participantBackgroundColor $PRIMARY
+skinparam participantFontColor #FFFFFF
+skinparam participantBorderColor #0054B6
+skinparam noteBackgroundColor $NOTE_BG
+skinparam noteBorderColor $NOTE_BORDER
+skinparam dividerBackgroundColor #F5F5F5
+skinparam dividerFontColor $DARK
+
+title **3. Resume Pending Task — User Input (Async via Queue)**
+
+actor Client
+participant "RunController" as RC
+participant "ResumePendingTask\nUseCase" as UC
+database "Repos\n(Task/Run)" as RR
+participant "DataStoreService" as DS
+participant "StageRecorder" as SR
+participant "EventPublisher" as EP
+queue "OrchestrationQueue" as Q $ASYNC
+participant "OrchestrationWorker" as OW $ASYNC
+participant "OrchestrationEngine" as OE $ASYNC
+
+== Synchronous — HTTP Request ==
+
+Client -> RC : POST /runs/{run_id}/tasks/{task_id}/resume\n{updated_input: {name: "Alice", ...}}
+activate RC
+RC -> UC : execute(ResumePendingTaskCommand)
+activate UC
+
+UC -> RR : load run, task (status=PENDING), workflow, node
+UC -> UC : merge updated_input into task.resolved_input
+UC -> UC : task.status = COMPLETED
+
+opt HUMAN_ACTION node
+  UC -> UC : extract action (confirm/reject)
+  UC -> UC : apply branching: skip not-taken branch\nand all downstream nodes
+end
+
+UC -> DS : store submitted_data as CSV -> file_ref
+UC -> RR : run.context.variables[node_id] = file_ref\nadd node to completed_nodes
+UC -> RR : save(task), save(run)
+UC -> SR : record("task.resumed")
+UC -[#F0AB00]> Q : enqueue(**ResumeTaskAction**(run_id, task_id))
+UC -> EP : publish(**InputSubmitted** / **HumanActionCompleted**)
+UC --> RC : {resumed: true, status: "COMPLETED"}
+deactivate UC
+RC --> Client : **200 OK**
+deactivate RC
+
+== Asynchronous — Background Worker ==
+
+Q -[#F0AB00]> OW : dequeue() -> ResumeTaskAction
+activate OW
+OW -> OE : orchestrate_resume(run_id, task_id)
+activate OE
+OE -> RR : load run (updated context), task, workflow
+OE -> OE : process_successors(completed_task)
+OE -> OE : enqueue ExecuteNodeAction → _exec_uniform() for each successor
+OE -> OE : check_run_completion()
+OE -> RR : save(run)
+deactivate OE
+deactivate OW
+
+@enduml
+
+@startuml
+!$PRIMARY = "#0070F2"
+!$DARK = "#1B2B3A"
+!$ASYNC = "#F0AB00"
+!$NOTE_BG = "#E8F0FE"
+!$NOTE_BORDER = "#0070F2"
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowColor $DARK
+skinparam sequenceLifeLineBorderColor $DARK
+skinparam participantBackgroundColor $PRIMARY
+skinparam participantFontColor #FFFFFF
+skinparam participantBorderColor #0054B6
+skinparam noteBackgroundColor $NOTE_BG
+skinparam noteBorderColor $NOTE_BORDER
+skinparam dividerBackgroundColor #F5F5F5
+skinparam dividerFontColor $DARK
+
+title **4. Test Full Workflow — Synchronous (No Queue)**
+
+actor Client
+participant "RunController" as RC
+participant "TestFullWorkflow\nUseCase" as UC
+database "Repos\n(Run/Task/Workflow)" as RR
+participant "StageRecorder" as SR
+participant "EventPublisher" as EP
+participant "OrchestrationEngine" as OE
+participant "NodeHandler" as NH
+participant "WorkerExecutor\n(External)" as WE
+
+note over UC : No orchestration queue\nFully **synchronous** execution
+
+Client -> RC : POST /workflows/{id}/test-full\n{input_data}
+activate RC
+RC -> UC : execute(TestFullWorkflowCommand)
+activate UC
+
+UC -> RR : load workflow, validate DAG
+UC -> RR : get/create persistent test_run\n(test_mode="full", is_test=true)
+UC -> RR : clear stale state: completed_nodes,\nvariables, cancel old tasks
+UC -> RR : run.status = RUNNING, save(run)
+UC -> SR : record("run.started")
+UC -> EP : publish(**RunStarted**)
+
+UC -> OE : **handle_entry_nodes()** [BLOCKING]
+activate OE #FFE0B2
+
+loop process all reachable nodes
+  OE -> NH : handle(node)
+  NH --> OE : result
+
+  OE -> OE : enqueue ExecuteNodeAction → _exec_uniform()\n(recursive for BUILTINs)
+  OE -[#999999]> WE : dispatch TASK nodes
+end
+
+note right of OE #FFE0B2 : **Blocks** until all control-flow\nnodes processed or PENDING hit
+
+OE --> UC : return
+deactivate OE
+
+UC -> OE : check_run_completion()
+UC --> RC : {status, output_data, completed_at}
+deactivate UC
+RC --> Client : **200 OK** (after full processing)
+deactivate RC
+
+note over Client : Response may take **seconds**\nIncludes final result
+
+@enduml
+
+@startuml
+!$PRIMARY = "#0070F2"
+!$DARK = "#1B2B3A"
+!$ASYNC = "#F0AB00"
+!$NOTE_BG = "#E8F0FE"
+!$NOTE_BORDER = "#0070F2"
+
+skinparam backgroundColor #FFFFFF
+skinparam sequenceArrowColor $DARK
+skinparam sequenceLifeLineBorderColor $DARK
+skinparam participantBackgroundColor $PRIMARY
+skinparam participantFontColor #FFFFFF
+skinparam participantBorderColor #0054B6
+skinparam noteBackgroundColor $NOTE_BG
+skinparam noteBorderColor $NOTE_BORDER
+skinparam dividerBackgroundColor #F5F5F5
+skinparam dividerFontColor $DARK
+
+title **5. Test Single Node — Synchronous (No Queue)**
+
+actor Client
+participant "RunController" as RC
+participant "TestNodeUseCase" as UC
+database "Repos\n(Run/Workflow)" as RR
+participant "NodeHandler" as NH
+participant "OrchestrationEngine" as OE
+participant "WorkerExecutor\n(External)" as WE
+
+note over UC : No orchestration queue\nSingle node only — **no successor processing**
+
+Client -> RC : POST /workflows/{id}/nodes/{node_id}/test\n{input_data, mock_variables}
+activate RC
+RC -> UC : execute(TestNodeCommand)
+activate UC
+
+UC -> RR : load workflow, get node
+UC -> RR : get/create test_run (test_mode="node")
+UC -> UC : apply input_data + mock_variables\nto run.context.variables
+
+alt **BUILTIN** node (Condition, Switch, Compute...)
+  UC -> NH : handle(node, run, ...)
+  NH --> UC : NodeHandlerResult\n(output, skipped_branches, events)
+  UC -> UC : apply state_updates to context
+  UC --> Client : {execution_type: "**builtin**",\noutput, events}
+
+else **TASK** node
+  UC -> NH : handle(node, run, ...)
+  NH --> UC : Task with resolved_input
+  UC -> OE : enqueue ExecuteNodeAction → _exec_uniform()
+  OE -[#999999]> WE : dispatch task to worker
+  note right : **No successor processing**\n(test_mode="node")
+  UC --> Client : {execution_type: "**task**",\ntask_id, resolved_input, worker_type}
+
+else **PENDING** node (Input, HumanAction, FileUpload)
+  UC -> NH : handle(node, run, ...)
+  NH --> UC : Task(PENDING)\n+ input_schema, instruction, prefilled
+  UC --> Client : {execution_type: "**pending**",\ninput_schema, instruction, prefilled}
+end
+
+deactivate UC
+deactivate RC
+
+@enduml

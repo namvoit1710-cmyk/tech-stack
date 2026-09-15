@@ -1,0 +1,23 @@
+# Shared build context for log-worker/, claude-worker/ and cs-worker/ Dockerfiles.
+# Only worker-sdk + the workers are COPYed, so exclude everything else to keep the
+# context small — and NEVER bake credentials into an image.
+*
+
+!worker-sdk/
+!claude-worker/
+!log-worker/
+!cs-worker/
+
+# ...but still drop noise from inside the dirs we keep.
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/*.egg-info/
+**/.git/
+**/*.log
+claude-worker/claude-worker-trace.log
+
+# Credentials must come from env at RUNTIME (compose env_file), never from the image.
+**/.env
+**/.env.*
+**/*secrets*.json

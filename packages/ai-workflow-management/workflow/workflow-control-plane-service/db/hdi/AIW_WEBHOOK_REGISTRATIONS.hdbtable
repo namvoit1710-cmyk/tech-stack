@@ -1,0 +1,16 @@
+COLUMN TABLE "AIW_WEBHOOK_REGISTRATIONS" (
+    "ID"                NVARCHAR(64)   NOT NULL,
+    "NAME"              NVARCHAR(256),
+    "PATH"              NVARCHAR(512),
+    "SOURCE"            NVARCHAR(64),
+    "SECRET"            NVARCHAR(512),
+    "HMAC_SECRET"       NVARCHAR(512),
+    "EMIT_TOPIC"        NVARCHAR(512),
+    "IP_ALLOWLIST"      NCLOB,
+    "INTEGRATION_ACTOR" NVARCHAR(512),
+    "TENANT_ID"         NVARCHAR(256),
+    "ENABLED"           NVARCHAR(8),
+    "CREATED_AT"        NVARCHAR(64),
+    "UPDATED_AT"        NVARCHAR(64),
+    PRIMARY KEY ("ID")
+)

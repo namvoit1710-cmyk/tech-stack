@@ -1,0 +1,18 @@
+# Normalize line endings to LF for this project.
+#
+# Windows/WSL checkouts otherwise write CRLF into the working tree while git
+# stores LF, which flips every line in `git diff` and buries real changes in
+# EOL noise. `text=auto eol=lf` tells git to store text as LF and check it out
+# as LF on every platform, killing that noise at the source.
+* text=auto eol=lf
+
+# Leave binaries untouched.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.whl  binary

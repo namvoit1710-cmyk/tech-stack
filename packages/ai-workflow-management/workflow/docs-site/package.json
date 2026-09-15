@@ -1,0 +1,15 @@
+{
+  "name": "workflow-engine-docs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "User guide for the AI Workflow Management engine — nodes, setup, and running workflows.",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.3"
+  }
+}

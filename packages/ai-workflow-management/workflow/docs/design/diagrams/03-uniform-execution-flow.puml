@@ -1,0 +1,166 @@
+@startuml uniform_execution_flow
+' ===========================================================================
+' Diagram 3: Uniform Node Execution (_exec_uniform)
+' Covers: ExecuteNodeAction → _exec_uniform → completion_mode branching
+' This is the Phase 6 unified path for ALL 16 node types.
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **Uniform Node Execution (Phase 6)**\n(orchestrate_execute_node → _exec_uniform)
+
+participant "OrchestrationQueue" as Q SAP_RED
+participant "OrchestrationWorker" as W SAP_RED
+participant "OrchestrationEngine" as OE SAP_BLUE
+participant "NodeHandlerRegistry" as REG SAP_GREEN
+participant "invoke_handler()" as IH SAP_GREEN
+participant "NodeHandler" as NH SAP_GREEN
+participant "TaskFactory" as TF SAP_GREEN
+participant "_route_to_successors()" as RS SAP_BLUE
+participant "compute_fanout()" as CF SAP_GREEN
+participant "EventPublisher" as EP SAP_NAVY
+database "TaskRepo /\nRunRepo" as DB SAP_TEAL
+
+== Dequeue & Pre-checks ==
+
+Q -[SAP_RED]>> W : dequeue()
+W -> OE : orchestrate_execute_node(\nrun_id, task_id)
+activate OE
+
+OE -> DB : fetch run, task,\nworkflow, node
+OE -> OE : Guard: skip if run\nis terminal
+
+alt task is inside loop body
+    OE -> OE : Apply loop iteration\nvariables to context\n(index, item, total, ...)
+end
+
+OE -> OE : Predecessor readiness\ncheck (all preds in\ncompleted ∪ skipped?)
+note right
+  If not ready, task
+  is deferred — will be
+  re-dispatched when
+  upstream completes.
+end note
+
+== _exec_uniform: Handler Invocation ==
+
+OE -> EP : buffer TaskDispatched
+
+OE -> REG : get(node.node_type)
+REG --> OE : handler
+
+OE -> IH : invoke_handler(handler,\nnode, run, ...,\ncurrent_scope_stack=\ntask.scope_stack)
+activate IH
+
+IH -> IH : set_current_scope_stack()\n(contextvar for TaskFactory)
+IH -> NH : handler.handle(node, run,\nworkflow, dag_info,\ncompleted_task, task_factory)
+activate NH
+
+note over NH
+  Handler resolves input,
+  evaluates conditions,
+  and returns result with
+  **output_port** and
+  **completion_mode**.
+end note
+
+NH --> IH : NodeHandlerResult
+deactivate NH
+
+IH -> IH : record duration metrics\nreset scope_stack contextvar
+IH --> OE : NodeHandlerResult
+deactivate IH
+
+OE -> OE : apply_state_updates_as_files()\n→ emits NodeOutputProduced
+OE -> OE : merge loop_state_updates\ninto run.context.loop_state
+
+== _exec_uniform: Completion Mode Branching ==
+
+alt completion_mode = "immediate"
+    note over OE : TRIGGER, COMPUTE, CONDITION,\nSWITCH, MERGE(met), PARALLEL,\nLOOP_EXIT, LOOP_CONTINUE, LOOP(done)
+
+    OE -> OE : completed_nodes.add(node.id)
+    OE -> OE : skipped_nodes += result.skipped
+    OE -> DB : task.status = COMPLETED\nsave(task)
+    OE -> EP : buffer TaskCompleted
+
+    OE -> RS : _route_to_successors(\nnode, result, task, ...)
+    activate RS
+    alt taken_edge_ports set (CONDITION/SWITCH)
+        RS -> RS : follow only selected edges
+    else port-based routing
+        RS -> CF : compute_fanout(\nexpected_port_override\n= result.output_port)
+        CF --> RS : FanoutDecision
+        RS -> RS : apply cascade-skip
+    end
+
+    loop for each successor
+        RS -> EP : publish EdgeTraversed
+        RS -> TF : create_task(target_node)
+        TF --> RS : task (inherits scope_stack\nfrom contextvar)
+        RS -> DB : save(task)
+        RS -[SAP_RED]> Q : enqueue(\nExecuteNodeAction)
+    end
+    deactivate RS
+
+else completion_mode = "dispatched"
+    note over OE : TASK nodes → external worker
+
+    OE -> OE : Apply CSV data mode
+    OE -> DB : task.status = RUNNING\nsave(task)
+    OE -> EP : publish TaskDispatched\n(direct, not buffered)
+
+else completion_mode = "pending"
+    note over OE : INPUT, HUMAN_ACTION,\nDATA_EDIT, FILE_UPLOAD
+
+    OE -> DB : save pending task
+    OE -> EP : publish TaskDispatched +\nInputRequested (direct)
+
+else completion_mode = "child_run"
+    note over OE : WORKFLOW node
+
+    OE -> DB : task.status = RUNNING
+    OE -> OE : _start_child_workflow()
+
+else completion_mode = "loop_body"
+    note over OE : LOOP with iterations
+
+    loop for each body task
+        OE -> DB : save(body_task)
+        OE -> EP : publish EdgeTraversed
+        OE -[SAP_RED]> Q : enqueue(\nExecuteNodeAction)
+    end
+
+else completion_mode = "deferred"
+    note over OE : MERGE quorum not met
+
+    OE -> OE : save state only
+end
+
+== Post-Execution ==
+
+OE -> EP : publish handler events\n(ConditionEvaluated, etc.)
+OE -> OE : maybe_enqueue_loop_iteration()
+
+OE -> EP : drain_events()
+OE -> OE : check_run_completion()
+OE -> EP : flush_events()
+
+deactivate OE
+
+@enduml

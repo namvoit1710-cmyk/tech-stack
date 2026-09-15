@@ -22,6 +22,7 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **Eagle Platform Core (Package)** | Bộ đôi Smart Service SDK & Governance Smart API phát hiện trùng lặp dữ liệu và phân tích hóa chất SDS | 📦 [Xem Mã Nguồn](./packages/eagle/) |
 | **Data Factory Core (Package)** | Nền tảng di trú, chuẩn hóa và kiểm tra dữ liệu lớn (Migration, Validation, Transformation, Schema Mapping) | 📦 [Xem Mã Nguồn](./packages/data-factory/) |
 | **Agent Registry (Package)** | Dịch vụ đăng ký, quản lý danh mục và điều phối quyền truy cập Agent (Agent Catalog, Capabilities, Discovery, RBAC) | 📦 [Xem Mã Nguồn](./packages/agent-registry/) |
+| **AI Workflow Management (Package)** | Nền tảng điều phối quy trình AI cốt lõi (Workflow Control Plane Service, Worker Executor Service, 15+ Workers) | 📦 [Xem Mã Nguồn](./packages/ai-workflow-management/) |
 | *(Mở Rộng Trong Tương Lai)* | *Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
 ---
@@ -30,6 +31,11 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 
 Toàn bộ mã nguồn phát triển chính thức của các SDK và gói dịch vụ lõi hiện đã được đưa vào thư mục [`packages/`](./packages/):
 
+- ⚙️ **[`packages/ai-workflow-management/`](./packages/ai-workflow-management/):** Trọn bộ nền tảng điều phối quy trình **AI Workflow Management** gồm:
+  - `workflow-control-plane-service`: Bộ máy điều phối trung tâm (FastAPI, Socket.IO, gRPC, 21 node types, Uniform Execution, Streaming I/O).
+  - `worker-executor-service`: Dịch vụ điều phối và quản lý vòng đời Worker.
+  - `worker`: Hệ thống 15+ Workers chuyên biệt (`http-request-worker`, `agent-worker`, `mapping-data-worker`, `wait-worker`, `cs-worker`, `email-worker`, v.v.).
+  - `workflow_proto`: Bộ định nghĩa gRPC Protocol Buffers dùng chung.
 - 🛠️ **[`packages/worker-sdk/`](./packages/worker-sdk/):** Bộ công cụ phát triển Worker cho hệ thống quy trình AI Workflow. Hỗ trợ 3 chế độ chạy (`SERVER`, `PULL`, `HEADLESS`), đa giao thức `gRPC` (:50051) & `REST HTTP`, giải quyết tham chiếu tệp qua File Service, và tối ưu ngân sách kết quả `ResultBudget`.
 - 🤖 **[`packages/agent-sdk/`](./packages/agent-sdk/):** Bộ công cụ phát triển tác nhân AI tự trị trên nền tảng **LangGraph**. Cung cấp 4 bộ dựng đồ thị (`ToolAgentBuilder`, `GraphAgentBuilder`, `FlowAgentBuilder`, `SubGraphAgentBuilder`), lưu vết trạng thái phân tán trên **SAP HANA** (`HanaCheckpointSaver`), tương tác phê duyệt Human-In-The-Loop (`HITL`), và nén ngữ cảnh thông minh qua `ContextBudgetManager`.
 - 🦅 **[`packages/eagle/`](./packages/eagle/):** Trọn bộ mã nguồn lõi của nền tảng **AI Eagle Platform** bao gồm:

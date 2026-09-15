@@ -1,0 +1,22 @@
+COLUMN TABLE "AIW_GATEWAY_FUNCTIONS" (
+    "ID"                  NVARCHAR(36)    NOT NULL,
+    "APP_ID"              NVARCHAR(36)    NOT NULL,
+    "NAME"                NVARCHAR(128)   NOT NULL,
+    "DESCRIPTION"         NVARCHAR(512),
+    "METHOD"              NVARCHAR(16)    NOT NULL,
+    "PATH_TEMPLATE"       NVARCHAR(1024)  NOT NULL,
+    "INPUT_SCHEMA"        NCLOB,
+    "OUTPUT_SCHEMA"       NCLOB,
+    "TIMEOUT_MS"          INTEGER         NOT NULL DEFAULT 30000,
+    "ICON"                NVARCHAR(64),
+    "COLOR"               NVARCHAR(32),
+    "TAGS"                NCLOB,
+    "IS_ACTIVE"           INTEGER         NOT NULL DEFAULT 1,
+    "NODE_DEFINITION_ID"  NVARCHAR(64),
+    "CREATED_BY"          NVARCHAR(128)   NOT NULL,
+    "CREATED_AT"          NVARCHAR(64)    NOT NULL,
+    "UPDATED_BY"          NVARCHAR(128)   NOT NULL,
+    "UPDATED_AT"          NVARCHAR(64)    NOT NULL,
+    "VERSION"             INTEGER         NOT NULL DEFAULT 1,
+    PRIMARY KEY ("ID")
+)

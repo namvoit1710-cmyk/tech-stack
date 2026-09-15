@@ -1,0 +1,6 @@
+from typing import Protocol, Any
+
+
+class IWorkerExecutor(Protocol):
+    def execute(self, task_data: dict[str, Any]) -> dict[str, Any]: ...
+    def dispatch(self, task_data: dict[str, Any]) -> dict[str, Any]: ...

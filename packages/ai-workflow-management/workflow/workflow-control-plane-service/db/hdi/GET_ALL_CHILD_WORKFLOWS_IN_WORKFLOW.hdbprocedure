@@ -1,0 +1,27 @@
+PROCEDURE "GET_ALL_CHILD_WORKFLOWS_IN_WORKFLOW" (
+    IN IP_START_ID NVARCHAR(64)
+)
+LANGUAGE SQLSCRIPT
+READS SQL DATA AS
+BEGIN
+    SELECT W."ID",
+        W."NAME",
+        W."NODES"
+    FROM "AIW_WORKFLOWS" W
+    INNER JOIN (
+        SELECT JT."NESTED_WF_ID" AS "ID"
+        FROM JSON_TABLE(
+            (
+                SELECT "NODES"
+                FROM "AIW_WORKFLOWS"
+                WHERE "ID" = :IP_START_ID
+            ),
+            '$[*]'
+            COLUMNS (
+                "NESTED_WF_ID" NVARCHAR(64) PATH '$.config.workflow_id'
+            )
+        ) JT
+        WHERE JT."NESTED_WF_ID" IS NOT NULL
+          AND JT."NESTED_WF_ID" <> ''
+    ) CHILD_IDS ON W."ID" = CHILD_IDS."ID";
+END

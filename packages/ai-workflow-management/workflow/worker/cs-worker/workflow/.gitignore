@@ -1,0 +1,3 @@
+*_body.json
+router_snapshot_*.json
+__pycache__/

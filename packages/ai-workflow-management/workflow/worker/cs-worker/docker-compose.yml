@@ -1,0 +1,91 @@
+# Run the SMDG cs-worker in Docker.
+#
+#   cd .../workflow/worker/cs-worker
+#   docker compose up -d --build       # build + run detached
+#   docker compose logs -f             # follow logs (the boot line lists the targets)
+#   docker compose up -d               # <- after editing .env: this is how a new project
+#                                      #    goes live (recreates the container, re-reads .env)
+#   docker compose down                # stop
+#
+# Build context is the PARENT worker/ dir (cs-worker needs the sibling worker-sdk).
+services:
+  cs-worker:
+    build:
+      context: ..
+      dockerfile: cs-worker/Dockerfile
+    image: cs-worker:local
+    # No container_name: it and `replicas` are mutually exclusive - Docker cannot
+    # give two containers one name, and it quietly keeps a single instance rather
+    # than telling you why.
+    deploy:
+      # Two. The failure this answers is measured, not hypothetical: 2026-08-28, one
+      # loop stopped leasing cs_submit_event_log and every CS run stalled there for
+      # 2.6h with the container still reporting healthy.
+      replicas: 2
+    # Pin public resolvers — the Docker/WSL embedded DNS intermittently throws
+    # "Temporary failure in name resolution", which drops the lease calls.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    # ADDING A PROJECT IS AN EDIT TO ./.env, NOT TO THIS FILE OR TO ANY CODE.
+    # Four variables per project+environment (see .env.example), then `docker compose up -d`.
+    #
+    # compose reads .env on the HOST and injects real environment variables; the file never
+    # enters the image (the shared .dockerignore excludes **/.env). That matters: the
+    # registry scans os.environ, which a pydantic-parsed .env would never reach.
+    env_file:
+      - .env
+    environment:
+      APP_MODE: PULL
+      WORKER_TENANT: ""
+      REGISTRY_URL: https://smdg-ai-tenant-1-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+      # Total in-flight tasks across ALL node types. Pinned because app/pull_multi.py is
+      # gone: that fork defaulted to one task at a time, while the SDK's multi-type runner
+      # gives every node type its own lease loop and is uncapped unless this says
+      # otherwise. Two node types shell out to the Claude CLI and concurrent runs SHARE
+      # the token pool, so keep this at or below the number of tokens supplied.
+      # 6, not 3: since the log flow fans out, ONE run claims three slots at
+      # stage one, so a second run had a branch wait a full 60s redelivery
+      # cycle. The Claude constraint that pinned this at 3 now lives in
+      # app/claude_cli.py (CLAUDE_MAX_CONCURRENT), where it only throttles the
+      # two node types that actually spend tokens.
+      WORKER_MAX_CONCURRENT: "6"
+      # Left at 3 while WORKER_MAX_CONCURRENT is 6: with 6, a three-way concurrent
+      # fan-out left one cs_submit_event_log task never offered to the worker at
+      # all (run 6834c084, 2026-08-28). Bisecting the two settings.
+      LEASE_MAX_BATCH: "3"
+      # 2, not 3: this gate is PER PROCESS and there are two replicas now, so the
+      # total becomes 4 - near the 3 that has been running against the single
+      # configured Claude token. Leaving it at 3 would quietly double to 6.
+      CLAUDE_MAX_CONCURRENT: "2"
+      # LEASE_WAIT_SECONDS is deliberately NOT set. It was pinned to 1 while this worker
+      # ran the forked lease loop, which walked all eight node types in one round robin —
+      # a short poll per type was the only way to keep a chained workflow from waiting a
+      # full cycle per node. With a loop per type the stock long poll (20 s) is the better
+      # setting: the poll for a type is already open when its task arrives, so pickup is
+      # immediate, and a short value would only add empty round trips.
+      #
+      # app/pull_multi.py forced lease renewal ON in code; the SDK's runner reads this
+      # setting and defaults it OFF. Pinned so deleting that fork does not silently
+      # disable renewal: a slow OData fetch can outlive the executor's lease TTL, and
+      # without renewal the lease expires mid-run, the executor re-leases the task, and
+      # the late callback is rejected 409 (TASK_SUPERSEDED) — a re-run loop.
+      LEASE_RENEW_ENABLED: "true"
+      # Where the healthcheck asks the registry about ITSELF.
+      HC_URL: https://smdg-ai-tenant-1-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com/api/v2/worker-replicas/cs_detect_request
+    # Liveness = does THIS container still have a fresh heartbeat in the registry.
+    # Not log age — an idle worker is silent, which would raise a false alarm.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import json,os,socket,sys,urllib.request as u;h=socket.gethostname();d=json.load(u.urlopen(os.environ['HC_URL'],timeout=8));d=d.get('data',d) if isinstance(d,dict) else d;sys.exit(0 if [r for r in d if str(r.get('host'))==h and float(r.get('age_seconds') or 1e9)<180] else 1)\""]
+      interval: 60s
+      timeout: 15s
+      # Three consecutive failures before it counts as broken, so one network blink does
+      # not cause a restart.
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    # Docker does NOT restart an `unhealthy` container — `restart:` fires when the PROCESS
+    # exits; HEALTHCHECK only writes a label. That label is the filter for
+    # `worker-autoheal.timer` (see ../systemd/), which does the restarting.
+    labels:
+      autoheal: "true"

@@ -1,0 +1,162 @@
+{
+  "_comment": "5-level nested sub-workflow bundle with custom (NodeDefinition) nodes. Mirror of tests/integration/test_nested_child_workflows_5layer_custom_nodes.py. Per level: HUMAN_ACTION -> CONDITION -> custom TASK -> COMPUTE -> SWITCH -> WORKFLOW(next) -> OUTPUT, plus reject/side OUTPUT leaves. The test seeds these with EXPLICIT workflow ids (wf-l1..wf-l5) via repo.save + stamps definition_snapshot with the production NodeDefinitionResolver. Over the public API the WORKFLOW node references children by workflow_id, so create bottom-up (wf-l5 first) and substitute each generated id into the parent's config.workflow_id. The custom node's base_worker_id ('biz-worker') is a placeholder; for a LIVE run point it at a registered worker (e.g. 'http_request') and adjust locked_defaults/input_mapping accordingly.",
+
+  "node_definitions": [
+    {
+      "id": "nd-business",
+      "tenant_id": "t1",
+      "name": "Business Step",
+      "base_type": "TASK",
+      "base_worker_id": "biz-worker",
+      "data_mode": "json",
+      "edit_mode": "none",
+      "locked_defaults": { "method": "POST" },
+      "input_mapping": { "payload": "{{$custom.note}}" },
+      "output_mapping": {
+        "summary": "{{$_output.status_code}}",
+        "tag": "{{$_output.tag}}"
+      },
+      "input_schema": [ { "key": "note", "outputType": "string" } ],
+      "output_schema": [
+        { "key": "summary", "outputType": "number" },
+        { "key": "tag", "outputType": "string" }
+      ]
+    },
+    {
+      "id": "nd-business-l5",
+      "tenant_id": "t1",
+      "name": "Business Step (L5)",
+      "base_type": "TASK",
+      "parent_definition_id": "nd-business",
+      "locked_defaults": { "method": "PATCH" }
+    }
+  ],
+
+  "workflows": [
+    {
+      "id": "wf-l1",
+      "name": "L1",
+      "nodes": [
+        { "id": "l1-trig", "name": "L1-START", "node_type": "TRIGGER", "parameters": { "trigger_type": "manual" } },
+        { "id": "l1-ha", "name": "L1-HA", "node_type": "HUMAN_ACTION", "config": { "instruction": "L1 approve?", "input_schema": [] } },
+        { "id": "l1-cond", "name": "L1-COND", "node_type": "CONDITION", "config": { "expression": "{{$l1-ha._action}} == \"confirm\"" } },
+        { "id": "l1-biz", "name": "L1-BIZ", "node_type": "TASK", "node_definition_id": "nd-business", "parameters": { "note": "level-1-note" } },
+        { "id": "l1-compute", "name": "L1-COMPUTE", "node_type": "COMPUTE", "config": { "expression": "{{$l1-biz.summary}} + 1", "result_key": "l1_total" } },
+        { "id": "l1-switch", "name": "L1-SWITCH", "node_type": "SWITCH", "config": { "data": [ { "key": "{{$l1-ha._action}}", "operations": "==", "value": "confirm", "branch": "go" } ] } },
+        { "id": "l1-rej", "name": "L1-REJ", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "rejected" }, { "key": "status", "type": "string", "value": "rejected" } ] } },
+        { "id": "l1-side", "name": "L1-SIDE", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "side" }, { "key": "status", "type": "string", "value": "side" } ] } },
+        { "id": "l1-wf", "name": "L1-CALL-L2", "node_type": "WORKFLOW", "config": { "workflow_id": "wf-l2", "input_mapping": {}, "on_failure": "fail" } },
+        { "id": "l1-out", "name": "L1-OUT", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "{{$l1-wf.output.deepest}}" }, { "key": "level1", "type": "number", "value": "{{$l1-compute.output.result}}" } ] } }
+      ],
+      "edges": [
+        { "source_node_id": "l1-trig", "target_node_id": "l1-ha" },
+        { "source_node_id": "l1-ha", "target_node_id": "l1-cond" },
+        { "source_node_id": "l1-cond", "target_node_id": "l1-biz", "source_port_id": "true_branch" },
+        { "source_node_id": "l1-cond", "target_node_id": "l1-rej", "source_port_id": "false_branch" },
+        { "source_node_id": "l1-biz", "target_node_id": "l1-compute" },
+        { "source_node_id": "l1-compute", "target_node_id": "l1-switch" },
+        { "source_node_id": "l1-switch", "target_node_id": "l1-wf", "source_port_id": "go" },
+        { "source_node_id": "l1-switch", "target_node_id": "l1-side", "source_port_id": "default" },
+        { "source_node_id": "l1-wf", "target_node_id": "l1-out" }
+      ]
+    },
+    {
+      "id": "wf-l2",
+      "name": "L2",
+      "nodes": [
+        { "id": "l2-ha", "name": "L2-HA", "node_type": "HUMAN_ACTION", "config": { "instruction": "L2 approve?", "input_schema": [] } },
+        { "id": "l2-cond", "name": "L2-COND", "node_type": "CONDITION", "config": { "expression": "{{$l2-ha._action}} == \"confirm\"" } },
+        { "id": "l2-biz", "name": "L2-BIZ", "node_type": "TASK", "node_definition_id": "nd-business", "parameters": { "note": "level-2-note" } },
+        { "id": "l2-compute", "name": "L2-COMPUTE", "node_type": "COMPUTE", "config": { "expression": "{{$l2-biz.summary}} + 2", "result_key": "l2_total" } },
+        { "id": "l2-switch", "name": "L2-SWITCH", "node_type": "SWITCH", "config": { "data": [ { "key": "{{$l2-ha._action}}", "operations": "==", "value": "confirm", "branch": "go" } ] } },
+        { "id": "l2-rej", "name": "L2-REJ", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "rejected" }, { "key": "status", "type": "string", "value": "rejected" } ] } },
+        { "id": "l2-side", "name": "L2-SIDE", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "side" }, { "key": "status", "type": "string", "value": "side" } ] } },
+        { "id": "l2-wf", "name": "L2-CALL-L3", "node_type": "WORKFLOW", "config": { "workflow_id": "wf-l3", "input_mapping": {}, "on_failure": "fail" } },
+        { "id": "l2-out", "name": "L2-OUT", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "{{$l2-wf.output.deepest}}" }, { "key": "level2", "type": "number", "value": "{{$l2-compute.output.result}}" } ] } }
+      ],
+      "edges": [
+        { "source_node_id": "l2-ha", "target_node_id": "l2-cond" },
+        { "source_node_id": "l2-cond", "target_node_id": "l2-biz", "source_port_id": "true_branch" },
+        { "source_node_id": "l2-cond", "target_node_id": "l2-rej", "source_port_id": "false_branch" },
+        { "source_node_id": "l2-biz", "target_node_id": "l2-compute" },
+        { "source_node_id": "l2-compute", "target_node_id": "l2-switch" },
+        { "source_node_id": "l2-switch", "target_node_id": "l2-wf", "source_port_id": "go" },
+        { "source_node_id": "l2-switch", "target_node_id": "l2-side", "source_port_id": "default" },
+        { "source_node_id": "l2-wf", "target_node_id": "l2-out" }
+      ]
+    },
+    {
+      "id": "wf-l3",
+      "name": "L3",
+      "nodes": [
+        { "id": "l3-ha", "name": "L3-HA", "node_type": "HUMAN_ACTION", "config": { "instruction": "L3 approve?", "input_schema": [] } },
+        { "id": "l3-cond", "name": "L3-COND", "node_type": "CONDITION", "config": { "expression": "{{$l3-ha._action}} == \"confirm\"" } },
+        { "id": "l3-biz", "name": "L3-BIZ", "node_type": "TASK", "node_definition_id": "nd-business", "parameters": { "note": "level-3-note" } },
+        { "id": "l3-compute", "name": "L3-COMPUTE", "node_type": "COMPUTE", "config": { "expression": "{{$l3-biz.summary}} + 3", "result_key": "l3_total" } },
+        { "id": "l3-switch", "name": "L3-SWITCH", "node_type": "SWITCH", "config": { "data": [ { "key": "{{$l3-ha._action}}", "operations": "==", "value": "confirm", "branch": "go" } ] } },
+        { "id": "l3-rej", "name": "L3-REJ", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "rejected" }, { "key": "status", "type": "string", "value": "rejected" } ] } },
+        { "id": "l3-side", "name": "L3-SIDE", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "side" }, { "key": "status", "type": "string", "value": "side" } ] } },
+        { "id": "l3-wf", "name": "L3-CALL-L4", "node_type": "WORKFLOW", "config": { "workflow_id": "wf-l4", "input_mapping": {}, "on_failure": "fail" } },
+        { "id": "l3-out", "name": "L3-OUT", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "{{$l3-wf.output.deepest}}" }, { "key": "level3", "type": "number", "value": "{{$l3-compute.output.result}}" } ] } }
+      ],
+      "edges": [
+        { "source_node_id": "l3-ha", "target_node_id": "l3-cond" },
+        { "source_node_id": "l3-cond", "target_node_id": "l3-biz", "source_port_id": "true_branch" },
+        { "source_node_id": "l3-cond", "target_node_id": "l3-rej", "source_port_id": "false_branch" },
+        { "source_node_id": "l3-biz", "target_node_id": "l3-compute" },
+        { "source_node_id": "l3-compute", "target_node_id": "l3-switch" },
+        { "source_node_id": "l3-switch", "target_node_id": "l3-wf", "source_port_id": "go" },
+        { "source_node_id": "l3-switch", "target_node_id": "l3-side", "source_port_id": "default" },
+        { "source_node_id": "l3-wf", "target_node_id": "l3-out" }
+      ]
+    },
+    {
+      "id": "wf-l4",
+      "name": "L4",
+      "nodes": [
+        { "id": "l4-ha", "name": "L4-HA", "node_type": "HUMAN_ACTION", "config": { "instruction": "L4 approve?", "input_schema": [] } },
+        { "id": "l4-cond", "name": "L4-COND", "node_type": "CONDITION", "config": { "expression": "{{$l4-ha._action}} == \"confirm\"" } },
+        { "id": "l4-biz", "name": "L4-BIZ", "node_type": "TASK", "node_definition_id": "nd-business", "parameters": { "note": "level-4-note" } },
+        { "id": "l4-compute", "name": "L4-COMPUTE", "node_type": "COMPUTE", "config": { "expression": "{{$l4-biz.summary}} + 4", "result_key": "l4_total" } },
+        { "id": "l4-switch", "name": "L4-SWITCH", "node_type": "SWITCH", "config": { "data": [ { "key": "{{$l4-ha._action}}", "operations": "==", "value": "confirm", "branch": "go" } ] } },
+        { "id": "l4-rej", "name": "L4-REJ", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "rejected" }, { "key": "status", "type": "string", "value": "rejected" } ] } },
+        { "id": "l4-side", "name": "L4-SIDE", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "side" }, { "key": "status", "type": "string", "value": "side" } ] } },
+        { "id": "l4-wf", "name": "L4-CALL-L5", "node_type": "WORKFLOW", "config": { "workflow_id": "wf-l5", "input_mapping": {}, "on_failure": "fail" } },
+        { "id": "l4-out", "name": "L4-OUT", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "{{$l4-wf.output.deepest}}" }, { "key": "level4", "type": "number", "value": "{{$l4-compute.output.result}}" } ] } }
+      ],
+      "edges": [
+        { "source_node_id": "l4-ha", "target_node_id": "l4-cond" },
+        { "source_node_id": "l4-cond", "target_node_id": "l4-biz", "source_port_id": "true_branch" },
+        { "source_node_id": "l4-cond", "target_node_id": "l4-rej", "source_port_id": "false_branch" },
+        { "source_node_id": "l4-biz", "target_node_id": "l4-compute" },
+        { "source_node_id": "l4-compute", "target_node_id": "l4-switch" },
+        { "source_node_id": "l4-switch", "target_node_id": "l4-wf", "source_port_id": "go" },
+        { "source_node_id": "l4-switch", "target_node_id": "l4-side", "source_port_id": "default" },
+        { "source_node_id": "l4-wf", "target_node_id": "l4-out" }
+      ]
+    },
+    {
+      "id": "wf-l5",
+      "name": "L5",
+      "nodes": [
+        { "id": "l5-ha", "name": "L5-HA", "node_type": "HUMAN_ACTION", "config": { "instruction": "L5 approve?", "input_schema": [] } },
+        { "id": "l5-cond", "name": "L5-COND", "node_type": "CONDITION", "config": { "expression": "{{$l5-ha._action}} == \"confirm\"" } },
+        { "id": "l5-biz", "name": "L5-BIZ", "node_type": "TASK", "node_definition_id": "nd-business-l5", "parameters": { "note": "level-5-note" } },
+        { "id": "l5-compute", "name": "L5-COMPUTE", "node_type": "COMPUTE", "config": { "expression": "{{$l5-biz.summary}} + 5", "result_key": "l5_total" } },
+        { "id": "l5-switch", "name": "L5-SWITCH", "node_type": "SWITCH", "config": { "data": [ { "key": "{{$l5-ha._action}}", "operations": "==", "value": "confirm", "branch": "go" } ] } },
+        { "id": "l5-rej", "name": "L5-REJ", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "rejected" }, { "key": "status", "type": "string", "value": "rejected" } ] } },
+        { "id": "l5-side", "name": "L5-SIDE", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "side" }, { "key": "status", "type": "string", "value": "side" } ] } },
+        { "id": "l5-out", "name": "L5-OUT", "node_type": "OUTPUT", "config": { "output_schema": [ { "key": "deepest", "type": "string", "value": "{{$l5-biz.tag}}" }, { "key": "level5", "type": "number", "value": "{{$l5-compute.output.result}}" } ] } }
+      ],
+      "edges": [
+        { "source_node_id": "l5-ha", "target_node_id": "l5-cond" },
+        { "source_node_id": "l5-cond", "target_node_id": "l5-biz", "source_port_id": "true_branch" },
+        { "source_node_id": "l5-cond", "target_node_id": "l5-rej", "source_port_id": "false_branch" },
+        { "source_node_id": "l5-biz", "target_node_id": "l5-compute" },
+        { "source_node_id": "l5-compute", "target_node_id": "l5-switch" },
+        { "source_node_id": "l5-switch", "target_node_id": "l5-out", "source_port_id": "go" },
+        { "source_node_id": "l5-switch", "target_node_id": "l5-side", "source_port_id": "default" }
+      ]
+    }
+  ]
+}

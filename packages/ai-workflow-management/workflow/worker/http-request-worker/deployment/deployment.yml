@@ -1,0 +1,118 @@
+name: worker-http-request-worker
+buildContext: ..
+buildContexts:
+  worker-sdk: ../../worker-sdk
+  json_csv_streamer: ../../../libs/json-csv-streamer
+
+# Raised 128M -> 512M together with RESOLVE_MAX_INPUT_BYTES below. The two are
+# one decision: this node POSTs a whole file-backed collection as a request body,
+# so the pod has to hold the parsed rows, the re-nested object and the serialized
+# body at once (~3.5x the wire bytes, measured). At 128M the worker could not
+# have served even the 16 MiB cap it already advertised — see
+# tests/unit/test_input_cap_fits_the_pod.py, which now fails if these two move
+# apart again.
+#
+# NOTE: tenant-1 (the `solace` env) reads the `dev` tier, so the dev row is also
+# production. There is no per-tenant tier for backend env, so this raises
+# smdg-ai-dev too.
+memory:
+  dev: 512M
+  qas: 512M
+
+http2: false
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  # 64 MiB of WIRE bytes. Sized from the pod above, not chosen for roundness:
+  # 64 MiB x 3.5 (measured peak multiplier) + 40 MB baseline = ~264 MB, i.e. 52%
+  # of a 512 MB pod. It admits ~28 000 rows of the shape this workflow sends
+  # (~2 349 B/row on the wire); the 10 000-row payload that was refused is 22.4 MB.
+  #
+  # Declared HERE rather than left to the SDK default (16 MiB) because the SDK
+  # default is sized for a 256 MB pod and this app is not that app. Moving this
+  # without moving `memory` above fails the manifest test.
+  RESOLVE_MAX_INPUT_BYTES:
+    dev: "67108864"
+    qas: "67108864"
+
+  # 300s -> 3000s. The code default stays 300 on purpose: the setting's own test
+  # states that raising the ceiling is a DEPLOYMENT decision, so it is made here.
+  #
+  # Why it must move with the cap: a 5 000-row payload already took 342 s and
+  # died on the old 300 s ceiling (run 5c742ec7) — i.e. time was binding BELOW
+  # the size cap. Raising only the cap would have moved the failure, not removed it.
+  # 3000 < 3570 = the executor's TASK_TIMEOUT_MAX_SECONDS (3600) minus
+  # TASK_CALLBACK_GRACE_SECONDS (30), so the executor still honours it.
+  #
+  # This raises the CEILING only. Each node still carries its own
+  # `timeout_seconds`, and an existing node pinned at 300 keeps timing out at 300
+  # until someone raises it on the node.
+  HTTP_MAX_TIMEOUT_SECONDS:
+    dev: "3000"
+    qas: "3000"
+  # Stream a large file-backed ARRAY body straight into the request instead of
+  # materialising it first. This is the node that POSTs whole collections, so it
+  # is the node the feature exists for — and the only handler that knows how to
+  # consume the handle.
+  #
+  # With this on, RESOLVE_MAX_INPUT_BYTES above stops being the ceiling on what
+  # can be SENT and becomes a per-WINDOW guard, which is the job it was written
+  # for. The pod can come back down once this is proven live; left at 512M until
+  # then, deliberately.
+  #
+  # Rollback is an env flip, not a redeploy:
+  #   cf set-env worker-http-request-worker WORKER_STREAM_FILE_BACKED_INPUTS false
+  #   cf restart worker-http-request-worker
+  WORKER_STREAM_FILE_BACKED_INPUTS:
+    dev: "true"
+    qas: "true"
+
+  WORKER_CHUNKED_OUTPUT_ENABLED:
+    dev: "true"
+    qas: "true"
+  APP_NAME:
+    dev: "HTTP Request Worker"
+    qas: "HTTP Request Worker"
+  WORKER_TYPE:
+    dev: "http_request"
+    qas: "http_request"
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  LOG_LEVEL:
+    dev: DEBUG
+    qas: INFO
+  SERVER_HOST:
+    dev: "0.0.0.0"
+    qas: "0.0.0.0"
+  SERVER_PORT:
+    dev: 35000
+    qas: 35000
+  PROXY_URL:
+    dev: https://smdg-ai-dev-worker-http-request-worker.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-worker-http-request-worker-qas.cfapps.br10.hana.ondemand.com
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-worker-executor-qas.cfapps.br10.hana.ondemand.com
+  FILE_SERVICE_URL:
+    dev: https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+
+services:
+  dev:
+    - simplemdg-logging
+    - simplemdg-event-core-2
+  qas:
+    - simplemdg-logging
+    - wio-orchestrator-management-001  # tenant-2 mirrors dev. CONFIG_TIER is literally 'tenant-2' there, and
+  # deploy.yml resolves services with `.[$tier] // []` — without this key
+  # the app is pushed with NO bindings (no HANA, no Event Mesh).
+  tenant-2:
+    - simplemdg-logging
+    - simplemdg-event-core-2

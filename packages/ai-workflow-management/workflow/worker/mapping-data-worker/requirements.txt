@@ -1,0 +1,4 @@
+-e ../worker-sdk
+pytest
+pytest-asyncio
+pytest-cov

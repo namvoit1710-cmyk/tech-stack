@@ -1,0 +1,26 @@
+{
+  "_comment": "Real-stack end-to-end smoke workflow. POST this to /api/v1/workflows on a running CP that has the worker-executor (:8004) + an http_request worker registered. Then POST /api/v1/runs {workflow_id}. The TASK node dispatches to the real http_request worker, which performs an actual HTTP GET; the response (status_code/response_body/...) flows back into the node output and the run reaches COMPLETED.",
+  "name": "claude-real-e2e-http",
+  "description": "real e2e: TASK runs the http_request worker against a live HTTP endpoint",
+  "nodes": [
+    {
+      "id": "trig",
+      "name": "Start",
+      "node_type": "TRIGGER",
+      "parameters": { "trigger_type": "manual" }
+    },
+    {
+      "id": "call",
+      "name": "Call Health",
+      "node_type": "TASK",
+      "worker_type": "http_request",
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:8001/api/v1/health"
+      }
+    }
+  ],
+  "edges": [
+    { "source_node_id": "trig", "target_node_id": "call" }
+  ]
+}

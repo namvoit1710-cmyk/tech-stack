@@ -1,0 +1,112 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Upload a file for processing.",
+          "rowsLength": 3
+        },
+        "fieldControl": "TextareaControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Instruction"
+        }
+      },
+      "key": "instruction",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "uploaded_file"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Artifact Key"
+        }
+      },
+      "key": "artifact_key",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "agent-1, agent-2..."
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Use Agent",
+          "required": true
+        }
+      },
+      "key": "use_agent",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "File ID"
+        }
+      },
+      "key": "file_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "File Name"
+        }
+      },
+      "key": "file_name",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true,
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "File Size"
+        }
+      },
+      "key": "file_size",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Content Type"
+        }
+      },
+      "key": "content_type",
+      "outputType": "string"
+    }
+  ]
+}

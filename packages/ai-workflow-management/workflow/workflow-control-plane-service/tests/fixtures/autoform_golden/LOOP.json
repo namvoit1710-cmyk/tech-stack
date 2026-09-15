@@ -1,0 +1,198 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "options": [
+            {
+              "id": "collection",
+              "value": "Collection"
+            },
+            {
+              "id": "count",
+              "value": "Count"
+            },
+            {
+              "id": "condition",
+              "value": "Condition"
+            }
+          ],
+          "placeholder": "Select loop type"
+        },
+        "fieldControl": "SelectControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Loop Type",
+          "required": true
+        }
+      },
+      "key": "loop_type",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "collection",
+          "fieldKey": "loop_type",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "{{$input.items}}"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Collection"
+        }
+      },
+      "key": "collection",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "100",
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Max Iterations"
+        }
+      },
+      "key": "max_iterations",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "condition",
+          "fieldKey": "loop_type",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "{{$nodeA.hasMore}}"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Condition"
+        }
+      },
+      "key": "condition",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "options": [
+            {
+              "id": "sequential",
+              "value": "Sequential"
+            },
+            {
+              "id": "parallel",
+              "value": "Parallel"
+            }
+          ],
+          "placeholder": "Select execution mode"
+        },
+        "fieldControl": "SelectControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Execution Mode"
+        }
+      },
+      "key": "mode",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "parallel",
+          "fieldKey": "mode",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "5",
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Max Parallelism"
+        }
+      },
+      "key": "parallelism",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "index",
+          "value": "index"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Counter Variable"
+        }
+      },
+      "key": "counter_variable",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true,
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Iteration Count"
+        }
+      },
+      "key": "iteration_count",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "SwitchControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Completed"
+        }
+      },
+      "key": "completed",
+      "outputType": "boolean"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Break Reason"
+        }
+      },
+      "key": "break_reason",
+      "outputType": "string"
+    }
+  ]
+}

@@ -1,0 +1,616 @@
+{
+  "id": "wf-order-processing",
+  "name": "Order Processing Workflow",
+  "version": "1",
+  "schema_version": "1.0.0",
+  "description": "End-to-end order processing with approval gate, CSV data review, and parallel fulfillment. Demonstrates technical nodes (control flow), raw TASK nodes (worker_type routing), and business nodes (node definition templates with CSV data mode).",
+  "purpose": "Automate the complete order lifecycle: receive an order event, fetch details via HTTP worker, let a business user review/edit the order items in a CSV data grid (HITL), route high-value orders through approval, charge payment and create shipment in parallel, then send a confirmation email.",
+  "status": "DRAFT",
+  "input_schema": [
+    {
+      "key": "order_id",
+      "outputType": "string",
+      "fieldConfig": {
+        "label": "Order ID",
+        "description": "Unique order identifier.",
+        "fieldControl": "Input",
+        "fieldWrapper": "FormItem"
+      },
+      "rules": { "isRequired": true }
+    }
+  ],
+  "output_schema": [
+    {
+      "key": "fulfillment_status",
+      "outputType": "string",
+      "fieldConfig": {
+        "label": "Fulfillment Status",
+        "fieldControl": "None"
+      }
+    }
+  ],
+
+  "__comment_node_definitions": "These are the NodeDefinition templates that business nodes reference. They are created via POST /node-definitions and stored separately. Included here for documentation.",
+  "node_definitions": [
+    {
+      "id": "nd-review-order-items",
+      "tenant_id": "acme-corp",
+      "name": "Review Order Items",
+      "description": "Business node: displays order line items as an editable CSV grid. User reviews/edits quantities before dispatch.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/orders/update-items"
+      },
+      "input_schema": [
+        { "key": "item_name", "type": "string", "label": "Item Name", "required": true },
+        { "key": "quantity", "type": "number", "label": "Quantity", "required": true },
+        { "key": "unit_price", "type": "number", "label": "Unit Price" },
+        { "key": "invoice", "type": "file", "label": "Invoice PDF" }
+      ],
+      "output_schema": [],
+      "input_mapping": {},
+      "output_mapping": { "updated_items": "{{$_output.response_body}}" },
+      "icon": "Table",
+      "color": "#F97316",
+      "tags": ["review", "csv", "hitl"],
+      "data_mode": "csv_multi",
+      "edit_mode": "before_dispatch"
+    },
+    {
+      "id": "nd-charge-payment",
+      "tenant_id": "acme-corp",
+      "name": "Charge Payment",
+      "description": "Business node: charges the customer payment. Locked to POST against the Payments API. User provides order_id via form, converted to single-row CSV.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/payments/charge"
+      },
+      "input_schema": [
+        { "key": "order_id", "type": "string", "label": "Order ID", "required": true },
+        { "key": "amount", "type": "number", "label": "Amount (USD)", "required": true }
+      ],
+      "output_schema": [
+        { "key": "transaction_id", "type": "string", "label": "Transaction ID" },
+        { "key": "charged_amount", "type": "number", "label": "Charged Amount" }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "transaction_id": "{{$_output.response_body.transaction_id}}" },
+      "icon": "CreditCard",
+      "color": "#10B981",
+      "tags": ["payment", "finance"],
+      "data_mode": "csv_single",
+      "edit_mode": "before_dispatch"
+    },
+    {
+      "id": "nd-create-shipment",
+      "tenant_id": "acme-corp",
+      "name": "Create Shipment",
+      "description": "Business node: creates shipping label via the Shipments API. No CSV — uses standard JSON passthrough.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/shipments"
+      },
+      "input_schema": [
+        { "key": "order_id", "type": "string", "label": "Order ID", "required": true }
+      ],
+      "output_schema": [
+        { "key": "tracking_number", "type": "string", "label": "Tracking Number" }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "tracking_number": "{{$_output.response_body.tracking_number}}" },
+      "icon": "Truck",
+      "color": "#0EA5E9",
+      "tags": ["shipping", "logistics"],
+      "data_mode": "json",
+      "edit_mode": "before_dispatch"
+    },
+    {
+      "id": "nd-send-confirmation",
+      "tenant_id": "acme-corp",
+      "name": "Send Confirmation Email",
+      "description": "Business node: sends order confirmation email. After-dispatch edit mode allows reviewing the email data while workflow continues.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/notifications"
+      },
+      "input_schema": [
+        { "key": "order_id", "type": "string", "label": "Order ID", "required": true },
+        { "key": "customer_email", "type": "string", "label": "Customer Email", "required": true },
+        { "key": "tracking_number", "type": "string", "label": "Tracking Number" }
+      ],
+      "output_schema": [],
+      "input_mapping": {},
+      "output_mapping": {},
+      "icon": "Mail",
+      "color": "#EC4899",
+      "tags": ["notification", "email"],
+      "data_mode": "csv_single",
+      "edit_mode": "before_dispatch"
+    }
+  ],
+
+  "__comment_parameters": "Nodes use a unified 'parameters' field. The backend splits it into engine-internal 'config' (behavior rules) and 'input_binding' (data mappings) based on node type. The frontend never needs to know this distinction.",
+
+  "nodes": [
+    {
+      "id": "trigger-1",
+      "name": "Order Received",
+      "type": "TRIGGER",
+      "node_class": "TECHNICAL",
+      "description": "Starts when a new order event arrives.",
+      "instruction": "Listen on the 'orders.created' event topic. When an event arrives, extract the trigger_payload containing order_id and pass it downstream.",
+      "icon": "Zap",
+      "color": "#F59E0B",
+      "tags": ["entry"],
+      "worker_id": null,
+      "parameters": {
+        "trigger_type": "event",
+        "event_topic": "orders.created"
+      },
+      "ports": {
+        "in": [],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 100,
+      "y": 200
+    },
+    {
+      "id": "fetch-order",
+      "name": "Fetch Order Details",
+      "type": "TASK",
+      "node_class": "TECHNICAL",
+      "description": "Calls the Orders API to retrieve full order details. This is a raw TASK node using worker_type-based routing — no node definition needed.",
+      "instruction": "HTTP GET to the Orders API using the order_id from the trigger payload. The response_body contains: order_id, total, customer_email, and items[].",
+      "icon": "Globe",
+      "color": "#3B82F6",
+      "tags": ["http", "api"],
+      "worker_id": "http-request-worker",
+      "parameters": {
+        "url": "https://api.example.com/orders/{{$trigger-1.trigger_payload.order_id}}",
+        "method": "GET"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Order object" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Error details" }
+        ]
+      },
+      "x": 300,
+      "y": 200
+    },
+    {
+      "id": "review-items",
+      "name": "Review Order Items",
+      "type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_multi + before_dispatch HITL): Displays the order's line items as an editable CSV data grid. The workflow pauses here until the user reviews, edits quantities, and clicks Confirm.",
+      "instruction": "The order items from the previous step are converted to a CSV file and uploaded to the file-service. The workflow pauses (PENDING_INPUT). The frontend renders an editable data grid. The user can add/edit/delete rows. On Confirm, the updated CSV is re-uploaded and the task dispatches to the HTTP worker.",
+      "icon": "Table",
+      "color": "#F97316",
+      "tags": ["review", "csv", "hitl"],
+      "worker_id": "http-request-worker",
+      "node_definition_id": "nd-review-order-items",
+      "parameters": {
+        "items": "{{$fetch-order.response_body.items}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Updated items" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "" }
+        ]
+      },
+      "x": 500,
+      "y": 200
+    },
+    {
+      "id": "compute-total",
+      "name": "Compute Order Total",
+      "type": "COMPUTE",
+      "node_class": "TECHNICAL",
+      "description": "Recalculates the order total from the (possibly edited) items.",
+      "instruction": "Sum the total from the updated items. The result is stored in run context as compute-total.output.result for downstream use.",
+      "icon": "Calculator",
+      "color": "#6366F1",
+      "tags": ["compute"],
+      "worker_id": null,
+      "parameters": {
+        "expression": "{{$fetch-order.response_body.total}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "number", "required": true, "description": "Computed total" }]
+      },
+      "x": 700,
+      "y": 200
+    },
+    {
+      "id": "check-amount",
+      "name": "High Value?",
+      "type": "CONDITION",
+      "node_class": "TECHNICAL",
+      "description": "Routes high-value orders (> $500) through approval.",
+      "instruction": "Evaluate whether the order total exceeds 500 USD. If true, route through manager approval. If false, proceed directly to fulfillment.",
+      "icon": "GitBranch",
+      "color": "#8B5CF6",
+      "tags": ["routing"],
+      "worker_id": null,
+      "parameters": {
+        "expression": "{{$compute-total.output.result}} > 500"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "true_branch", "label": "True", "data_type": "any", "required": true, "description": "Order > $500" },
+          { "id": "false_branch", "label": "False", "data_type": "any", "required": true, "description": "Order <= $500" }
+        ]
+      },
+      "x": 900,
+      "y": 200
+    },
+    {
+      "id": "approval-gate",
+      "name": "Manager Approval",
+      "type": "TASK",
+      "node_class": "TECHNICAL",
+      "description": "Waits for manager approval on high-value orders. Raw TASK node using wait-worker.",
+      "instruction": "Pause workflow execution and send an approval request to a manager. Resumes only on explicit approve/reject.",
+      "icon": "Clock",
+      "color": "#EC4899",
+      "tags": ["approval", "hitl"],
+      "worker_id": "wait-worker",
+      "parameters": {
+        "wait_type": "approval",
+        "message": "Please approve order {{$fetch-order.response_body.order_id}} (${{$compute-total.output.result}})"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Approved", "data_type": "object", "required": true, "description": "" },
+          { "id": "failure", "label": "Rejected", "data_type": "object", "required": false, "description": "" }
+        ]
+      },
+      "x": 1100,
+      "y": 100
+    },
+    {
+      "id": "merge-approval",
+      "name": "Merge Approval",
+      "type": "MERGE",
+      "node_class": "TECHNICAL",
+      "description": "Merges the approval and direct paths.",
+      "instruction": "Converge the two branches from the condition. Uses wait_any — only one branch is ever active.",
+      "icon": "Merge",
+      "color": "#10B981",
+      "tags": [],
+      "worker_id": null,
+      "parameters": {
+        "merge_strategy": "wait_any"
+      },
+      "ports": {
+        "in": [
+          { "id": "in_approval", "label": "From Approval", "data_type": "any", "required": true, "description": "" },
+          { "id": "in_direct", "label": "Direct", "data_type": "any", "required": true, "description": "" }
+        ],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 1300,
+      "y": 200
+    },
+    {
+      "id": "parallel-fulfill",
+      "name": "Parallel Fulfillment",
+      "type": "PARALLEL",
+      "node_class": "TECHNICAL",
+      "description": "Executes payment and shipping in parallel.",
+      "instruction": "Fork into two concurrent branches: payment and shipment. Both must complete. Fail fast on any failure.",
+      "icon": "LayoutGrid",
+      "color": "#0EA5E9",
+      "tags": ["parallel"],
+      "worker_id": null,
+      "parameters": {
+        "max_concurrency": 0,
+        "fail_strategy": "fail_fast"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "branch_payment", "label": "Payment", "data_type": "any", "required": true, "description": "" },
+          { "id": "branch_shipping", "label": "Shipping", "data_type": "any", "required": true, "description": "" }
+        ]
+      },
+      "x": 1500,
+      "y": 200
+    },
+    {
+      "id": "charge-payment",
+      "name": "Charge Payment",
+      "type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_single, auto-dispatch): Charges the customer. Form data (order_id, amount) is converted to a single-row CSV and uploaded. The locked_defaults (method, url) are merged at dispatch time.",
+      "instruction": "The parameters provide order_id and amount from prior context. The CSV converter separates these from locked_defaults, creates a single-row CSV, uploads to file-service, and dispatches to the HTTP worker with {file_id, method, url}.",
+      "icon": "CreditCard",
+      "color": "#10B981",
+      "tags": ["payment", "finance"],
+      "worker_id": "http-request-worker",
+      "node_definition_id": "nd-charge-payment",
+      "parameters": {
+        "order_id": "{{$fetch-order.response_body.order_id}}",
+        "amount": "{{$compute-total.output.result}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Payment confirmation" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Payment decline" }
+        ]
+      },
+      "x": 1700,
+      "y": 100
+    },
+    {
+      "id": "create-shipment",
+      "name": "Create Shipment",
+      "type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (json, auto-dispatch): Creates a shipping label. Uses standard JSON mode — no CSV conversion. The locked_defaults lock the HTTP method and URL.",
+      "instruction": "Dispatches to the HTTP worker with {order_id, method: POST, url: shipments API}. No CSV involved since data_mode is json.",
+      "icon": "Truck",
+      "color": "#0EA5E9",
+      "tags": ["shipping", "logistics"],
+      "worker_id": "http-request-worker",
+      "node_definition_id": "nd-create-shipment",
+      "parameters": {
+        "order_id": "{{$fetch-order.response_body.order_id}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Shipment details" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Shipping error" }
+        ]
+      },
+      "x": 1700,
+      "y": 300
+    },
+    {
+      "id": "merge-fulfill",
+      "name": "Merge Fulfillment",
+      "type": "MERGE",
+      "node_class": "TECHNICAL",
+      "description": "Waits for both payment and shipping to complete.",
+      "instruction": "Converge the two parallel branches. Uses wait_all — both must complete before proceeding.",
+      "icon": "Merge",
+      "color": "#10B981",
+      "tags": [],
+      "worker_id": null,
+      "parameters": {
+        "merge_strategy": "wait_all"
+      },
+      "ports": {
+        "in": [
+          { "id": "in_payment", "label": "Payment", "data_type": "any", "required": true, "description": "" },
+          { "id": "in_shipping", "label": "Shipping", "data_type": "any", "required": true, "description": "" }
+        ],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 1900,
+      "y": 200
+    },
+    {
+      "id": "notify-customer",
+      "name": "Send Confirmation",
+      "type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_single + after_dispatch): Sends confirmation email. Dispatches immediately but the CSV data remains viewable/editable in the run view for auditing.",
+      "instruction": "Form data (order_id, email, tracking_number) is converted to a single-row CSV and uploaded. Dispatches immediately to the HTTP worker. The after_dispatch edit_mode means the data grid remains editable in the run view — useful for auditing or re-sending with corrections.",
+      "icon": "Mail",
+      "color": "#EC4899",
+      "tags": ["notification", "email"],
+      "worker_id": "http-request-worker",
+      "node_definition_id": "nd-send-confirmation",
+      "parameters": {
+        "order_id": "{{$fetch-order.response_body.order_id}}",
+        "customer_email": "{{$fetch-order.response_body.customer_email}}",
+        "tracking_number": "{{$create-shipment.response_body.tracking_number}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Delivery confirmation" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Non-blocking failure" }
+        ]
+      },
+      "x": 2100,
+      "y": 200
+    },
+    {
+      "id": "group-fulfillment",
+      "name": "Fulfillment Group",
+      "type": "GROUP",
+      "node_class": "BUSINESS",
+      "description": "Visual group enclosing the parallel fulfillment steps.",
+      "instruction": "Visual grouping only — no execution behavior. Contains the parallel fork, payment, shipment, and merge nodes.",
+      "icon": "Layers",
+      "color": "#E3F2FD",
+      "tags": ["visual"],
+      "worker_id": null,
+      "parameters": {
+        "children": ["parallel-fulfill", "charge-payment", "create-shipment", "merge-fulfill"],
+        "label": "Fulfillment"
+      },
+      "ports": {
+        "in": [],
+        "out": []
+      },
+      "x": 1450,
+      "y": 50
+    }
+  ],
+
+  "edges": [
+    {
+      "id": "e1",
+      "source_node_id": "trigger-1",
+      "target_node_id": "fetch-order",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "",
+      "description": "Passes trigger event payload containing order_id to fetch step."
+    },
+    {
+      "id": "e2",
+      "source_node_id": "fetch-order",
+      "target_node_id": "review-items",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "on success",
+      "description": "Order fetched — sends items to the HITL review grid."
+    },
+    {
+      "id": "e3",
+      "source_node_id": "review-items",
+      "target_node_id": "compute-total",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "items confirmed",
+      "description": "User confirmed the reviewed items — recalculate total."
+    },
+    {
+      "id": "e4",
+      "source_node_id": "compute-total",
+      "target_node_id": "check-amount",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "",
+      "description": "Total computed — check if high-value."
+    },
+    {
+      "id": "e5",
+      "source_node_id": "check-amount",
+      "target_node_id": "approval-gate",
+      "source_port_id": "true_branch",
+      "target_port_id": "in_default",
+      "condition": "then",
+      "label": "high value",
+      "description": "Order > $500 — requires manager approval."
+    },
+    {
+      "id": "e6",
+      "source_node_id": "check-amount",
+      "target_node_id": "merge-approval",
+      "source_port_id": "false_branch",
+      "target_port_id": "in_direct",
+      "condition": "else",
+      "label": "low value",
+      "description": "Order <= $500 — skips approval."
+    },
+    {
+      "id": "e7",
+      "source_node_id": "approval-gate",
+      "target_node_id": "merge-approval",
+      "source_port_id": "success",
+      "target_port_id": "in_approval",
+      "condition": null,
+      "label": "approved",
+      "description": "Manager approved — merge back to main path."
+    },
+    {
+      "id": "e8",
+      "source_node_id": "merge-approval",
+      "target_node_id": "parallel-fulfill",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "",
+      "description": "Order authorized — begin parallel fulfillment."
+    },
+    {
+      "id": "e9",
+      "source_node_id": "parallel-fulfill",
+      "target_node_id": "charge-payment",
+      "source_port_id": "branch_payment",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "payment branch",
+      "description": "Parallel branch: charge payment."
+    },
+    {
+      "id": "e10",
+      "source_node_id": "parallel-fulfill",
+      "target_node_id": "create-shipment",
+      "source_port_id": "branch_shipping",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "shipping branch",
+      "description": "Parallel branch: create shipment."
+    },
+    {
+      "id": "e11",
+      "source_node_id": "charge-payment",
+      "target_node_id": "merge-fulfill",
+      "source_port_id": "success",
+      "target_port_id": "in_payment",
+      "condition": null,
+      "label": "",
+      "description": "Payment charged — signal merge."
+    },
+    {
+      "id": "e12",
+      "source_node_id": "create-shipment",
+      "target_node_id": "merge-fulfill",
+      "source_port_id": "success",
+      "target_port_id": "in_shipping",
+      "condition": null,
+      "label": "",
+      "description": "Shipment created — signal merge."
+    },
+    {
+      "id": "e13",
+      "source_node_id": "merge-fulfill",
+      "target_node_id": "notify-customer",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "",
+      "description": "Both payment and shipping complete — send confirmation."
+    }
+  ],
+
+  "metadata": {
+    "author": "platform-team",
+    "domain": "e-commerce",
+    "notes": {
+      "parameters_convention": "All nodes use a single 'parameters' field. The backend splits it into engine-internal 'config' (behavior/control-flow rules) and 'input_binding' (data mappings from upstream nodes) based on node type. The frontend never needs to know this distinction.",
+      "worker_id_convention": "worker_id uses worker_type (e.g. 'http-request-worker', 'wait-worker') as the stable routing identifier, not auto-generated UUIDs. The worker-executor resolves worker_type to the current registration.",
+      "node_types_used": {
+        "technical_control_flow": ["TRIGGER", "CONDITION", "MERGE", "PARALLEL", "COMPUTE", "GROUP"],
+        "technical_task": ["fetch-order (raw TASK)", "approval-gate (raw TASK with wait-worker)"],
+        "business_nodes": ["review-items (csv_multi + HITL)", "charge-payment (csv_single)", "create-shipment (json)", "notify-customer (csv_single + after_dispatch)"]
+      },
+      "data_mode_examples": {
+        "json": "create-shipment — standard JSON passthrough, no CSV conversion",
+        "csv_single": "charge-payment — form fields converted to single-row CSV, uploaded to file-service",
+        "csv_multi": "review-items — list of items converted to multi-row CSV with editable data grid"
+      },
+      "edit_mode_examples": {
+        "none": "charge-payment, create-shipment — auto-dispatch, no user interaction",
+        "before_dispatch": "review-items — workflow pauses (PENDING_INPUT), user reviews/edits CSV data grid, confirms to dispatch",
+        "after_dispatch": "notify-customer — dispatches immediately, but CSV remains editable in run view for auditing"
+      }
+    }
+  }
+}

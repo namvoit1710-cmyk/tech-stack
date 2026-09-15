@@ -1,0 +1,71 @@
+{
+  "name": "Ticket → Patch (agentic_coder demo)",
+  "description": "Minimal slice of the ticket-automation pipeline as workflow nodes: read a ticket (passed as run input), let the agentic_coder decide enough/implement, and branch on the understanding gate. Runnable with ONLY this worker + the control plane + an Anthropic key — no Jira/git/forge needed.",
+  "nodes": [
+    {
+      "id": "trigger-1",
+      "type": "TRIGGER",
+      "config": { "trigger_type": "manual" }
+    },
+    {
+      "id": "coder-1",
+      "type": "TASK",
+      "config": {
+        "worker_type": "agentic_coder",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "api_key": "{{$input.api_key}}",
+        "ticket_key": "{{$input.ticket_key}}",
+        "ticket_summary": "{{$input.ticket_summary}}",
+        "ticket_description": "{{$input.ticket_description}}",
+        "acceptance_criteria": "{{$input.acceptance_criteria}}",
+        "repo_context": "{{$input.repo_context}}",
+        "max_tokens": 4096,
+        "temperature": 0.2
+      }
+    },
+    {
+      "id": "gate-1",
+      "type": "CONDITION",
+      "config": {
+        "data": [
+          { "key": "{{$coder-1.output.enough}}", "operations": "=", "value": "true" }
+        ]
+      }
+    },
+    {
+      "id": "out-done",
+      "type": "OUTPUT",
+      "config": {
+        "instruction": "Ticket was clear enough — return the implementation patch, score, and usage.",
+        "output_schema": [
+          { "key": "outcome",       "type": "string", "value": "implemented" },
+          { "key": "score",         "type": "number", "value": "{{$coder-1.output.score}}" },
+          { "key": "summary",       "type": "string", "value": "{{$coder-1.output.summary}}" },
+          { "key": "patch",         "type": "string", "value": "{{$coder-1.output.patch}}" },
+          { "key": "files_changed", "type": "array",  "value": "{{$coder-1.output.files_changed}}" },
+          { "key": "total_tokens",  "type": "number", "value": "{{$coder-1.output.total_tokens}}" },
+          { "key": "cost_usd",      "type": "number", "value": "{{$coder-1.output.cost_usd}}" }
+        ]
+      }
+    },
+    {
+      "id": "out-blocked",
+      "type": "OUTPUT",
+      "config": {
+        "instruction": "Ticket was NOT clear enough — return the blocking questions (in the real pipeline these get @-tagged on Jira and the ticket is moved to Blocked).",
+        "output_schema": [
+          { "key": "outcome",   "type": "string", "value": "blocked_needs_info" },
+          { "key": "questions", "type": "array",  "value": "{{$coder-1.output.questions}}" },
+          { "key": "summary",   "type": "string", "value": "{{$coder-1.output.summary}}" }
+        ]
+      }
+    }
+  ],
+  "edges": [
+    { "source": "trigger-1", "sourcePort": "out_default",  "target": "coder-1",     "targetPort": "in_default" },
+    { "source": "coder-1",   "sourcePort": "success",      "target": "gate-1",      "targetPort": "in_default" },
+    { "source": "gate-1",    "sourcePort": "true_branch",  "target": "out-done",    "targetPort": "in_default" },
+    { "source": "gate-1",    "sourcePort": "false_branch", "target": "out-blocked", "targetPort": "in_default" }
+  ]
+}

@@ -1,0 +1,78 @@
+-- Migration: drop AIW_WORKFLOW_RUNS.CONTEXT. Step 5b, the end of the redesign.
+--
+-- Design + every measurement: solace/specs/wcp-node-output-storage-redesign.md.
+--
+-- ============================================================================
+-- What this column cost
+-- ============================================================================
+--
+-- One NCLOB rewritten IN FULL on every save, because the optimistic-CAS UPDATE
+-- sets all data columns. Measured on prod-br10 / tenant-1:
+--
+--     192.43 MB stored
+--     1.58 GB rewritten across 43,199 saves   -- 8.4x write amplification
+--
+-- One node completion cost three round-trips carrying twice the whole context.
+-- That number is the reason this redesign exists.
+--
+-- ============================================================================
+-- Where its twelve fields went
+-- ============================================================================
+--
+--   variables, completed_nodes, skipped_nodes, child_runs,
+--   last_output_ports, last_taken_edge_ports   -> the PROJECTOR, rebuilt from
+--                                                 AIW_EVENT_LOG (authoritative
+--                                                 in prod since Phase 1b)
+--   topology, entry_nodes                      -> rebuilt from AIW_WORKFLOWS
+--   loop_state                                 -> AIW_RUN_LOOP_STATE (056/057)
+--   node_visits, pending_revisits              -> AIW_RUN_NODE_STATE (055/058)
+--   current_node                               -> NOWHERE. It was dead: of 16
+--                                                 references in app/, zero were
+--                                                 a read (section 13.5)
+--   __credentials (a key inside variables)     -> NOWHERE, and that was the
+--                                                 hard part -- see below
+--   merge_quorum_buffers, triggered_nodes      -> were never persisted at all
+--
+-- ============================================================================
+-- __credentials was the real blocker, and it was found the hard way
+-- ============================================================================
+--
+-- The section 13 audit marked variables "event-sourced, safe". True of the
+-- FIELD, false of one key inside it: grep __credentials run_projection.py
+-- returns ZERO hits, because LAI-19 keeps the sealed credential map out of any
+-- replayable or queryable store -- the same reason AIW_RUN_VARIABLE excludes it.
+--
+-- So DROP CONTEXT would have destroyed it silently, on every reload, for every
+-- credential-using worker -> 401. The attempt that discovered this was reverted
+-- before anything shipped. It was caught by
+-- test_hana_run_repo_cas::test_encrypted_credentials_survive_reload_as_dict,
+-- which failed the moment the write path lost the column.
+--
+-- Retiring it took its own phase: SA-2287/B3 had already moved the vault half to
+-- the egress boundary (each node resolves its own credential_ref at dispatch),
+-- and phase 1 removed the three remaining writers of the inline map.
+--
+-- ============================================================================
+-- ORDER. This is the part that cannot be got wrong.
+-- ============================================================================
+--
+-- _DATA_COLUMNS in hana_run_repo.py IS the write path. Dropping this column
+-- while that tuple still names it makes EVERY insert and EVERY CAS update fail
+-- instantly -- a total outage, not a degradation. So:
+--
+--   1. code stops writing CONTEXT               (PR #1853)
+--   2. deploy, and VERIFY: every run created afterwards has CONTEXT IS NULL
+--   3. read modes to `table`, verified by a loop workflow completing with its
+--      loop_state served from AIW_RUN_LOOP_STATE
+--   4. only then: this migration
+--
+-- Steps 2 and 3 were both verified on tenant-1 before this file was written.
+--
+-- Note also that on tenant-1 HANA_RUN_MIGRATIONS=false, so THIS FILE NEVER RUNS
+-- THERE. db/hdi/AIW_WORKFLOW_RUNS.hdbtable is the authority, and the column is
+-- removed from it in the same commit. Dropping it with raw SQL instead would be
+-- undone by the next HDI deploy, which reconciles the table back to the declared
+-- shape -- and the runtime user has no ALTER privilege anyway, which is how that
+-- mistake got caught.
+
+ALTER TABLE "AIW_WORKFLOW_RUNS" DROP ("CONTEXT");

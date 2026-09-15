@@ -1,0 +1,121 @@
+@startuml start_run_flow
+' ===========================================================================
+' Diagram 1: Start Run — From API to Entry Node Dispatch
+' Covers: StartRunUseCase → Queue → OrchestrationEngine.orchestrate_start
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam sequenceGroupBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **Start Run Flow**\n(StartRunUseCase → Entry Node Dispatch)
+
+actor "API Client" as Client SAP_PURPLE
+participant "StartRunUseCase" as UC SAP_BLUE
+participant "DAGPreparer" as DAG SAP_GREEN
+participant "DataStoreService" as DS SAP_TEAL
+database "RunRepo" as RR SAP_TEAL
+participant "EventPublisher" as EP SAP_NAVY
+participant "OrchestrationQueue" as Q SAP_RED
+participant "OrchestrationWorker" as W SAP_RED
+participant "OrchestrationEngine" as OE SAP_BLUE
+participant "NodeHandler" as NH SAP_GREEN
+
+== Phase 1: Use Case Execution ==
+
+Client -> UC : execute(StartRunCommand)
+activate UC
+
+UC -> RR : get workflow by ID
+UC -> DAG : prepare(workflow)
+DAG --> UC : DAGInfo (entry_nodes,\nleaf_nodes, edge_map)
+
+UC -> DS : store_data(input_data)
+DS --> UC : file_ref
+
+UC -> UC : Create WorkflowRun\nstatus=PENDING
+
+UC -> RR : save(run)
+UC -> UC : Transition PENDING → RUNNING
+UC -> RR : save(run)
+
+UC -> EP : publish("run.started",\nRunStarted)
+
+== Phase 2: Async Handoff ==
+
+UC -[SAP_RED]> Q : enqueue(\nStartRunAction(run_id))
+note right of Q
+  Async boundary:
+  use case returns
+  immediately.
+  Worker picks up later.
+end note
+
+UC --> Client : StartRunResult(run_id, status)
+deactivate UC
+
+...
+
+== Phase 3: Worker Picks Up ==
+
+Q -[SAP_RED]>> W : dequeue()
+activate W
+W -> OE : orchestrate_start(run_id)
+activate OE
+
+OE -> OE : acquire run_lock(run_id)
+OE -> OE : set_current_run_id(run_id)
+OE -> RR : fetch run, workflow
+
+loop for each entry_node_id
+    OE -> OE : handle_entry_nodes()
+    OE -> OE : create Task(status=READY)
+    OE -> RR : save(task)
+    OE -> EP : buffer TaskDispatched
+
+    OE -> NH : invoke_handler(node, run,\nworkflow, dag_info)
+    activate NH
+    NH --> OE : NodeHandlerResult(\ncompletion_mode,\noutput_port)
+    deactivate NH
+
+    OE -> OE : apply state_updates\nto run.context.variables
+
+    alt completion_mode = "immediate" (BUILTIN)
+        OE -> OE : mark completed_nodes
+        OE -> OE : _route_to_successors()
+        note right: Enqueues ExecuteNodeAction\nfor each successor
+    else completion_mode = "dispatched" (TASK)
+        OE -> OE : mark RUNNING,\nsave & publish
+    else completion_mode = "pending" (INPUT)
+        OE -> OE : save PENDING task
+    else completion_mode = "loop_body" (LOOP)
+        OE -> OE : enqueue body tasks
+    else completion_mode = "child_run" (WORKFLOW)
+        OE -> OE : start child workflow
+    end
+end
+
+OE -> EP : drain_events()\n[IMMEDIATE → NORMAL → TERMINAL]
+OE -> OE : check_run_completion()
+OE -> EP : flush_events()
+OE -> OE : reset_current_run_id()
+
+deactivate OE
+deactivate W
+
+@enduml

@@ -1,0 +1,55 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "len({{$nodeId.output.items}}) or {{$input.price}} * 1.08",
+          "rowsLength": 3
+        },
+        "fieldControl": "TextareaControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Expression",
+          "required": true
+        }
+      },
+      "key": "expression",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "total"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Result Key"
+        }
+      },
+      "key": "result_key",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Result"
+        }
+      },
+      "key": "result",
+      "outputType": "object"
+    }
+  ]
+}

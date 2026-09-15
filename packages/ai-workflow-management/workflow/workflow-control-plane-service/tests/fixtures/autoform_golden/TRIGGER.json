@@ -1,0 +1,156 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "options": [
+            {
+              "id": "manual",
+              "value": "Manual"
+            },
+            {
+              "id": "schedule",
+              "value": "Schedule"
+            },
+            {
+              "id": "event",
+              "value": "Event"
+            }
+          ],
+          "placeholder": "Select trigger type"
+        },
+        "fieldControl": "SelectControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Trigger Type",
+          "required": true
+        }
+      },
+      "key": "trigger_type",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "schedule",
+          "fieldKey": "trigger_type",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "0 9 * * *"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Cron Schedule"
+        }
+      },
+      "key": "schedule_cron",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "event",
+          "fieldKey": "trigger_type",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "orders.created"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Event Topic"
+        }
+      },
+      "key": "event_topic",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "event",
+          "fieldKey": "trigger_type",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "{{$event.priority}} == 'high'"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Event Filter"
+        }
+      },
+      "key": "event_filter",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Trigger Type"
+        }
+      },
+      "key": "trigger_type",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Triggered At"
+        }
+      },
+      "key": "triggered_at",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Trigger Payload"
+        }
+      },
+      "key": "trigger_payload",
+      "outputType": "object"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Correlation ID"
+        }
+      },
+      "key": "correlation_id",
+      "outputType": "string"
+    }
+  ]
+}

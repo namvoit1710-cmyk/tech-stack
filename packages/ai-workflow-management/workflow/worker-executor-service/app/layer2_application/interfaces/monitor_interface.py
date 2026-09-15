@@ -1,0 +1,6 @@
+from typing import Protocol
+
+
+class IMonitor(Protocol):
+    def track(self, metric: str, value: float) -> None: ...
+    def increment(self, metric: str, value: float = 1.0) -> None: ...

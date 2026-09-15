@@ -1,0 +1,154 @@
+@startuml loop_execution_flow
+' ===========================================================================
+' Diagram 4: Loop Execution Flow (Event-Driven)
+' Covers: LoopNodeHandler → EventDrivenLoopDriver → queued iteration
+'         advancement → LoopCompleted → exit edge dispatch
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **Loop Execution Flow (Event-Driven)**\n(Queued Mode — Phase 5.2.2)
+
+participant "OrchestrationEngine" as OE SAP_BLUE
+participant "LoopNodeHandler" as LH SAP_GREEN
+participant "EventDrivenLoopDriver" as LD SAP_GREEN
+participant "VariableResolver" as VR SAP_BLUE
+participant "TaskFactory" as TF SAP_GREEN
+participant "EventPublisher" as EP SAP_NAVY
+participant "OrchestrationQueue" as Q SAP_RED
+participant "OrchestrationWorker" as W SAP_RED
+database "RunRepo" as DB SAP_TEAL
+
+== Phase 1: Loop Initialization (via _exec_uniform) ==
+
+OE -> LH : handle(node, run, workflow,\ndag_info, completed_task=None,\ntask_factory)
+activate LH
+
+LH -> LD : initialize_loop(node, run, ...)
+activate LD
+
+LD -> VR : resolve loop items /\ncondition / counter
+VR --> LD : items[]
+
+LD -> LD : derive_invocation_id(\nrun.id, node.id, enclosing)
+note right: uuid5 — deterministic,\nnested-loop-unique
+
+LD -> LD : Build loop_state:\n- items, total, mode\n- invocation_id\n- iteration_results: []\n- completed_iterations: []
+
+LD -> EP : emit LoopStarted(\ninvocation_id, total, mode)
+
+alt items is empty
+    LD -> EP : emit LoopCompleted(\nreason="all_done",\ntotal_iterations=0)
+    LD -> LD : create exit edge task
+    LD --> LH : result (completion_mode\n= "immediate")
+else items not empty
+    LD -> TF : create_task(body_entry_node)
+    TF --> LD : body_task (with scope_stack\n= [LoopScope(iter=0)])
+    LD -> EP : emit LoopIterationStarted(\niter=0, item=items[0])
+    LD --> LH : result (tasks_to_dispatch,\nloop_state_updates)
+end
+deactivate LD
+
+LH -> LH : Set completion_mode\n= "loop_body"
+LH --> OE : NodeHandlerResult
+deactivate LH
+
+note over OE
+  Engine's _exec_uniform handles
+  "loop_body" mode: save body tasks,
+  emit EdgeTraversed, enqueue
+  ExecuteNodeAction for each.
+end note
+
+OE -> DB : save(run) with loop_state
+OE -[SAP_RED]> Q : enqueue(\nExecuteNodeAction(\nbody_task))
+
+== Phase 2: Body Execution (1..N nodes per iteration) ==
+
+... body nodes execute via _exec_uniform ...
+
+note over OE
+  After each body node completes,
+  maybe_enqueue_loop_iteration()
+  checks if the full iteration
+  is done via runtime BFS.
+end note
+
+OE -> OE : maybe_enqueue_loop_iteration()
+OE -> OE : Record node_id in\nloop_state["iter_progress"]\n[iter_idx]
+OE -> OE : Sweep skipped nodes\ninto progress
+OE -> LD : is_iteration_done(\nloop_node_id, iter_idx, ...)
+LD --> OE : true (all body nodes\nin progress)
+
+OE -[SAP_RED]> Q : enqueue(\nLoopIterationAction(\nrun_id, task_id,\nloop_node_id, iter_idx))
+
+== Phase 3: Iteration Advancement ==
+
+Q -[SAP_RED]>> W : dequeue LoopIterationAction
+W -> OE : orchestrate_loop_iteration(\nrun_id, task_id,\nloop_node_id, iter_idx)
+activate OE
+
+OE -> DB : fetch run, workflow
+
+OE -> LD : iteration_complete(\nnode, run, ..., loop_state)
+activate LD
+
+LD -> LD : Accumulate body output\ninto iteration_results[]
+
+LD -> EP : emit LoopIterationCompleted(\niter=0, outcome="ok")
+
+alt break_requested
+    LD -> LD : force total = len(completed)
+    LD -> EP : emit LoopCompleted(\nreason="break")
+    LD -> LD : create exit edge task
+    LD --> OE : result → exit
+else continue_requested
+    LD -> LD : reset flag, outcome="skipped"
+    LD -> LD : advance to next iter
+else condition loop && condition false
+    LD -> EP : emit LoopCompleted(\nreason="condition_false")
+    LD -> LD : create exit edge task
+    LD --> OE : result → exit
+else more iterations
+    LD -> TF : create_task(body_entry,\nscope_stack=[LoopScope(iter=1)])
+    LD -> EP : emit LoopIterationStarted(\niter=1, item=items[1])
+    LD --> OE : result → body tasks
+else all done
+    LD -> EP : emit LoopCompleted(\nreason="all_done",\ntotal_iterations=N)
+    LD -> LD : Build loop output:\n{results: iteration_results}
+    LD -> LD : create exit edge task
+    LD --> OE : result → exit
+end
+deactivate LD
+
+OE -> OE : Clean up iter_progress\nfor finished iteration
+OE -> OE : BFS-wipe body nodes from\ncompleted_nodes / skipped_nodes\n(re-runnable for next iter)
+
+alt next body task
+    OE -[SAP_RED]> Q : enqueue(\nExecuteNodeAction(body_task))
+else exit task
+    OE -> OE : _route_to_successors()\nfor exit edge
+    OE -[SAP_RED]> Q : enqueue(\nExecuteNodeAction(exit_task))
+end
+
+OE -> EP : drain & flush events
+OE -> OE : check_run_completion()
+
+deactivate OE
+
+@enduml

@@ -1,0 +1,48 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Please fill in the required information.",
+          "rowsLength": 3
+        },
+        "fieldControl": "TextareaControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Instruction"
+        }
+      },
+      "key": "instruction",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "fieldControl": "FormBuilderControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "fieldSpan": "xl-12 lg-12 md-12 xs-12",
+          "label": "Input Schema",
+          "labelSpan": "xl-12 lg-12 md-12 xs-12"
+        }
+      },
+      "key": "input_schema",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Submitted Data"
+        }
+      },
+      "key": "submitted_data",
+      "outputType": "object"
+    }
+  ]
+}

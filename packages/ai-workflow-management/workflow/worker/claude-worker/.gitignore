@@ -1,0 +1,8 @@
+# Local secrets file read by the worker (GitHub PAT + Claude CLI token[s]).
+# NEVER commit real secrets — keep this file outside the repo (default: ~/.smdg-worker-secrets.json).
+.smdg-worker-secrets.json
+*secrets*.json
+# Local run/debug artifacts
+claude-worker-trace.log
+__pycache__/
+*.pyc

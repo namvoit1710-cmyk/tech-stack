@@ -1,0 +1,20 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+hdbcli>=2.18.0
+sqlalchemy>=2.0.0
+sqlalchemy-hana>=2.0.0
+httpx>=0.25.0
+prometheus_client>=0.20.0
+confluent-kafka>=2.3.0
+# AMQP 1.0 over WebSocket push consumer for SAP Event Mesh — replaces the REST
+# consumption polling that trips the per-instance 429 rate limit. Bridges two
+# libs: websocket-client does the wss:// upgrade (TLS + 'amqp' sub-protocol +
+# bearer on the handshake), proton's engine does AMQP framing + SASL PLAIN.
+# Optional at runtime: the broker falls back to REST polling if either import fails.
+python-qpid-proton>=0.39.0
+websocket-client>=1.6.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0

@@ -1,0 +1,12 @@
+{
+  "workflow_id": "PASTE_WORKFLOW_ID_FROM_CREATE_RESPONSE",
+  "skip_validation": false,
+  "input_data": {
+    "api_key": "sk-ant-PASTE_YOUR_ANTHROPIC_KEY",
+    "ticket_key": "DEMO-1",
+    "ticket_summary": "Add a /healthz liveness endpoint to the API",
+    "ticket_description": "Expose GET /healthz that returns HTTP 200 and JSON {\"status\":\"ok\"}. It must not require auth and must not touch the database. Add a unit test.",
+    "acceptance_criteria": "1) GET /healthz returns 200\n2) body is {\"status\":\"ok\"}\n3) no auth required\n4) a passing unit test exists",
+    "repo_context": ""
+  }
+}

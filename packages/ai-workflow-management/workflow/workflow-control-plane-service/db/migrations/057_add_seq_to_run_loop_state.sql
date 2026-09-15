@@ -1,0 +1,72 @@
+-- Migration: preserve loop_state INSERTION ORDER in AIW_RUN_LOOP_STATE.
+--
+-- Design + every measurement: solace/specs/wcp-node-output-storage-redesign.md
+-- sections 13 and 15 (smdg-ai-hub). Amends migration 056. The table is still
+-- EMPTY -- nothing reads or writes it yet -- which is why this is an ALTER now
+-- rather than a data migration later.
+--
+-- ============================================================================
+-- The order of run.context.loop_state is LOAD-BEARING
+-- ============================================================================
+--
+-- LOOP_CONTINUE and LOOP_EXIT resolve "which loop am I inside?" by scanning
+--
+--     for loop_node_id, loop_state in reversed(list(run.context.loop_state.items())):
+--
+-- (loop_continue_handler.py:137, loop_exit_handler.py:179). Reverse INSERTION
+-- order is how they pick the INNERMOST enclosing loop: the dict is a Python 3.7+
+-- ordered mapping and each loop appends itself when it starts, so the last entry
+-- is the most recently entered one. Their own docstrings name it -- "scans
+-- run.context.loop_state in reverse insertion order".
+--
+-- A table has no insertion order. Rows come back in whatever order the scan
+-- produces unless an ORDER BY says otherwise, so rebuilding loop_state from
+-- AIW_RUN_LOOP_STATE without an ordering column would silently hand those two
+-- handlers a different answer -- and the wrong answer is not an error, it is a
+-- BREAK applied to the wrong loop.
+--
+-- ============================================================================
+-- Why store it instead of deriving it
+-- ============================================================================
+--
+-- Three candidates were considered and rejected:
+--
+--   UPDATED_AT       -- changes on every mutation, so it records the order loops
+--                       were last TOUCHED, not the order they were ENTERED. An
+--                       inner loop that finishes first would sort last.
+--   INVOCATION_ID    -- derive_invocation_id() is a hash, not a sequence.
+--   enclosing_scope_stack -- does record nesting, and is the RIGHT long-term
+--                       answer, but the two handlers do not consult it. Changing
+--                       how they resolve the enclosing loop is a runtime change
+--                       with its own blast radius, and it does not belong in the
+--                       migration that gives the field a home.
+--
+-- So: SEQ is written by the repository as the position of the entry in the
+-- loop_state dict, and every read orders by it. It costs 4 bytes on a table
+-- holding one row per loop node per run -- 23 rows for the entire history of
+-- this tenant.
+--
+-- ============================================================================
+-- Why it has never mattered in production, and why it still gets a column
+-- ============================================================================
+--
+-- Measured on prod-br10 / tenant-1 across all 23 LoopStarted events ever
+-- written: nesting depth 0 for every one, exactly one loop node per run. There
+-- has never been a second entry for the tie-break to resolve, so today the scan
+-- would find the same loop in any order.
+--
+-- That is an argument for the column being CHEAP, not for it being unnecessary.
+-- Nested loops are legal, the handlers already implement the semantics, and the
+-- moment the CONTEXT column is dropped the dict's order is gone for good --
+-- there would be nothing left to reconstruct it from. Adding 4 bytes to an empty
+-- table now costs nothing. Discovering the ordering was lost after DROP CONTEXT
+-- costs the data.
+--
+-- NOT NULL DEFAULT 0, matching db/hdi/AIW_RUN_LOOP_STATE.hdbtable exactly. The
+-- earlier ALTER migrations here (050, 052) add NULLABLE columns because their
+-- tables already held rows. This one does not, so the stricter shape is free.
+-- It also matters: a writer that forgets to set SEQ degrades to "all equal" --
+-- today's behaviour -- whereas NULL sorts LAST in HANA and would put the
+-- OUTERMOST loop exactly where the innermost belongs.
+
+ALTER TABLE "AIW_RUN_LOOP_STATE" ADD ("SEQ" INTEGER NOT NULL DEFAULT 0);

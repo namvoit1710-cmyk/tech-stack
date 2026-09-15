@@ -1,0 +1,117 @@
+@startuml task_completion_flow
+' ===========================================================================
+' Diagram 2: Task Completion — Worker Callback to Successor Dispatch
+' Covers: CompleteTaskUseCase → Queue → orchestrate_continue → successors
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **Task Completion Flow**\n(Worker Callback → Successor Dispatch)
+
+participant "Worker\n(HTTP/Agent)" as WK SAP_GOLD
+participant "CompleteTaskUseCase" as CU SAP_BLUE
+participant "DataStoreService" as DS SAP_TEAL
+database "TaskRepo /\nRunRepo" as DB SAP_TEAL
+participant "EventPublisher" as EP SAP_NAVY
+participant "OrchestrationQueue" as Q SAP_RED
+participant "OrchestrationWorker" as OW SAP_RED
+participant "OrchestrationEngine" as OE SAP_BLUE
+participant "SuccessorProcessor" as SP SAP_GREEN
+participant "compute_fanout()" as CF SAP_GREEN
+
+== Phase 1: Worker Reports Completion ==
+
+WK -> CU : execute(CompleteTaskCommand\n{run_id, task_id, output_ref})
+activate CU
+
+CU -> DB : fetch run, task, workflow
+CU -> CU : task.status = COMPLETED\ntask.completed_at = now
+
+CU -> CU : Apply output_mapping\n(node definition transform)
+CU -> CU : Apply output_binding\n(node instance transform)
+
+CU -> DS : store_data(transformed_output)
+DS --> CU : file_ref
+
+CU -> CU : run.context.variables[node_id]\n= {output, metadata, file_ref}
+
+CU -> DB : save(task), save(run)
+
+CU -> EP : publish TaskCompleted
+CU -> EP : publish ContextUpdated
+
+== Phase 2: Async Handoff ==
+
+CU -[SAP_RED]> Q : enqueue(\nContinueRunAction(run_id, task_id))
+CU --> WK : CompleteTaskResult
+deactivate CU
+
+...
+
+== Phase 3: Orchestration Continues ==
+
+Q -[SAP_RED]>> OW : dequeue()
+activate OW
+OW -> OE : orchestrate_continue(\nrun_id, task_id)
+activate OE
+
+OE -> OE : acquire run_lock(run_id)
+OE -> DB : fetch run, task, workflow
+
+OE -> OE : process_and_dispatch_successors()
+
+OE -> SP : process(completed_task,\nrun, workflow, dag_info)
+activate SP
+
+SP -> SP : _process_uniform()
+SP -> CF : compute_fanout(\ncausation_id=task.id,\noutgoing_edges,\ncompleted_nodes,\nskipped_nodes, ...)
+activate CF
+CF --> SP : FanoutDecision(\nactions, skipped,\ndeferred)
+deactivate CF
+
+loop for each skip in decision.skipped
+    SP -> SP : run.context.skipped_nodes\n.add(node_id)
+    SP -> SP : append TaskSkipped event
+end
+
+loop for each action in decision.actions
+    SP -> SP : create_task(target_node)
+    SP -> SP : append EdgeTraversed event
+end
+
+SP --> OE : ProcessingResult(\ntasks, events)
+deactivate SP
+
+OE -> EP : publish events
+
+loop for each successor task
+    OE -> DB : save(task)
+    OE -[SAP_RED]> Q : enqueue(\nExecuteNodeAction(\nrun_id, task_id))
+end
+
+OE -> OE : maybe_enqueue_loop_iteration()\n(if task was in loop body)
+
+OE -> EP : drain_events()
+OE -> OE : check_run_completion()
+OE -> EP : flush_events()
+
+deactivate OE
+deactivate OW
+
+@enduml

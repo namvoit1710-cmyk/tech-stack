@@ -1,0 +1,470 @@
+###############################################################################
+# Worker Executor Service — Test Requests
+#
+# Prerequisites:
+#   1. Start the worker-executor-service:
+#        cd worker-executor-service && python3 main.py
+#        (runs on http://localhost:8004, INFRA_MODE=mock)
+#
+#   2. (Optional) Start workers for end-to-end task execution:
+#        cd worker/wait-worker && python main.py       (port 35001)
+#        cd worker/http-request-worker && python main.py  (port 35002)
+#
+# Usage:
+#   - VS Code: Install "REST Client" extension, click "Send Request" above each block
+#   - IntelliJ: Built-in HTTP Client support
+#
+###############################################################################
+
+@baseUrl = http://localhost:8004
+
+
+###############################################################################
+# 1. HEALTH CHECK
+###############################################################################
+
+### Health Check
+GET {{baseUrl}}/health
+Accept: application/json
+
+
+###############################################################################
+# 2. WORKER REGISTRATION (Legacy)
+###############################################################################
+
+### Register a legacy worker (custom capabilities)
+POST {{baseUrl}}/api/v1/workers
+Content-Type: application/json
+
+{
+  "name": "custom-processor",
+  "capabilities": [
+    {"domain": "data", "action": "process"},
+    {"domain": "data", "action": "transform"}
+  ],
+  "endpoint_url": "http://localhost:9000",
+  "ttl_seconds": 120
+}
+
+
+###############################################################################
+# 3. SDK WORKER REGISTRATION
+###############################################################################
+
+### Register wait-worker via SDK endpoint
+POST {{baseUrl}}/api/v1/workers/register
+Content-Type: application/json
+
+{
+  "worker_type": "wait",
+  "version": "0.1.0",
+  "endpoint": "http://localhost:35001",
+  "sdk_version": "1.0.0",
+  "input_schema": [
+    {
+      "key": "wait_type",
+      "outputType": "string",
+      "fieldConfig": {
+        "label": "Wait Type",
+        "description": "The type of wait to perform.",
+        "fieldControl": "Select",
+        "fieldWrapper": "FormItem",
+        "controlProps": {
+          "placeholder": "Select wait type",
+          "options": [
+            {"id": "fixed_duration", "value": "fixed_duration"},
+            {"id": "until_datetime", "value": "until_datetime"},
+            {"id": "manual_approval", "value": "manual_approval"}
+          ]
+        }
+      },
+      "default": "fixed_duration",
+      "rules": {"isRequired": true}
+    },
+    {
+      "key": "duration_seconds",
+      "outputType": "number",
+      "fieldConfig": {
+        "label": "Duration (seconds)",
+        "description": "Number of seconds to wait.",
+        "fieldControl": "Input",
+        "fieldWrapper": "FormItem",
+        "controlProps": {"placeholder": "60", "type": "number"}
+      },
+      "default": 60
+    }
+  ],
+  "output_schema": [
+    {
+      "key": "wait_status",
+      "outputType": "string",
+      "fieldConfig": {
+        "label": "Wait Status",
+        "description": "Outcome of the wait operation.",
+        "fieldControl": "Select",
+        "fieldWrapper": "FormItem"
+      },
+      "rules": {"isRequired": true}
+    }
+  ]
+}
+
+### Register http-request-worker via SDK endpoint
+POST {{baseUrl}}/api/v1/workers/register
+Content-Type: application/json
+
+{
+  "worker_type": "http_request",
+  "version": "0.1.0",
+  "endpoint": "http://localhost:35002",
+  "sdk_version": "1.0.0",
+  "input_schema": [
+    {
+      "key": "method",
+      "outputType": "string",
+      "fieldConfig": {
+        "label": "HTTP Method",
+        "fieldControl": "Select",
+        "fieldWrapper": "FormItem"
+      },
+      "default": "GET",
+      "rules": {"isRequired": true}
+    },
+    {
+      "key": "url",
+      "outputType": "string",
+      "fieldConfig": {
+        "label": "URL",
+        "fieldControl": "Input",
+        "fieldWrapper": "FormItem"
+      },
+      "rules": {"isRequired": true}
+    }
+  ],
+  "output_schema": [
+    {
+      "key": "status_code",
+      "outputType": "number",
+      "fieldConfig": {
+        "label": "HTTP Status Code",
+        "fieldControl": "Input",
+        "fieldWrapper": "FormItem"
+      },
+      "rules": {"isRequired": true}
+    }
+  ]
+}
+
+
+###############################################################################
+# 4. LIST & GET WORKERS
+###############################################################################
+
+### List all registered workers
+GET {{baseUrl}}/api/v1/workers
+Accept: application/json
+
+### Get a specific worker by ID
+# (replace {{workerId}} with an actual ID from the register response)
+@workerId = <paste-worker-id-here>
+
+GET {{baseUrl}}/api/v1/workers/{{workerId}}
+Accept: application/json
+
+### Get worker input/output schema
+GET {{baseUrl}}/api/v1/workers/{{workerId}}/schema
+Accept: application/json
+
+
+###############################################################################
+# 5. DISCOVER WORKERS BY CAPABILITY
+###############################################################################
+
+### Discover workers that can handle "wait" tasks
+GET {{baseUrl}}/api/v1/workers/discover/wait
+Accept: application/json
+
+### Discover workers that can handle "http_request" tasks
+GET {{baseUrl}}/api/v1/workers/discover/http_request
+Accept: application/json
+
+### Discover workers for "data" capability (legacy registered worker)
+GET {{baseUrl}}/api/v1/workers/discover/data
+Accept: application/json
+
+
+###############################################################################
+# 6. TASK EXECUTION (via executor service — no live worker needed)
+###############################################################################
+
+### Execute task — dispatched to wait-worker (static mapping)
+# Uses the statically registered "wait-worker" worker_id from bootstrap.py.
+# In mock mode (no live worker), this dispatches via HttpWorkerExecutor.
+# If the wait-worker is NOT running, the executor catches the error and returns FAILED.
+POST {{baseUrl}}/api/v1/tasks/execute
+Content-Type: application/json
+
+{
+  "task_id": "task-wait-001",
+  "run_id": "run-001",
+  "node_id": "node-wait-1",
+  "worker_id": "wait-worker",
+  "input": {
+    "wait_type": "fixed_duration",
+    "duration_seconds": 30,
+    "timeout_seconds": 3600,
+    "reason": "Cool-down period between pipeline stages"
+  },
+  "node_config": {
+    "timeout_ms": 60000,
+    "retry_max": 2
+  },
+  "idempotency_key": "idem-wait-001"
+}
+
+### Execute task — dispatched to http-request-worker (static mapping)
+POST {{baseUrl}}/api/v1/tasks/execute
+Content-Type: application/json
+
+{
+  "task_id": "task-http-001",
+  "run_id": "run-001",
+  "node_id": "node-http-1",
+  "worker_id": "http-request-worker",
+  "input": {
+    "method": "GET",
+    "url": "https://httpbin.org/get",
+    "headers": {"Accept": "application/json"},
+    "timeout_seconds": 30,
+    "follow_redirects": true,
+    "verify_ssl": true
+  },
+  "node_config": {
+    "timeout_ms": 30000
+  },
+  "idempotency_key": "idem-http-001"
+}
+
+### Execute task — no worker_id (executor-only, no dispatch)
+# When worker_id is empty, the executor completes the task without dispatching.
+# Useful for testing the executor pipeline (concurrency, result publishing) in isolation.
+POST {{baseUrl}}/api/v1/tasks/execute
+Content-Type: application/json
+
+{
+  "task_id": "task-noop-001",
+  "run_id": "run-002",
+  "node_id": "node-noop-1",
+  "payload": {
+    "message": "No worker dispatch, executor pipeline only"
+  }
+}
+
+### Execute task — dynamically registered worker
+# First register a worker via SDK (step 3), then use its worker_id here.
+# The dispatcher will look up the endpoint from the registry store.
+@dynamicWorkerId = <paste-sdk-registered-worker-id-here>
+
+POST {{baseUrl}}/api/v1/tasks/execute
+Content-Type: application/json
+
+{
+  "task_id": "task-dynamic-001",
+  "run_id": "run-003",
+  "node_id": "node-dynamic-1",
+  "worker_id": "{{dynamicWorkerId}}",
+  "input": {
+    "wait_type": "manual_approval",
+    "reason": "Manager sign-off required for production deployment"
+  }
+}
+
+
+###############################################################################
+# 7. TASK ROUTING
+###############################################################################
+
+### Route a task to the best available worker for "wait" capability
+POST {{baseUrl}}/api/v1/tasks/route
+Content-Type: application/json
+
+{
+  "task_id": "task-route-001",
+  "capability": "wait"
+}
+
+### Route a task for "http_request" capability
+POST {{baseUrl}}/api/v1/tasks/route
+Content-Type: application/json
+
+{
+  "task_id": "task-route-002",
+  "capability": "http_request"
+}
+
+### Route a task for unknown capability (should return error)
+POST {{baseUrl}}/api/v1/tasks/route
+Content-Type: application/json
+
+{
+  "task_id": "task-route-003",
+  "capability": "nonexistent_capability"
+}
+
+
+###############################################################################
+# 8. HEARTBEAT & HEALTH REPORTING
+###############################################################################
+
+### Worker heartbeat — report healthy status
+POST {{baseUrl}}/api/v1/workers/{{workerId}}/heartbeat
+Content-Type: application/json
+
+{
+  "status": "healthy"
+}
+
+### Worker heartbeat — report busy status
+POST {{baseUrl}}/api/v1/workers/{{workerId}}/heartbeat
+Content-Type: application/json
+
+{
+  "status": "busy"
+}
+
+### Worker heartbeat — no body (defaults to "healthy")
+POST {{baseUrl}}/api/v1/workers/{{workerId}}/heartbeat
+
+### Report worker health via dedicated endpoint
+POST {{baseUrl}}/api/v1/heartbeat/report
+Content-Type: application/json
+
+{
+  "worker_id": "wait-worker",
+  "healthy": true
+}
+
+### Start heartbeat loop for a worker
+POST {{baseUrl}}/api/v1/heartbeat/start/{{workerId}}
+
+
+###############################################################################
+# 9. REPORT TASK RESULT (external result reporting)
+###############################################################################
+
+### Report a successful task result
+POST {{baseUrl}}/api/v1/tasks/report
+Content-Type: application/json
+
+{
+  "message_type": "task.completed",
+  "correlation_id": "run-001",
+  "payload": {
+    "task_id": "task-wait-001",
+    "run_id": "run-001",
+    "node_id": "node-wait-1",
+    "status": "COMPLETED",
+    "output_reference": "s3://artifacts/run-001/node-wait-1/output.json",
+    "output_metadata": {
+      "wait_status": "completed",
+      "wait_type": "fixed_duration",
+      "actual_duration_seconds": 30.0
+    },
+    "execution_time_ms": 30012
+  }
+}
+
+### Report a failed task result
+POST {{baseUrl}}/api/v1/tasks/report
+Content-Type: application/json
+
+{
+  "message_type": "task.failed",
+  "correlation_id": "run-001",
+  "payload": {
+    "task_id": "task-http-001",
+    "run_id": "run-001",
+    "node_id": "node-http-1",
+    "status": "FAILED",
+    "error": {
+      "code": "WORKER_ERROR",
+      "message": "Connection refused: https://unreachable.example.com",
+      "retryable": true
+    },
+    "attempt": 1
+  }
+}
+
+
+###############################################################################
+# 10. DEREGISTER WORKERS
+###############################################################################
+
+### Deregister worker via SDK endpoint (POST)
+POST {{baseUrl}}/api/v1/workers/{{workerId}}/deregister
+
+### Deregister worker via REST (DELETE)
+DELETE {{baseUrl}}/api/v1/workers/{{workerId}}
+
+
+###############################################################################
+# 11. END-TO-END SCENARIO (run in order)
+#
+# This section walks through a complete lifecycle:
+#   1. Register a wait-worker via SDK
+#   2. Verify it appears in worker list
+#   3. Execute a wait task dispatched to it
+#   4. Send a heartbeat
+#   5. Deregister the worker
+#
+# Prerequisites: wait-worker must be running on port 35001
+###############################################################################
+
+### E2E Step 1: SDK-register the wait-worker
+POST {{baseUrl}}/api/v1/workers/register
+Content-Type: application/json
+
+{
+  "worker_type": "wait",
+  "version": "0.1.0",
+  "endpoint": "http://localhost:35001",
+  "sdk_version": "1.0.0"
+}
+
+### E2E Step 2: List workers — verify wait-worker is registered
+GET {{baseUrl}}/api/v1/workers
+Accept: application/json
+
+### E2E Step 3: Execute a wait task (uses static "wait-worker" dispatcher)
+POST {{baseUrl}}/api/v1/tasks/execute
+Content-Type: application/json
+
+{
+  "task_id": "e2e-task-001",
+  "run_id": "e2e-run-001",
+  "node_id": "e2e-node-1",
+  "worker_id": "wait-worker",
+  "input": {
+    "wait_type": "fixed_duration",
+    "duration_seconds": 10,
+    "reason": "E2E test wait"
+  }
+}
+
+### E2E Step 4: Send heartbeat for the dynamically registered worker
+# (paste the worker_id from Step 1 response)
+@e2eWorkerId = <paste-worker-id-from-step-1>
+
+POST {{baseUrl}}/api/v1/workers/{{e2eWorkerId}}/heartbeat
+Content-Type: application/json
+
+{
+  "status": "healthy"
+}
+
+### E2E Step 5: Deregister the worker
+POST {{baseUrl}}/api/v1/workers/{{e2eWorkerId}}/deregister
+
+### E2E Step 6: Verify worker is gone
+GET {{baseUrl}}/api/v1/workers
+Accept: application/json

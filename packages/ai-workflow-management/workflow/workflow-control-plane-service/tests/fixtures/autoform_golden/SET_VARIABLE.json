@@ -1,0 +1,141 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "fieldWrapper": "SequenceWrapper",
+        "wrapperProps": {
+          "label": "Variables to set"
+        }
+      },
+      "fields": [
+        {
+          "fieldConfig": {
+            "fieldWrapper": "FragmentWrapper"
+          },
+          "fields": [
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "userCount"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "rules": [
+                  {
+                    "method": "required"
+                  }
+                ],
+                "wrapperProps": {
+                  "label": "Name",
+                  "required": true
+                }
+              },
+              "key": "name",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "options": [
+                    {
+                      "id": "string",
+                      "value": "String"
+                    },
+                    {
+                      "id": "number",
+                      "value": "Number"
+                    },
+                    {
+                      "id": "boolean",
+                      "value": "Boolean"
+                    },
+                    {
+                      "id": "object",
+                      "value": "Object"
+                    },
+                    {
+                      "id": "array",
+                      "value": "Array"
+                    }
+                  ],
+                  "placeholder": "Select type"
+                },
+                "fieldControl": "SelectControl",
+                "fieldWrapper": "FormItemWrapper",
+                "rules": [
+                  {
+                    "method": "required"
+                  }
+                ],
+                "wrapperProps": {
+                  "label": "Type",
+                  "required": true
+                }
+              },
+              "key": "type",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "condition": {
+                  "action": "invisible",
+                  "conditionValue": "array",
+                  "fieldKey": "type",
+                  "operator": "notEquals"
+                },
+                "controlProps": {
+                  "options": [
+                    {
+                      "id": "string",
+                      "value": "String"
+                    },
+                    {
+                      "id": "number",
+                      "value": "Number"
+                    },
+                    {
+                      "id": "boolean",
+                      "value": "Boolean"
+                    },
+                    {
+                      "id": "object",
+                      "value": "Object"
+                    }
+                  ],
+                  "value": "string"
+                },
+                "fieldControl": "SelectControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Item Type"
+                }
+              },
+              "key": "item_type",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "{{$nodeId.totalUsers}} or 42 or \"active\"",
+                  "rowsLength": 3
+                },
+                "fieldControl": "TextareaControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Value (literal or expression)"
+                }
+              },
+              "key": "value_expression",
+              "outputType": "string"
+            }
+          ],
+          "key": "0",
+          "outputType": "object"
+        }
+      ],
+      "key": "variables",
+      "outputType": "array"
+    }
+  ],
+  "output_schema": []
+}

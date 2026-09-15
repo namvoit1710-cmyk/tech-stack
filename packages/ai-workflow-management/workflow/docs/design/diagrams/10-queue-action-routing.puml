@@ -1,0 +1,137 @@
+@startuml queue_action_routing
+' ===========================================================================
+' Diagram 10: Orchestration Queue Action Types & Routing
+' Shows all 7 action types and how the worker dispatches them.
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam activityDiamondBackgroundColor #FFFDE7
+skinparam activityDiamondBorderColor SAP_GOLD
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **Orchestration Queue — Action Routing**\n(OrchestrationWorker._dispatch)
+
+|#E8F0FE| **Producers (Use Cases)** |
+start
+
+:Enqueue action to\nIOrchestrationQueue;
+
+note right
+  **Queue backends:**
+  - MemoryOrchestrationQueue (mock/test)
+  - BrokerOrchestrationQueue (Kafka/EventMesh)
+end note
+
+|#FFF0E0| **OrchestrationWorker** |
+
+:Dequeue action from queue;
+
+if (action.action_type?) then
+
+    |#E8F5E9| **start** |
+    :StartRunAction(run_id);
+    :engine.**orchestrate_start**(run_id);
+    note right
+      Process entry nodes.
+      Dispatch first tasks.
+    end note
+
+    |#FFF0E0| **OrchestrationWorker** |
+
+elseif (action_type?) is (continue)
+
+    |#E8F5E9| **continue** |
+    :ContinueRunAction(\nrun_id, task_id);
+    :engine.**orchestrate_continue**(\nrun_id, task_id);
+    note right
+      After worker completes task.
+      Compute fanout → enqueue
+      successor ExecuteNodeActions.
+    end note
+
+    |#FFF0E0| **OrchestrationWorker** |
+
+elseif (action_type?) is (execute_node)
+
+    |#E8F5E9| **execute_node** |
+    :ExecuteNodeAction(\nrun_id, task_id);
+    :engine.**orchestrate_execute_node**(\nrun_id, task_id);
+    note right
+      **Phase 6 uniform path.**
+      Invoke handler → _exec_uniform
+      → branch on completion_mode.
+      Used for ALL node types.
+    end note
+
+    |#FFF0E0| **OrchestrationWorker** |
+
+elseif (action_type?) is (loop_iteration)
+
+    |#E8F5E9| **loop_iteration** |
+    :LoopIterationAction(\nrun_id, task_id,\nloop_node_id, iter_idx);
+    :engine.**orchestrate_loop_iteration**(\nrun_id, task_id,\nloop_node_id, iter_idx);
+    note right
+      Loop body completed.
+      Advance to next iteration
+      or exit loop.
+    end note
+
+    |#FFF0E0| **OrchestrationWorker** |
+
+elseif (action_type?) is (fail)
+
+    |#E8F5E9| **fail** |
+    :FailTaskAction(\nrun_id, task_id);
+    :engine.**orchestrate_fail**(\nrun_id, task_id);
+    note right
+      Worker reports failure.
+      Check retry policy.
+      Mark task FAILED or retry.
+    end note
+
+    |#FFF0E0| **OrchestrationWorker** |
+
+elseif (action_type?) is (resume)
+
+    |#E8F5E9| **resume** |
+    :ResumeTaskAction(\nrun_id, task_id);
+    :engine.**orchestrate_resume**(\nrun_id, task_id);
+    note right
+      After user submits input.
+      Process successors of the
+      resumed pending node.
+    end note
+
+    |#FFF0E0| **OrchestrationWorker** |
+
+else (resume_run)
+
+    |#E8F5E9| **resume_run** |
+    :ResumeRunAction(run_id);
+    :engine.**orchestrate_resume_run**(\nrun_id);
+    note right
+      Re-dispatch stalled tasks.
+      Recovery mechanism.
+    end note
+
+    |#FFF0E0| **OrchestrationWorker** |
+
+endif
+
+:Return to dequeue loop;
+
+stop
+
+@enduml

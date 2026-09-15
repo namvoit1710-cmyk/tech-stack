@@ -1,0 +1,126 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Describe the workflow output format.",
+          "rowsLength": 3
+        },
+        "fieldControl": "TextareaControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Instruction"
+        }
+      },
+      "key": "instruction",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "fieldWrapper": "FragmentWrapper",
+        "wrapperProps": {
+          "label": "Output Schema"
+        }
+      },
+      "fields": [
+        {
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper"
+          },
+          "fields": [
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "field_name"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "rules": [
+                  {
+                    "method": "required"
+                  }
+                ],
+                "wrapperProps": {
+                  "label": "Key",
+                  "required": true
+                }
+              },
+              "key": "key",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "options": [
+                    {
+                      "id": "string",
+                      "value": "String"
+                    },
+                    {
+                      "id": "number",
+                      "value": "Number"
+                    },
+                    {
+                      "id": "boolean",
+                      "value": "Boolean"
+                    },
+                    {
+                      "id": "object",
+                      "value": "Object"
+                    },
+                    {
+                      "id": "array",
+                      "value": "Array"
+                    }
+                  ],
+                  "value": "string"
+                },
+                "fieldControl": "SelectControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Type"
+                }
+              },
+              "key": "type",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "{{$nodeId.output.field}}"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Value"
+                }
+              },
+              "key": "value",
+              "outputType": "string"
+            }
+          ],
+          "key": "0",
+          "outputType": "object"
+        }
+      ],
+      "key": "output_schema",
+      "outputType": "array"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Formatted Output"
+        }
+      },
+      "key": "formatted_output",
+      "outputType": "object"
+    }
+  ]
+}

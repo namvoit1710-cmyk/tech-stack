@@ -1,0 +1,5 @@
+-e ../worker-sdk
+mini-racer>=0.12.0
+pytest
+pytest-asyncio
+pytest-cov

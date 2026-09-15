@@ -1,0 +1,1387 @@
+{
+  "id": "wf-document-processing",
+  "name": "Document Processing Workflow",
+  "version": "1",
+  "schema_version": "1.0.0",
+  "description": "End-to-end document processing pipeline where customers send CSV/Excel files through validation, mapping, AI classification, quality checks, and final output generation. Demonstrates parallel processing branches with condition gates, human-in-the-loop reviews, and a linear fix path for rejected data.",
+  "purpose": "Automate the complete document processing lifecycle: receive customer CSV/Excel files, create a case record, upload files, run parallel order matching / field mapping / document classification, merge results, run the data pipeline, handle rejections via human fix, and produce the final CV output.",
+  "status": "DRAFT",
+  "input_schema": [
+    {
+      "key": "customer_id",
+      "outputType": "string",
+      "fieldConfig": {
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": { "label": "Customer ID", "description": "Unique customer identifier.", "required": true },
+        "fieldControl": "InputControl",
+        "rules": [{ "method": "required" }]
+      }
+    },
+    {
+      "key": "file_name",
+      "outputType": "string",
+      "fieldConfig": {
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": { "label": "File Name", "description": "Name of the uploaded CSV/Excel file.", "required": true },
+        "fieldControl": "InputControl",
+        "rules": [{ "method": "required" }]
+      }
+    },
+    {
+      "key": "file_type",
+      "outputType": "string",
+      "fieldConfig": {
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": { "label": "File Type", "description": "Type of file: csv or excel.", "required": true },
+        "fieldControl": "SelectControl",
+        "controlProps": {
+          "options": [
+            { "label": "CSV", "value": "csv" },
+            { "label": "Excel", "value": "excel" }
+          ]
+        },
+        "rules": [{ "method": "required" }]
+      }
+    }
+  ],
+  "output_schema": [
+    {
+      "key": "final_cv_id",
+      "outputType": "string",
+      "fieldConfig": {
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": { "label": "Final CV ID" },
+        "fieldControl": "InputControl"
+      }
+    },
+    {
+      "key": "processing_status",
+      "outputType": "string",
+      "fieldConfig": {
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": { "label": "Processing Status" },
+        "fieldControl": "InputControl"
+      }
+    }
+  ],
+
+  "__comment_node_definitions": "NodeDefinition templates that business nodes reference. Created via POST /node-definitions and stored separately. Included here for documentation.",
+  "node_definitions": [
+    {
+      "id": "nd-create-cv",
+      "tenant_id": "acme-corp",
+      "name": "Create CV Record",
+      "description": "Business node: creates an initial case/CV record for the incoming document processing request.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/cv/records"
+      },
+      "input_schema": [
+        {
+          "key": "customer_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Customer ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "file_name",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "File Name", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "cv_id": "{{$_output.response_body.cv_id}}" },
+      "icon": "FilePlus",
+      "color": "#3B82F6",
+      "tags": ["cv", "record"],
+      "data_mode": "json",
+      "edit_mode": "none"
+    },
+    {
+      "id": "nd-upload-file",
+      "tenant_id": "acme-corp",
+      "name": "Upload File",
+      "description": "Business node: uploads the customer CSV/Excel file to the file service for downstream processing.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/files/upload"
+      },
+      "input_schema": [
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "file_name",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "File Name", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "file_type",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "File Type", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "file_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Uploaded File ID" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "file_id": "{{$_output.response_body.file_id}}" },
+      "icon": "Upload",
+      "color": "#0EA5E9",
+      "tags": ["file", "upload"],
+      "data_mode": "csv_multi",
+      "edit_mode": "none"
+    },
+    {
+      "id": "nd-order-matching",
+      "tenant_id": "acme-corp",
+      "name": "Create Order with History Matching",
+      "description": "Business node: matches incoming data rows against historical orders. User reviews/edits matching results before confirming.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/orders/match"
+      },
+      "input_schema": [
+        {
+          "key": "file_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "File ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "matched_orders",
+          "outputType": "array",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Matched Orders" },
+            "fieldControl": "InputControl"
+          }
+        },
+        {
+          "key": "match_confidence",
+          "outputType": "number",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Match Confidence" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "matched_orders": "{{$_output.response_body.matched_orders}}" },
+      "icon": "Link",
+      "color": "#F97316",
+      "tags": ["matching", "orders"],
+      "data_mode": "csv_multi",
+      "edit_mode": "before_dispatch"
+    },
+    {
+      "id": "nd-field-mapping",
+      "tenant_id": "acme-corp",
+      "name": "Create Field Mapping",
+      "description": "Business node: maps incoming file columns to target schema fields. User reviews and confirms field mappings before proceeding.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/fields/map"
+      },
+      "input_schema": [
+        {
+          "key": "file_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "File ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "field_map",
+          "outputType": "object",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Field Mapping Result" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "field_map": "{{$_output.response_body.field_map}}" },
+      "icon": "Columns",
+      "color": "#8B5CF6",
+      "tags": ["mapping", "fields"],
+      "data_mode": "csv_multi",
+      "edit_mode": "before_dispatch"
+    },
+    {
+      "id": "nd-classify-docs",
+      "tenant_id": "acme-corp",
+      "name": "Classify/Identify Documents",
+      "description": "Business node: uses AI to classify and identify document types and content categories from the uploaded file.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/documents/classify"
+      },
+      "input_schema": [
+        {
+          "key": "file_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "File ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "classifications",
+          "outputType": "array",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Document Classifications" },
+            "fieldControl": "InputControl"
+          }
+        },
+        {
+          "key": "doc_type",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Document Type" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "classifications": "{{$_output.response_body.classifications}}" },
+      "icon": "Brain",
+      "color": "#EC4899",
+      "tags": ["ai", "classification"],
+      "data_mode": "csv_multi",
+      "edit_mode": "none"
+    },
+    {
+      "id": "nd-handle-rejection",
+      "tenant_id": "acme-corp",
+      "name": "Handle Document Rejection",
+      "description": "Business node: processes rejected documents — logs rejection reason and notifies stakeholders.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/documents/rejection"
+      },
+      "input_schema": [
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "rejection_reason",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Rejection Reason" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "rejection_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Rejection Record ID" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": { "rejection_id": "{{$_output.response_body.rejection_id}}" },
+      "icon": "XCircle",
+      "color": "#EF4444",
+      "tags": ["rejection", "handling"],
+      "data_mode": "json",
+      "edit_mode": "none"
+    },
+    {
+      "id": "nd-run-pipeline",
+      "tenant_id": "acme-corp",
+      "name": "Run Data Block Pipeline",
+      "description": "Business node: executes the data processing pipeline combining matched orders, field mappings, and classifications. User reviews pipeline input before execution.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/pipeline/run"
+      },
+      "input_schema": [
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "file_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "File ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "matched_orders",
+          "outputType": "array",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Matched Orders" },
+            "fieldControl": "InputControl"
+          }
+        },
+        {
+          "key": "field_map",
+          "outputType": "object",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Field Mapping" },
+            "fieldControl": "InputControl"
+          }
+        },
+        {
+          "key": "classifications",
+          "outputType": "array",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Classifications" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "pipeline_result",
+          "outputType": "object",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Pipeline Result" },
+            "fieldControl": "InputControl"
+          }
+        },
+        {
+          "key": "has_rejections",
+          "outputType": "boolean",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Has Rejections" },
+            "fieldControl": "CheckboxControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": {
+        "pipeline_result": "{{$_output.response_body.pipeline_result}}",
+        "has_rejections": "{{$_output.response_body.has_rejections}}"
+      },
+      "icon": "Play",
+      "color": "#10B981",
+      "tags": ["pipeline", "processing"],
+      "data_mode": "csv_multi",
+      "edit_mode": "before_dispatch"
+    },
+    {
+      "id": "nd-create-final-cv",
+      "tenant_id": "acme-corp",
+      "name": "Create Final CV",
+      "description": "Business node: generates the final CV output document from the processed data. Data remains viewable after dispatch for auditing.",
+      "base_type": "TASK",
+      "base_worker_id": "http-request-worker",
+      "locked_defaults": {
+        "method": "POST",
+        "url": "https://api.example.com/cv/finalize"
+      },
+      "input_schema": [
+        {
+          "key": "cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "CV Record ID", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        },
+        {
+          "key": "pipeline_result",
+          "outputType": "object",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Pipeline Result", "required": true },
+            "fieldControl": "InputControl",
+            "rules": [{ "method": "required" }]
+          }
+        }
+      ],
+      "output_schema": [
+        {
+          "key": "final_cv_id",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Final CV ID" },
+            "fieldControl": "InputControl"
+          }
+        },
+        {
+          "key": "processing_status",
+          "outputType": "string",
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper",
+            "wrapperProps": { "label": "Processing Status" },
+            "fieldControl": "InputControl"
+          }
+        }
+      ],
+      "input_mapping": {},
+      "output_mapping": {
+        "final_cv_id": "{{$_output.response_body.final_cv_id}}",
+        "processing_status": "{{$_output.response_body.processing_status}}"
+      },
+      "icon": "FileCheck",
+      "color": "#10B981",
+      "tags": ["cv", "final", "output"],
+      "data_mode": "csv_multi",
+      "edit_mode": "after_dispatch"
+    }
+  ],
+
+  "__comment_parameters": "Nodes use a unified 'parameters' field. The backend splits it into engine-internal 'config' (behavior rules) and 'input_binding' (data mappings) based on node type. The frontend never needs to know this distinction.",
+
+  "nodes": [
+    {
+      "id": "trigger-start",
+      "name": "Customer Sends File",
+      "node_type": "TRIGGER",
+      "node_class": "TECHNICAL",
+      "description": "Starts when a customer sends a CSV/Excel file for processing.",
+      "instruction": "Listen on the 'documents.submitted' event topic. When an event arrives, extract the trigger_payload containing customer_id, file_name, and file_type.",
+      "icon": "Zap",
+      "color": "#F59E0B",
+      "tags": ["entry"],
+      "worker_type": null,
+      "parameters": {
+        "trigger_type": "event",
+        "event_topic": "documents.submitted"
+      },
+      "ports": {
+        "in": [],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 100,
+      "y": 300
+    },
+    {
+      "id": "create-cv",
+      "name": "Create CV Record",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (json, auto-dispatch): Creates an initial case/CV record for the document processing request.",
+      "instruction": "Create a new CV record using customer_id and file_name from the trigger payload. The response contains the cv_id used by all downstream nodes.",
+      "icon": "FilePlus",
+      "color": "#3B82F6",
+      "tags": ["cv", "record"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-create-cv",
+      "parameters": {
+        "customer_id": "{{$trigger.body.customer_id}}",
+        "file_name": "{{$trigger.body.file_name}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "CV record created" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Creation error" }
+        ]
+      },
+      "x": 300,
+      "y": 300
+    },
+    {
+      "id": "upload-file",
+      "name": "Upload File",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_multi, auto-dispatch): Uploads the customer CSV/Excel file to the file service.",
+      "instruction": "Upload the file using the cv_id from the previous step and file metadata from the trigger. The response contains file_id for downstream processing.",
+      "icon": "Upload",
+      "color": "#0EA5E9",
+      "tags": ["file", "upload"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-upload-file",
+      "parameters": {
+        "cv_id": "{{$create-cv.output.cv_id}}",
+        "file_name": "{{$trigger.body.file_name}}",
+        "file_type": "{{$trigger.body.file_type}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "File uploaded" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Upload error" }
+        ]
+      },
+      "x": 500,
+      "y": 300
+    },
+    {
+      "id": "parallel-process",
+      "name": "Parallel Processing",
+      "node_type": "PARALLEL",
+      "node_class": "TECHNICAL",
+      "description": "Fan-out into three parallel branches: order matching, field mapping, and document classification.",
+      "instruction": "Fork into three concurrent branches. All three must complete before merging. Fail fast on any failure.",
+      "icon": "LayoutGrid",
+      "color": "#0EA5E9",
+      "tags": ["parallel"],
+      "worker_type": null,
+      "parameters": {
+        "max_concurrency": 0,
+        "fail_strategy": "fail_fast"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "branch_matching", "label": "Order Matching", "data_type": "any", "required": true, "description": "" },
+          { "id": "branch_mapping", "label": "Field Mapping", "data_type": "any", "required": true, "description": "" },
+          { "id": "branch_classify", "label": "Classification", "data_type": "any", "required": true, "description": "" }
+        ]
+      },
+      "x": 700,
+      "y": 300
+    },
+
+    {
+      "id": "order-matching",
+      "name": "Order Matching",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_multi + before_dispatch HITL): Matches incoming data rows against historical orders. Workflow pauses for user review.",
+      "instruction": "Match file data against historical orders. The CSV data grid is presented to the user for review/edit. On Confirm, the matched orders are dispatched to the HTTP worker.",
+      "icon": "Link",
+      "color": "#F97316",
+      "tags": ["matching", "orders"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-order-matching",
+      "parameters": {
+        "file_id": "{{$upload-file.output.file_id}}",
+        "cv_id": "{{$create-cv.output.cv_id}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Matching result" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Matching error" }
+        ]
+      },
+      "x": 900,
+      "y": 100
+    },
+    {
+      "id": "cond-mapping-confirmed",
+      "name": "Mapping Auto-Confirmed?",
+      "node_type": "CONDITION",
+      "node_class": "TECHNICAL",
+      "description": "Checks whether the order matching was auto-confirmed (high confidence) or needs human review.",
+      "instruction": "Evaluate whether match_confidence exceeds the auto-confirm threshold. If true, proceed directly to merge. If false, route through human confirmation.",
+      "icon": "GitBranch",
+      "color": "#8B5CF6",
+      "tags": ["routing"],
+      "worker_type": null,
+      "parameters": {
+        "expression": "{{$order-matching.output.match_confidence}} > 0.9"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "true_branch", "label": "Yes", "data_type": "any", "required": true, "description": "Auto-confirmed" },
+          { "id": "false_branch", "label": "No", "data_type": "any", "required": true, "description": "Needs review" }
+        ]
+      },
+      "x": 1100,
+      "y": 100
+    },
+    {
+      "id": "human-mapping-confirm",
+      "name": "Confirm Mapping",
+      "node_type": "HUMAN_ACTION",
+      "node_class": "TECHNICAL",
+      "description": "Pauses workflow for a human to review and confirm the order matching results.",
+      "instruction": "Present the order matching results to a business user. They review the matched orders and either confirm or reject the mapping. On confirm, proceed to merge.",
+      "icon": "UserCheck",
+      "color": "#F59E0B",
+      "tags": ["hitl", "confirmation"],
+      "worker_type": null,
+      "parameters": {
+        "message": "Please review and confirm the order matching results for CV {{$create-cv.output.cv_id}}.",
+        "confirm_label": "Confirm Mapping",
+        "reject_label": "Reject Mapping"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 1300,
+      "y": 50
+    },
+
+    {
+      "id": "field-mapping",
+      "name": "Field Mapping",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_multi + before_dispatch HITL): Maps incoming file columns to target schema fields. Workflow pauses for user review.",
+      "instruction": "Analyze the uploaded file columns and propose field mappings. The CSV data grid shows source-to-target column mappings. User reviews, adjusts mappings, and confirms.",
+      "icon": "Columns",
+      "color": "#8B5CF6",
+      "tags": ["mapping", "fields"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-field-mapping",
+      "parameters": {
+        "file_id": "{{$upload-file.output.file_id}}",
+        "cv_id": "{{$create-cv.output.cv_id}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Field mapping result" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Mapping error" }
+        ]
+      },
+      "x": 900,
+      "y": 300
+    },
+    {
+      "id": "human-field-confirm",
+      "name": "Confirm Field Mapping",
+      "node_type": "HUMAN_ACTION",
+      "node_class": "TECHNICAL",
+      "description": "Pauses workflow for a human to review and confirm the field mapping results.",
+      "instruction": "Present the field mapping results to a business user. They review source-to-target mappings and either confirm or request changes.",
+      "icon": "UserCheck",
+      "color": "#F59E0B",
+      "tags": ["hitl", "confirmation"],
+      "worker_type": null,
+      "parameters": {
+        "message": "Please review and confirm the field mappings for CV {{$create-cv.output.cv_id}}.",
+        "confirm_label": "Confirm Fields",
+        "reject_label": "Reject Fields"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 1100,
+      "y": 300
+    },
+
+    {
+      "id": "classify-docs",
+      "name": "Classify Documents",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_multi, auto-dispatch): Uses AI to classify and identify document types from the uploaded file.",
+      "instruction": "Send the file to the AI classification service. The response contains document type classifications and confidence scores.",
+      "icon": "Brain",
+      "color": "#EC4899",
+      "tags": ["ai", "classification"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-classify-docs",
+      "parameters": {
+        "file_id": "{{$upload-file.output.file_id}}",
+        "cv_id": "{{$create-cv.output.cv_id}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Classification result" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Classification error" }
+        ]
+      },
+      "x": 900,
+      "y": 500
+    },
+    {
+      "id": "ai-processing",
+      "name": "AI Processing",
+      "node_type": "TASK",
+      "node_class": "TECHNICAL",
+      "description": "Processes classifications through additional AI quality checks and enrichment.",
+      "instruction": "Run additional AI-based quality checks on the classified documents. Validates classification confidence and enriches with metadata.",
+      "icon": "Cpu",
+      "color": "#6366F1",
+      "tags": ["ai", "processing"],
+      "worker_type": "http-request-worker",
+      "parameters": {
+        "url": "https://api.example.com/ai/process",
+        "method": "POST",
+        "cv_id": "{{$create-cv.output.cv_id}}",
+        "classifications": "{{$classify-docs.output.classifications}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "AI processing result" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Processing error" }
+        ]
+      },
+      "x": 1100,
+      "y": 500
+    },
+    {
+      "id": "cond-reject-docs",
+      "name": "Documents Rejected?",
+      "node_type": "CONDITION",
+      "node_class": "TECHNICAL",
+      "description": "Checks whether any documents were rejected by the AI classification/processing step.",
+      "instruction": "Evaluate whether the AI processing flagged any documents for rejection. If rejected, route to rejection handling. Otherwise, proceed to merge.",
+      "icon": "GitBranch",
+      "color": "#8B5CF6",
+      "tags": ["routing"],
+      "worker_type": null,
+      "parameters": {
+        "expression": "{{$ai-processing.output.has_rejections}} == true"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "true_branch", "label": "Reject", "data_type": "any", "required": true, "description": "Documents rejected" },
+          { "id": "false_branch", "label": "Accept", "data_type": "any", "required": true, "description": "Documents accepted" }
+        ]
+      },
+      "x": 1300,
+      "y": 500
+    },
+    {
+      "id": "handle-rejection",
+      "name": "Handle Rejection",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (json, auto-dispatch): Processes rejected documents — logs rejection reason and notifies stakeholders.",
+      "instruction": "Log the rejection details, notify the customer, and record the rejection reason in the CV record.",
+      "icon": "XCircle",
+      "color": "#EF4444",
+      "tags": ["rejection", "handling"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-handle-rejection",
+      "parameters": {
+        "cv_id": "{{$create-cv.output.cv_id}}",
+        "rejection_reason": "{{$ai-processing.output.rejection_reason}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Rejection handled" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Handling error" }
+        ]
+      },
+      "x": 1500,
+      "y": 550
+    },
+
+    {
+      "id": "merge-branches",
+      "name": "Merge Parallel Branches",
+      "node_type": "MERGE",
+      "node_class": "TECHNICAL",
+      "description": "Waits for all three parallel branches (matching, mapping, classification) to complete.",
+      "instruction": "Converge the three parallel branches. Uses wait_all — all three branches must complete before proceeding to the pipeline.",
+      "icon": "Merge",
+      "color": "#10B981",
+      "tags": [],
+      "worker_type": null,
+      "parameters": {
+        "merge_strategy": "wait_all"
+      },
+      "ports": {
+        "in": [
+          { "id": "in_matching", "label": "From Matching", "data_type": "any", "required": true, "description": "" },
+          { "id": "in_mapping", "label": "From Mapping", "data_type": "any", "required": true, "description": "" },
+          { "id": "in_classify", "label": "From Classification", "data_type": "any", "required": true, "description": "" }
+        ],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 1700,
+      "y": 300
+    },
+
+    {
+      "id": "run-pipeline",
+      "name": "Run Data Pipeline",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_multi + before_dispatch HITL): Runs the data processing pipeline combining all three branch results. User reviews pipeline input before execution.",
+      "instruction": "Combine matched orders, field mappings, and classifications into a single pipeline run. The CSV data grid shows the combined data. User reviews and confirms before the pipeline executes.",
+      "icon": "Play",
+      "color": "#10B981",
+      "tags": ["pipeline", "processing"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-run-pipeline",
+      "parameters": {
+        "cv_id": "{{$create-cv.output.cv_id}}",
+        "file_id": "{{$upload-file.output.file_id}}",
+        "matched_orders": "{{$order-matching.output.matched_orders}}",
+        "field_map": "{{$field-mapping.output.field_map}}",
+        "classifications": "{{$classify-docs.output.classifications}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Pipeline result" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Pipeline error" }
+        ]
+      },
+      "x": 1900,
+      "y": 300
+    },
+    {
+      "id": "cond-any-reject",
+      "name": "Any Rejections?",
+      "node_type": "CONDITION",
+      "node_class": "TECHNICAL",
+      "description": "Checks whether the pipeline produced any rejected data blocks that need fixing.",
+      "instruction": "Evaluate whether the pipeline result contains rejections. If yes, route through the fix-data path. If no, proceed directly to merge.",
+      "icon": "GitBranch",
+      "color": "#8B5CF6",
+      "tags": ["routing"],
+      "worker_type": null,
+      "parameters": {
+        "expression": "{{$run-pipeline.output.has_rejections}} == true"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "true_branch", "label": "Yes", "data_type": "any", "required": true, "description": "Has rejections" },
+          { "id": "false_branch", "label": "No", "data_type": "any", "required": true, "description": "No rejections" }
+        ]
+      },
+      "x": 2100,
+      "y": 300
+    },
+    {
+      "id": "fix-data",
+      "name": "Fix Rejected Data",
+      "node_type": "HUMAN_ACTION",
+      "node_class": "TECHNICAL",
+      "description": "Pauses workflow for a human to fix rejected data blocks before re-running the pipeline.",
+      "instruction": "Present the rejected data blocks to a business user. They review the issues, fix the data, and confirm to re-run the pipeline.",
+      "icon": "Wrench",
+      "color": "#F59E0B",
+      "tags": ["hitl", "fix"],
+      "worker_type": null,
+      "parameters": {
+        "message": "Some data blocks were rejected in the pipeline for CV {{$create-cv.output.cv_id}}. Please review and fix the rejected data.",
+        "confirm_label": "Data Fixed",
+        "reject_label": "Abort"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 2300,
+      "y": 200
+    },
+    {
+      "id": "rerun-pipeline",
+      "name": "Re-run Pipeline",
+      "node_type": "TASK",
+      "node_class": "TECHNICAL",
+      "description": "Re-runs the data pipeline after the human has fixed the rejected data.",
+      "instruction": "Re-execute the data pipeline with the corrected data. Uses the same pipeline endpoint but with updated/fixed input.",
+      "icon": "RefreshCw",
+      "color": "#10B981",
+      "tags": ["pipeline", "retry"],
+      "worker_type": "http-request-worker",
+      "parameters": {
+        "url": "https://api.example.com/pipeline/run",
+        "method": "POST",
+        "cv_id": "{{$create-cv.output.cv_id}}",
+        "file_id": "{{$upload-file.output.file_id}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Pipeline re-run result" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Pipeline error" }
+        ]
+      },
+      "x": 2500,
+      "y": 200
+    },
+    {
+      "id": "merge-pipeline",
+      "name": "Merge Pipeline Paths",
+      "node_type": "MERGE",
+      "node_class": "TECHNICAL",
+      "description": "Merges the direct (no rejection) and fix (rejection → re-run) paths.",
+      "instruction": "Converge the two paths from the rejection condition. Uses wait_any — only one path is ever active.",
+      "icon": "Merge",
+      "color": "#10B981",
+      "tags": [],
+      "worker_type": null,
+      "parameters": {
+        "merge_strategy": "wait_any"
+      },
+      "ports": {
+        "in": [
+          { "id": "in_direct", "label": "Direct", "data_type": "any", "required": true, "description": "" },
+          { "id": "in_fixed", "label": "From Fix", "data_type": "any", "required": true, "description": "" }
+        ],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 2700,
+      "y": 300
+    },
+
+    {
+      "id": "human-final-approval",
+      "name": "Final Approval",
+      "node_type": "HUMAN_ACTION",
+      "node_class": "TECHNICAL",
+      "description": "Pauses workflow for final human approval before generating the final CV output.",
+      "instruction": "Present the complete processed data to a business user for final review and approval before creating the final CV document.",
+      "icon": "CheckCircle",
+      "color": "#F59E0B",
+      "tags": ["hitl", "approval"],
+      "worker_type": null,
+      "parameters": {
+        "message": "Please review the complete processed data for CV {{$create-cv.output.cv_id}} and approve for final CV generation.",
+        "confirm_label": "Approve",
+        "reject_label": "Reject"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [{ "id": "out_default", "label": "Output", "data_type": "any", "required": true, "description": "" }]
+      },
+      "x": 2900,
+      "y": 300
+    },
+    {
+      "id": "create-final-cv",
+      "name": "Create Final CV",
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "description": "BUSINESS NODE (csv_multi + after_dispatch): Generates the final CV output document. Dispatches immediately but data remains viewable for auditing.",
+      "instruction": "Generate the final CV document from the processed and approved data. The after_dispatch edit_mode means the data grid remains viewable in the run view for auditing purposes.",
+      "icon": "FileCheck",
+      "color": "#10B981",
+      "tags": ["cv", "final", "output"],
+      "worker_type": "http-request-worker",
+      "node_definition_id": "nd-create-final-cv",
+      "parameters": {
+        "cv_id": "{{$create-cv.output.cv_id}}",
+        "pipeline_result": "{{$run-pipeline.output.pipeline_result}}"
+      },
+      "ports": {
+        "in": [{ "id": "in_default", "label": "Input", "data_type": "any", "required": true, "description": "" }],
+        "out": [
+          { "id": "success", "label": "Success", "data_type": "object", "required": true, "description": "Final CV created" },
+          { "id": "failure", "label": "Failure", "data_type": "object", "required": false, "description": "Creation error" }
+        ]
+      },
+      "x": 3100,
+      "y": 300
+    }
+  ],
+
+  "edges": [
+    {
+      "id": "e1",
+      "source_node_id": "trigger-start",
+      "target_node_id": "create-cv",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "",
+      "description": "Passes trigger event payload containing customer_id, file_name, file_type to CV creation."
+    },
+    {
+      "id": "e2",
+      "source_node_id": "create-cv",
+      "target_node_id": "upload-file",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "on success",
+      "description": "CV record created — upload the customer file."
+    },
+    {
+      "id": "e3",
+      "source_node_id": "upload-file",
+      "target_node_id": "parallel-process",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "file uploaded",
+      "description": "File uploaded — fork into three parallel processing branches."
+    },
+
+    {
+      "id": "e4",
+      "source_node_id": "parallel-process",
+      "target_node_id": "order-matching",
+      "source_port_id": "branch_matching",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "matching branch",
+      "description": "Parallel branch A: order matching with history."
+    },
+    {
+      "id": "e5",
+      "source_node_id": "parallel-process",
+      "target_node_id": "field-mapping",
+      "source_port_id": "branch_mapping",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "mapping branch",
+      "description": "Parallel branch B: field mapping."
+    },
+    {
+      "id": "e6",
+      "source_node_id": "parallel-process",
+      "target_node_id": "classify-docs",
+      "source_port_id": "branch_classify",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "classification branch",
+      "description": "Parallel branch C: document classification."
+    },
+
+    {
+      "id": "e7",
+      "source_node_id": "order-matching",
+      "target_node_id": "cond-mapping-confirmed",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "matched",
+      "description": "Order matching complete — check if auto-confirmed."
+    },
+    {
+      "id": "e8",
+      "source_node_id": "cond-mapping-confirmed",
+      "target_node_id": "merge-branches",
+      "source_port_id": "true_branch",
+      "target_port_id": "in_matching",
+      "condition": "then",
+      "label": "auto-confirmed",
+      "description": "High confidence match — skip human review, go directly to merge."
+    },
+    {
+      "id": "e9",
+      "source_node_id": "cond-mapping-confirmed",
+      "target_node_id": "human-mapping-confirm",
+      "source_port_id": "false_branch",
+      "target_port_id": "in_default",
+      "condition": "else",
+      "label": "needs review",
+      "description": "Low confidence match — route through human confirmation."
+    },
+    {
+      "id": "e10",
+      "source_node_id": "human-mapping-confirm",
+      "target_node_id": "merge-branches",
+      "source_port_id": "out_default",
+      "target_port_id": "in_matching",
+      "condition": null,
+      "label": "confirmed",
+      "description": "Human confirmed mapping — merge back to main path."
+    },
+
+    {
+      "id": "e11",
+      "source_node_id": "field-mapping",
+      "target_node_id": "human-field-confirm",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "mapped",
+      "description": "Field mapping complete — send to human for confirmation."
+    },
+    {
+      "id": "e12",
+      "source_node_id": "human-field-confirm",
+      "target_node_id": "merge-branches",
+      "source_port_id": "out_default",
+      "target_port_id": "in_mapping",
+      "condition": null,
+      "label": "confirmed",
+      "description": "Human confirmed field mapping — merge to main path."
+    },
+
+    {
+      "id": "e13",
+      "source_node_id": "classify-docs",
+      "target_node_id": "ai-processing",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "classified",
+      "description": "Documents classified — run AI quality checks."
+    },
+    {
+      "id": "e14",
+      "source_node_id": "ai-processing",
+      "target_node_id": "cond-reject-docs",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "processed",
+      "description": "AI processing complete — check for rejections."
+    },
+    {
+      "id": "e15",
+      "source_node_id": "cond-reject-docs",
+      "target_node_id": "handle-rejection",
+      "source_port_id": "true_branch",
+      "target_port_id": "in_default",
+      "condition": "then",
+      "label": "rejected",
+      "description": "Documents rejected — handle rejection."
+    },
+    {
+      "id": "e16",
+      "source_node_id": "cond-reject-docs",
+      "target_node_id": "merge-branches",
+      "source_port_id": "false_branch",
+      "target_port_id": "in_classify",
+      "condition": "else",
+      "label": "accepted",
+      "description": "Documents accepted — proceed to merge."
+    },
+    {
+      "id": "e17",
+      "source_node_id": "handle-rejection",
+      "target_node_id": "merge-branches",
+      "source_port_id": "success",
+      "target_port_id": "in_classify",
+      "condition": null,
+      "label": "handled",
+      "description": "Rejection handled — proceed to merge."
+    },
+
+    {
+      "id": "e18",
+      "source_node_id": "merge-branches",
+      "target_node_id": "run-pipeline",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "",
+      "description": "All branches merged — run the data processing pipeline."
+    },
+    {
+      "id": "e19",
+      "source_node_id": "run-pipeline",
+      "target_node_id": "cond-any-reject",
+      "source_port_id": "success",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "pipeline done",
+      "description": "Pipeline complete — check for rejections."
+    },
+    {
+      "id": "e20",
+      "source_node_id": "cond-any-reject",
+      "target_node_id": "fix-data",
+      "source_port_id": "true_branch",
+      "target_port_id": "in_default",
+      "condition": "then",
+      "label": "has rejections",
+      "description": "Pipeline produced rejections — human fix required."
+    },
+    {
+      "id": "e21",
+      "source_node_id": "cond-any-reject",
+      "target_node_id": "merge-pipeline",
+      "source_port_id": "false_branch",
+      "target_port_id": "in_direct",
+      "condition": "else",
+      "label": "no rejections",
+      "description": "No rejections — proceed directly to merge."
+    },
+    {
+      "id": "e22",
+      "source_node_id": "fix-data",
+      "target_node_id": "rerun-pipeline",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "data fixed",
+      "description": "Human fixed data — re-run pipeline."
+    },
+    {
+      "id": "e23",
+      "source_node_id": "rerun-pipeline",
+      "target_node_id": "merge-pipeline",
+      "source_port_id": "success",
+      "target_port_id": "in_fixed",
+      "condition": null,
+      "label": "re-run done",
+      "description": "Pipeline re-run complete — merge to main path."
+    },
+
+    {
+      "id": "e24",
+      "source_node_id": "merge-pipeline",
+      "target_node_id": "human-final-approval",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "",
+      "description": "Pipeline paths merged — final human approval."
+    },
+    {
+      "id": "e25",
+      "source_node_id": "human-final-approval",
+      "target_node_id": "create-final-cv",
+      "source_port_id": "out_default",
+      "target_port_id": "in_default",
+      "condition": null,
+      "label": "approved",
+      "description": "Final approval granted — create the final CV output."
+    }
+  ],
+
+  "metadata": {
+    "author": "platform-team",
+    "domain": "document-processing",
+    "notes": {
+      "parameters_convention": "All nodes use a single 'parameters' field. The backend splits it into engine-internal 'config' (behavior/control-flow rules) and 'input_binding' (data mappings from upstream nodes) based on node type. The frontend never needs to know this distinction.",
+      "worker_id_convention": "worker_id uses worker_type (e.g. 'http-request-worker') as the stable routing identifier. The worker-executor resolves worker_type to the current registration.",
+      "dag_constraint": "No cycles allowed — the DAG validator enforces acyclicity via topological sort. The 'fix data → rerun pipeline' loop from the BPMN diagram is modeled as a linear fix path with a MERGE (wait_any) to rejoin the main flow.",
+      "node_types_used": {
+        "technical_control_flow": ["TRIGGER", "CONDITION", "MERGE", "PARALLEL"],
+        "technical_task": ["ai-processing (raw TASK)", "rerun-pipeline (raw TASK)"],
+        "business_nodes": ["create-cv (json)", "upload-file (csv_multi)", "order-matching (csv_multi + HITL)", "field-mapping (csv_multi + HITL)", "classify-docs (csv_multi)", "handle-rejection (json)", "run-pipeline (csv_multi + HITL)", "create-final-cv (csv_multi + after_dispatch)"],
+        "human_action_nodes": ["human-mapping-confirm", "human-field-confirm", "fix-data", "human-final-approval"]
+      },
+      "data_mode_examples": {
+        "json": "create-cv, handle-rejection — standard JSON passthrough, no CSV conversion",
+        "csv_multi": "upload-file, order-matching, field-mapping, classify-docs, run-pipeline, create-final-cv — multi-row CSV with editable data grid"
+      },
+      "edit_mode_examples": {
+        "none": "create-cv, upload-file, classify-docs, handle-rejection — auto-dispatch, no user interaction",
+        "before_dispatch": "order-matching, field-mapping, run-pipeline — workflow pauses (PENDING_INPUT), user reviews/edits CSV data grid, confirms to dispatch",
+        "after_dispatch": "create-final-cv — dispatches immediately, but CSV remains editable in run view for auditing"
+      }
+    }
+  }
+}

@@ -1,0 +1,137 @@
+syntax = "proto3";
+package workflow.v1;
+
+
+import "google/protobuf/struct.proto";
+import "workflow/v1/worker_execution.proto";
+
+// Served by Worker Executor.
+// Called by Workers (register, heartbeat, deregister) and
+// by Control Plane (list, get, discover).
+service WorkerRegistryService {
+  // --- Worker → Executor ---
+  rpc Register(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+  rpc Deregister(DeregisterWorkerRequest) returns (DeregisterWorkerResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Bidirectional heartbeat stream: worker sends periodic pings, executor
+  // responds with acks (and optional re_register signals).
+  rpc HeartbeatStream(stream HeartbeatRequest) returns (stream HeartbeatResponse);
+
+  // --- CP → Executor (discovery) ---
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
+  rpc GetWorker(GetWorkerRequest) returns (WorkerDetail);
+  rpc GetWorkerSchema(GetWorkerSchemaRequest) returns (WorkerSchemaResponse);
+  rpc DiscoverWorkers(DiscoverWorkersRequest) returns (DiscoverWorkersResponse);
+}
+
+// ---------- Registration ----------
+
+message Capability {
+  string domain = 1;
+  string action = 2;
+}
+
+message RegisterWorkerRequest {
+  string worker_type = 1;
+  string version = 2;
+  string endpoint = 3;
+  string sdk_version = 4;
+  string name = 5;
+  string description = 6;
+  string node_class = 7;
+  string icon = 8;
+  string color = 9;
+  repeated string tags = 10;
+  repeated Capability capabilities = 11;
+  google.protobuf.Struct input_schema = 12;
+  google.protobuf.Struct output_schema = 13;
+  google.protobuf.Struct ports = 14;
+  repeated WorkerFunctionDef functions = 15;
+  // Contract identity (semver). Bumped independently from `version`
+  // only when input_schema/output_schema/ports change in a way that
+  // affects workflows referencing this worker.
+  string spec_version = 16;
+  // Functional taxonomy (SA-1734). Additive; absent => "action" on read.
+  string kind = 17;
+}
+
+message RegisterWorkerResponse {
+  string worker_id = 1;
+  string worker_type = 2;
+  string version = 3;
+  string endpoint_url = 4;
+  string health_status = 5;
+}
+
+// ---------- Deregistration ----------
+
+message DeregisterWorkerRequest {
+  string worker_id = 1;
+}
+
+message DeregisterWorkerResponse {
+  bool success = 1;
+}
+
+// ---------- Heartbeat ----------
+
+message HeartbeatRequest {
+  string worker_id = 1;
+  // "healthy" | "degraded" | "unhealthy"
+  string status = 2;
+}
+
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  bool re_register = 2;
+}
+
+// ---------- Discovery ----------
+
+message ListWorkersRequest {}
+
+message ListWorkersResponse {
+  repeated WorkerDetail workers = 1;
+}
+
+message GetWorkerRequest {
+  string worker_id = 1;
+}
+
+message WorkerDetail {
+  string worker_id = 1;
+  string worker_type = 2;
+  string version = 3;
+  string endpoint = 4;
+  string name = 5;
+  string description = 6;
+  string node_class = 7;
+  string icon = 8;
+  string color = 9;
+  repeated string tags = 10;
+  repeated Capability capabilities = 11;
+  string health_status = 12;
+  google.protobuf.Struct ports = 13;
+  repeated WorkerFunctionDef functions = 14;
+  // Contract identity (semver). Parallel to `version` (build identity).
+  string spec_version = 15;
+  string kind = 16;
+}
+
+message GetWorkerSchemaRequest {
+  string worker_id = 1;
+}
+
+message WorkerSchemaResponse {
+  google.protobuf.Struct input_schema = 1;
+  google.protobuf.Struct output_schema = 2;
+}
+
+message DiscoverWorkersRequest {
+  string capability = 1;
+}
+
+message DiscoverWorkersResponse {
+  repeated WorkerDetail workers = 1;
+}

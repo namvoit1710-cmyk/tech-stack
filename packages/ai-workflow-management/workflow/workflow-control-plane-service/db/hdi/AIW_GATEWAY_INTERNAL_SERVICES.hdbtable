@@ -1,0 +1,16 @@
+COLUMN TABLE "AIW_GATEWAY_INTERNAL_SERVICES" (
+    "ID"                       NVARCHAR(36)   NOT NULL,
+    "NAME"                     NVARCHAR(128)  NOT NULL,
+    "BASE_URL"                 NVARCHAR(512)  NOT NULL,
+    "AUTH_TYPE"                NVARCHAR(32)   NOT NULL,
+    "AUTH_CONFIG_ENCRYPTED"    NCLOB          NOT NULL,
+    "AUTH_CONFIG_KEY_VERSION"  INTEGER        NOT NULL,
+    "IS_ACTIVE"                INTEGER        NOT NULL DEFAULT 1,
+    "DESCRIPTION"              NVARCHAR(512),
+    "CREATED_BY"               NVARCHAR(128)  NOT NULL,
+    "CREATED_AT"               NVARCHAR(64)   NOT NULL,
+    "UPDATED_BY"               NVARCHAR(128)  NOT NULL,
+    "UPDATED_AT"               NVARCHAR(64)   NOT NULL,
+    "VERSION"                  INTEGER        NOT NULL DEFAULT 1,
+    PRIMARY KEY ("ID")
+)

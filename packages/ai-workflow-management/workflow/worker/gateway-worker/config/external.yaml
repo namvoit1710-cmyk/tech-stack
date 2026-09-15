@@ -1,0 +1,9 @@
+# External host allowlist for `call_external`.
+#
+# Each entry is a host pattern: either an exact host (`api.partner.com`)
+# or a one-level wildcard (`*.partner.com`). Schemes other than `https`
+# are rejected regardless of this list.
+#
+# Empty list → all external URLs are rejected with HOST_NOT_ALLOWED.
+
+allowed_hosts: []

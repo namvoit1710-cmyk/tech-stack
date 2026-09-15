@@ -1,0 +1,100 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "options": [
+            {
+              "id": "delay",
+              "value": "Delay"
+            },
+            {
+              "id": "until",
+              "value": "Until timestamp"
+            },
+            {
+              "id": "sla",
+              "value": "SLA timeout"
+            }
+          ],
+          "value": "delay"
+        },
+        "fieldControl": "SelectControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Wait Mode"
+        }
+      },
+      "key": "mode",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "delay",
+          "fieldKey": "mode",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "60",
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Delay (seconds)"
+        }
+      },
+      "key": "delay_seconds",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "until",
+          "fieldKey": "mode",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "2026-07-01T00:00:00+00:00"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Until (ISO-8601)"
+        }
+      },
+      "key": "until",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "condition": {
+          "action": "invisible",
+          "conditionValue": "sla",
+          "fieldKey": "mode",
+          "operator": "notEquals"
+        },
+        "controlProps": {
+          "placeholder": "3600",
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "SLA Timeout (seconds)"
+        }
+      },
+      "key": "sla_timeout_seconds",
+      "outputType": "number"
+    }
+  ],
+  "output_schema": []
+}

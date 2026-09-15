@@ -1,0 +1,129 @@
+@startuml pending_node_resume_flow
+' ===========================================================================
+' Diagram 5: Pending Node Resume (INPUT / HUMAN_ACTION / DATA_EDIT / FILE_UPLOAD)
+' Covers: User submits data → ResumePendingTaskUseCase → successor dispatch
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_PURPLE #7C5CCC
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **Pending Node Resume Flow**\n(User Input → Workflow Continues)
+
+actor "User" as U SAP_PURPLE
+participant "ResumePendingTask\nUseCase" as UC SAP_BLUE
+participant "DataStoreService" as DS SAP_TEAL
+database "TaskRepo /\nRunRepo" as DB SAP_TEAL
+participant "EventPublisher" as EP SAP_NAVY
+participant "OrchestrationQueue" as Q SAP_RED
+participant "OrchestrationWorker" as W SAP_RED
+participant "OrchestrationEngine" as OE SAP_BLUE
+
+== Phase 1: Initial Pending State ==
+
+note over U, OE
+  Precondition: A node (e.g., INPUT) was executed by _exec_uniform
+  with completion_mode="pending". The task is saved with
+  status=PENDING. The run is paused (status=PENDING).
+  The frontend shows a form to the user via InputRequested event.
+end note
+
+== Phase 2: User Submits Input ==
+
+U -> UC : execute(ResumePendingTask\nCommand{run_id, task_id,\nupdated_input})
+activate UC
+
+UC -> DB : fetch run (check RUNNING\nor PENDING)
+UC -> UC : was_pending = (run.status\n== PENDING)
+UC -> DB : fetch task (check PENDING)
+UC -> DB : fetch workflow, node
+
+alt node is INPUT / DATA_EDIT / FILE_UPLOAD
+    UC -> UC : Merge updated_input\ninto task.resolved_input
+    UC -> UC : Coerce types per\ninput_schema outputType
+
+    UC -> UC : task.status = COMPLETED\ntask.completed_at = now
+
+    UC -> DS : store_data(user_submission)
+    DS --> UC : file_ref
+
+    UC -> UC : run.context.variables[node_id]\n= user_submitted_data
+
+    UC -> UC : completed_nodes.add(node.id)
+
+else node is HUMAN_ACTION
+    UC -> UC : Extract action:\n"confirm" or "reject"
+
+    alt action = "confirm"
+        UC -> UC : Traverse CONFIRM edges\n(success, true)
+        UC -> UC : Skip REJECT branch\nvia cascade-skip BFS
+    else action = "reject"
+        UC -> UC : Traverse REJECT edges\n(failure, false)
+        UC -> UC : Skip CONFIRM branch\nvia cascade-skip BFS
+    end
+
+    UC -> UC : task.status = COMPLETED
+
+    loop for each skipped node
+        UC -> EP : publish TaskSkipped
+    end
+end
+
+UC -> DB : save(task), save(run)
+
+== Phase 3: Publish Events ==
+
+UC -> EP : publish InputSubmitted /\nDataEditCompleted /\nHumanActionCompleted
+
+alt was_pending
+    UC -> EP : publish RunResumed\n(PENDING → RUNNING)
+end
+
+== Phase 4: Async Successor Dispatch ==
+
+UC -[SAP_RED]> Q : enqueue(\nResumeTaskAction(\nrun_id, task_id))
+
+UC --> U : ResumePendingTaskResult
+deactivate UC
+
+...
+
+== Phase 5: Orchestration Continues ==
+
+Q -[SAP_RED]>> W : dequeue ResumeTaskAction
+W -> OE : orchestrate_resume(\nrun_id, task_id)
+activate OE
+
+note over OE
+  Same flow as orchestrate_continue():
+  - process_and_dispatch_successors()
+  - SuccessorProcessor._process_uniform()
+  - compute_fanout() → FanoutDecision
+  - Enqueue ExecuteNodeAction for each
+    ready successor
+  - maybe_enqueue_loop_iteration()
+  - drain_events()
+  - check_run_completion()
+  - flush_events()
+end note
+
+OE -> OE : process_and_dispatch_successors()
+OE -> OE : check_run_completion()
+
+deactivate OE
+
+@enduml

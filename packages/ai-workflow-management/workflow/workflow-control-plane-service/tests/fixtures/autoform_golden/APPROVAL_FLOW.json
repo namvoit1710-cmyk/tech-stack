@@ -1,0 +1,83 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "{{$nodeId.output.change_request_id}}"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Change Request ID",
+          "required": true
+        }
+      },
+      "key": "change_request_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Describe what this node does and how its output should be used.",
+          "rowsLength": 3
+        },
+        "fieldControl": "TextareaControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Instruction"
+        }
+      },
+      "key": "instruction",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Approval Nodes"
+        }
+      },
+      "key": "nodes",
+      "outputType": "object"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Approval Edges"
+        }
+      },
+      "key": "edges",
+      "outputType": "object"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Change Request ID"
+        }
+      },
+      "key": "change_request_id",
+      "outputType": "string"
+    }
+  ]
+}

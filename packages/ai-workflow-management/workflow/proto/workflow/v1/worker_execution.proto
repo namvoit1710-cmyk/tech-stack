@@ -1,0 +1,90 @@
+syntax = "proto3";
+package workflow.v1;
+
+
+import "google/protobuf/struct.proto";
+
+// Served by Worker (via SDK), called by Worker Executor.
+// Replaces HTTP POST /api/v1/execute and /api/v1/execute-async.
+service WorkerExecutionService {
+  // Unary: synchronous execution — blocks until the worker finishes.
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+
+  // Server-streaming: execute with progress updates.
+  // The final message carries event_type="result" with the ExecuteResponse.
+  // Replaces the async callback pattern entirely.
+  rpc ExecuteWithProgress(ExecuteRequest) returns (stream ExecutionEvent);
+
+  // Worker metadata (replaces GET /api/v1/info).
+  rpc GetInfo(GetInfoRequest) returns (WorkerInfoResponse);
+
+  // Invoke a named function declared by the worker.
+  rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse);
+}
+
+message ExecuteRequest {
+  string task_id = 1;
+  string action = 2;
+  google.protobuf.Struct inputs = 3;
+  google.protobuf.Struct parameters = 4;
+  string correlation_id = 5;
+}
+
+message ExecuteResponse {
+  string task_id = 1;
+  // "SUCCESS" | "ERROR"
+  string status = 2;
+  google.protobuf.Struct outputs = 3;
+  string error = 4;
+  double duration_ms = 5;
+  string output_reference = 6;
+}
+
+message ExecutionEvent {
+  string task_id = 1;
+  // "progress" | "log" | "result"
+  string event_type = 2;
+  // 0.0 – 1.0
+  float progress_pct = 3;
+  string message = 4;
+  // Populated only when event_type="result".
+  ExecuteResponse result = 5;
+}
+
+message GetInfoRequest {}
+
+message WorkerInfoResponse {
+  string worker_type = 1;
+  string version = 2;
+  string sdk_version = 3;
+  string name = 4;
+  string description = 5;
+  string node_class = 6;
+  string icon = 7;
+  string color = 8;
+  repeated string tags = 9;
+  google.protobuf.Struct input_schema = 10;
+  google.protobuf.Struct output_schema = 11;
+  repeated WorkerFunctionDef functions = 12;
+}
+
+// ---------- Worker Functions ----------
+
+message WorkerFunctionDef {
+  string name = 1;
+  string description = 2;
+  google.protobuf.Struct input_schema = 3;
+  google.protobuf.Struct output_schema = 4;
+}
+
+message InvokeFunctionRequest {
+  string function_name = 1;
+  google.protobuf.Struct params = 2;
+}
+
+message InvokeFunctionResponse {
+  // "success" | "error"
+  string status = 1;
+  google.protobuf.Struct result = 2;
+  string error = 3;
+}

@@ -1,0 +1,21 @@
+-- Migration: index AIW_TASKS on (RUN_ID, NODE_ID) — SA-2318.
+--
+-- OrchestrationEngine._active_task answers "is this node's latest task still in
+-- flight?" once per successor, on every node completion. It used to answer it
+-- with SELECT * WHERE RUN_ID=? and a Python scan, so it read every task of the
+-- run just to return one of them. The read is now a point lookup:
+--
+--     SELECT * FROM AIW_TASKS
+--      WHERE RUN_ID = ? AND NODE_ID = ?
+--      ORDER BY COALESCE(CREATED_AT, '') DESC LIMIT 1
+--
+-- The two existing indexes do not serve it: IDX_AIW_TASKS_RUN is (RUN_ID) only,
+-- and IDX_AIW_TASKS_STATUS is (RUN_ID, STATUS) — neither narrows on NODE_ID, so
+-- without this the new query still touches every task of the run and the shape
+-- change buys nothing.
+--
+-- CREATED_AT is deliberately NOT in the index. AIW_TASKS is a COLUMN table, the
+-- residual per (RUN_ID, NODE_ID) is a handful of rows (one per visit of that
+-- node), and sorting a handful is free — a third column would cost write
+-- amplification on the hottest table in the service for no read benefit.
+CREATE INDEX "IDX_AIW_TASKS_RUN_NODE" ON "AIW_TASKS" ("RUN_ID", "NODE_ID");

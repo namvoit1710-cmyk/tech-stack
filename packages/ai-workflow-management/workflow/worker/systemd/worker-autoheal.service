@@ -1,0 +1,25 @@
+# Dung lai nhung container bi danh dau `unhealthy`.
+#
+# VI SAO CAN: Docker KHONG lam viec nay. `restart:` kich hoat khi tien trinh
+# THOAT; `HEALTHCHECK` chi ghi mot nhan trang thai va khong co hanh dong di kem.
+# Hai co che do khong bao gio gap nhau — va dung khoang trong ay la cho su co
+# 14/08/2026 lot qua: worker treo nhung khong thoat, nen khong gi dung no lai.
+#
+# (Swarm va Kubernetes co lam. Docker Engine mot may thi khong.)
+#
+# Loc theo nhan `autoheal=true` chu khong phai moi container: dat nhan la hanh
+# dong CO Y trong compose cua tung worker.
+[Unit]
+Description=Restart Docker containers marked unhealthy
+Documentation=file:///etc/systemd/system/worker-autoheal.timer
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# `xargs -r` de khong goi `docker restart` voi danh sach rong.
+ExecStart=/bin/sh -c '/usr/bin/docker ps --filter health=unhealthy --filter label=autoheal=true --quiet | xargs -r /usr/bin/docker restart'
+# Ghi lai moi lan dung: neu container bi dung lai nhieu lan, do la trieu chung
+# can dieu tra, khong phai thanh cong cua co che nay.
+StandardOutput=journal
+StandardError=journal

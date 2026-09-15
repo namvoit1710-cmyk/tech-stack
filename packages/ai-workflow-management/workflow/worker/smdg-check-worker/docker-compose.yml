@@ -1,0 +1,45 @@
+# Run the SMDG check-worker in Docker.
+#
+#   cd .../workflow/worker/smdg-check-worker
+#   docker compose up --build          # build + run in the foreground
+#   docker compose up -d --build       # ...detached
+#   docker compose logs -f             # follow logs
+#   docker compose down                # stop
+#
+# Build context is the PARENT worker/ dir (this worker needs sibling worker-sdk).
+services:
+  smdg-check-worker:
+    build:
+      context: ..
+      dockerfile: smdg-check-worker/Dockerfile
+    image: smdg-check-worker:local
+    container_name: smdg-check-worker
+    # Pin public resolvers — the Docker/WSL embedded DNS intermittently throws
+    # "Temporary failure in name resolution", which drops the lease calls.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    # No credentials here: the node OAuth credential comes from the flow environment
+    # ({{$env.OAUTH}}). `.env` holds run config only.
+    env_file:
+      - .env
+    environment:
+      APP_MODE: PULL
+      LEASE_RENEW_ENABLED: "true"
+      WORKER_TENANT: ""
+      # Total in-flight tasks across ALL node types (three here). "1" keeps one task
+      # at a time; the SDK's multi-type runner is otherwise uncapped.
+      WORKER_MAX_CONCURRENT: "1"
+      REGISTRY_URL: https://smdg-ai-tenant-1-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+      # Registry replicas endpoint for the self-healthcheck (any of this worker's node types).
+      HC_URL: https://smdg-ai-tenant-1-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com/api/v2/worker-replicas/qc_duplication_check
+    # Liveness: does THIS container still have a fresh heartbeat in the registry.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import json,os,socket,sys,urllib.request as u;h=socket.gethostname();d=json.load(u.urlopen(os.environ['HC_URL'],timeout=8));d=d.get('data',d) if isinstance(d,dict) else d;sys.exit(0 if [r for r in d if str(r.get('host'))==h and float(r.get('age_seconds') or 1e9)<180] else 1)\""]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    labels:
+      autoheal: "true"

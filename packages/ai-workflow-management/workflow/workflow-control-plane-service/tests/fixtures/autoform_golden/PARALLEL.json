@@ -1,0 +1,64 @@
+{
+  "input_schema": [],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true,
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Branches Total"
+        }
+      },
+      "key": "branches_total",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true,
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Branches Completed"
+        }
+      },
+      "key": "branches_completed",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true,
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Branches Failed"
+        }
+      },
+      "key": "branches_failed",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "SwitchControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "All Succeeded"
+        }
+      },
+      "key": "all_succeeded",
+      "outputType": "boolean"
+    }
+  ]
+}

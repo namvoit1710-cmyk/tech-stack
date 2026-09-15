@@ -1,0 +1,39 @@
+[package]
+name = "json-csv-streamer"
+version = "0.2.0"
+edition = "2021"
+description = "Streaming JSON-array -> CSV artifacts for SMDG-AI claim-check (SA-1905)"
+
+[lib]
+name = "json_csv_streamer"
+# ``rlib`` alongside ``cdylib``: a cdylib-only crate has no library for the test
+# harness to link against, so ``cargo test`` could not run and this crate shipped
+# to 11 production images with zero Rust-side coverage. The rlib costs nothing at
+# runtime (maturin still packages the cdylib) and makes the parity functions —
+# ``item_kind``, ``json_cells``, ``finish`` — testable without a Python at all.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# ``extension-module`` is deliberately NOT set here: it tells pyo3 to leave
+# libpython unresolved, which is right for the wheel and fatal for ``cargo test``
+# (the test binary is an executable and must link libpython). maturin adds it
+# back for the wheel via ``[tool.maturin] features`` in pyproject.toml, so the
+# shipped artifact is unchanged and the tests can still link.
+pyo3 = { version = "0.23", features = ["abi3-py39"] }
+# ``arbitrary_precision``: without it, an integer outside i64/u64 is parsed as
+# f64 and written back in exponent form — 10**25 became 1e+25, while the Python
+# writer kept it exact. Two producers of one format must not disagree about the
+# VALUE, let alone silently lose precision on an id. (SA-1977 A5.)
+serde_json = { version = "1", features = ["preserve_order", "arbitrary_precision"] }
+csv = "1"
+# Both callers key an upload on `sha256:<hex>` of the exact CSV bytes
+# (`_content_key` / `content_idempotency_key`). Hashing here means neither ever
+# has to read the file back into RAM just to name it. Pure Rust, no TLS, no
+# async runtime — the crate stays a bytes-in/bytes-out library.
+sha2 = "0.10"
+# ``ipc_compression`` = ["ipc", "arrow-ipc/lz4", "arrow-ipc/zstd"] — it grants BOTH
+# directions at once. Without it arrow-ipc compiles ``decompress_zstd`` as a stub
+# that returns an error, which is why a reader built without this flag cannot open
+# a compressed file at all. The rollout therefore ships this wheel EVERYWHERE with
+# ARROW_SIDECAR_COMPRESSION unset before any writer is flipped.
+arrow = { version = "59.2.0", default-features = false, features = ["ipc", "ffi", "ipc_compression"] }

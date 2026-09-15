@@ -1,0 +1,93 @@
+name: ai-workflow-worker-executor
+
+# SA-1531: memory raised with MAX_CONCURRENT_TASKS (100 -> 300 on dev path;
+# each in-flight task holds a pending entry + dispatch bookkeeping).
+memory:
+  dev: 1024M
+  qas: 512M
+http2: false
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "REST"
+    qas: "REST"
+  LOG_LEVEL:
+    dev: INFO
+    qas: INFO
+  SERVICE_PORT:
+    dev: 8004
+    qas: 8004
+
+  # SA-1531 sizing: global in-flight cap raised for the 200-type scenario
+  # (fleet ceiling = sum of per-worker WORKER_MAX_CONCURRENT, SA-1530).
+  # Per-type pending-timeout overrides for long-running types.
+  MAX_CONCURRENT_TASKS:
+    dev: 300
+    qas: 100
+  # Keys are WORKER_TYPE values (the string on the task), NOT CF app names.
+  # This map previously read {"agent-worker": ..., "code-worker": ...} and so
+  # matched nothing — every type silently ran on TASK_TIMEOUT_SECONDS (120s).
+  TASK_TIMEOUT_OVERRIDES:
+    dev: '{"agent": 600, "code": 300}'
+    qas: ""
+
+  # SA-1526: results flow back to WCP over the Event Mesh (workflow.results)
+  # on the dev path (also feeds solace→tenant-1); the synchronous HTTP result
+  # reporter is disabled in event_mesh mode (result_reporter=None). qas keeps
+  # the legacy http reporter until verified there.
+  TRANSPORT_MODE:
+    dev: event_mesh
+    qas: http
+
+  # Where a worker posts its async result. Unset, execute_task_usecase falls
+  # back to `http://localhost:{SERVICE_PORT}` -- which resolves inside the
+  # WORKER's own container, so every async callback dies with ECONNREFUSED and
+  # every worker node ends as "did not callback in time". dev and tenant-1 only
+  # work because someone set this by hand; a fresh sub-account has no such luck.
+  CALLBACK_BASE_URL:
+    dev: https://smdg-ai-dev-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+    # qas runs no executor app today; this mirrors how the control plane
+    # addresses it there (WORKER_EXECUTION_URL.qas) so the two cannot drift.
+    qas: https://smdg-ai-dev-ai-workflow-worker-executor-qas.cfapps.br10.hana.ondemand.com
+  WORKFLOW_CONTROL_PLANE_URL:
+    dev: https://smdg-ai-dev-ai-workflow-control-plane-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-control-plane-qas.cfapps.br10.hana.ondemand.com
+
+  # The dev row is ALSO the tenant-1 template: deploy.yml resolves
+  # "dev/solace read 'dev'", then tenantize.sh swaps the subdomain and strips a
+  # trailing "-dev" to get the clean, env-agnostic route. So "-qas" here does not
+  # normalise — it tenantizes to smdg-ai-tenant-1-file-service-qas, and
+  # `cf routes` on tenant-1 has exactly one file-service route:
+  # smdg-ai-tenant-1-file-service. The tenant-1 app is currently running the
+  # correct value, so this has been surviving on something other than this file;
+  # the next deploy would have overwritten it with a dead host.
+  #
+  # "-dev" is what all ten worker manifests carry, and it is what makes the rule
+  # produce the same clean route for the executor as it does for them.
+  FILE_SERVICE_URL:
+    dev: https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+
+services:
+  dev:
+    - workflow-control-plane-db
+    - simplemdg-event-core-2
+  qas:
+    - wio-workflow-control-plane-db
+    - simplemdg-logging
+    - wio-orchestrator-management-001  # tenant-2 mirrors dev. CONFIG_TIER is literally 'tenant-2' there, and
+  # deploy.yml resolves services with `.[$tier] // []` — without this key
+  # the app is pushed with NO bindings (no HANA, no Event Mesh).
+  tenant-2:
+    - workflow-control-plane-db
+    - simplemdg-event-core-2

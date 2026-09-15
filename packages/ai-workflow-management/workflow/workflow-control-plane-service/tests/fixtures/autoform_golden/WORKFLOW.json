@@ -1,0 +1,144 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "fieldControl": "WorkflowPickerControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Workflow ID",
+          "required": true
+        }
+      },
+      "key": "workflow_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "fieldWrapper": "TableRowWrapper",
+        "wrapperProps": {
+          "label": "Input Mapping"
+        }
+      },
+      "fields": [
+        {
+          "fieldConfig": {
+            "fieldWrapper": "TableCellWrapper"
+          },
+          "fields": [
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "param1"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Parameter"
+                }
+              },
+              "key": "param_name",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "$.data.value"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Value Expression"
+                }
+              },
+              "key": "param_value",
+              "outputType": "string"
+            }
+          ],
+          "key": "0",
+          "outputType": "object"
+        }
+      ],
+      "key": "input_mapping",
+      "outputType": "array"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "value": true
+        },
+        "fieldControl": "SwitchControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Wait for Completion"
+        }
+      },
+      "key": "wait_for_completion",
+      "outputType": "boolean"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "3600",
+          "type": "number",
+          "value": 3600
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Timeout (seconds)"
+        }
+      },
+      "key": "timeout_seconds",
+      "outputType": "number"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Sub-Run ID"
+        }
+      },
+      "key": "sub_run_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Sub-Workflow Status"
+        }
+      },
+      "key": "sub_workflow_status",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Output Data"
+        }
+      },
+      "key": "output_data",
+      "outputType": "object"
+    }
+  ]
+}

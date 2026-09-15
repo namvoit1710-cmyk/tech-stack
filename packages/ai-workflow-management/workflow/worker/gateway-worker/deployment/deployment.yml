@@ -1,0 +1,66 @@
+name: worker-gateway-worker
+buildContext: ..
+buildContexts:
+  worker-sdk: ../../worker-sdk
+  json_csv_streamer: ../../../libs/json-csv-streamer
+
+memory:
+  dev: 128M
+  qas: 128M
+
+http2: false
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  WORKER_CHUNKED_OUTPUT_ENABLED:
+    dev: "true"
+    qas: "true"
+  APP_NAME:
+    dev: "Gateway Worker"
+    qas: "Gateway Worker"
+  WORKER_TYPE:
+    dev: "gateway"
+    qas: "gateway"
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  LOG_LEVEL:
+    dev: DEBUG
+    qas: DEBUG
+  SERVER_HOST:
+    dev: "0.0.0.0"
+    qas: "0.0.0.0"
+  SERVER_PORT:
+    dev: 35000
+    qas: 35000
+  PROXY_URL:
+    dev: https://smdg-ai-dev-worker-gateway-worker.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-worker-gateway-worker-qas.cfapps.br10.hana.ondemand.com
+  CONTROL_PLANE_URL:
+    dev: https://smdg-ai-dev-ai-workflow-control-plane-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-control-plane-qas.cfapps.br10.hana.ondemand.com
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-worker-executor-qas.cfapps.br10.hana.ondemand.com
+  FILE_SERVICE_URL:
+    dev: https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+
+services:
+  dev:
+    - simplemdg-logging
+    - simplemdg-event-core-2
+  qas:
+    - simplemdg-logging
+    - wio-orchestrator-management-001  # tenant-2 mirrors dev. CONFIG_TIER is literally 'tenant-2' there, and
+  # deploy.yml resolves services with `.[$tier] // []` — without this key
+  # the app is pushed with NO bindings (no HANA, no Event Mesh).
+  tenant-2:
+    - simplemdg-logging
+    - simplemdg-event-core-2

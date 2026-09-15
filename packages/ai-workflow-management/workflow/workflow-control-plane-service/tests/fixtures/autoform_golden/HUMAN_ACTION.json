@@ -1,0 +1,177 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Review the document and approve or reject.",
+          "rowsLength": 3
+        },
+        "fieldControl": "TextareaControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Instruction",
+          "required": true
+        }
+      },
+      "key": "instruction",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "fieldWrapper": "TableRowWrapper",
+        "wrapperProps": {
+          "label": "Input Schema"
+        }
+      },
+      "fields": [
+        {
+          "fieldConfig": {
+            "fieldWrapper": "TableCellWrapper"
+          },
+          "fields": [
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "comments"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Key"
+                }
+              },
+              "key": "key",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "options": [
+                    {
+                      "id": "string",
+                      "value": "String"
+                    },
+                    {
+                      "id": "number",
+                      "value": "Number"
+                    },
+                    {
+                      "id": "boolean",
+                      "value": "Boolean"
+                    },
+                    {
+                      "id": "file",
+                      "value": "File"
+                    }
+                  ],
+                  "placeholder": "Select type"
+                },
+                "fieldControl": "SelectControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Type"
+                }
+              },
+              "key": "type",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "Comments"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Label"
+                }
+              },
+              "key": "label",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "fieldControl": "SwitchControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Required"
+                }
+              },
+              "key": "required",
+              "outputType": "boolean"
+            }
+          ],
+          "key": "0",
+          "outputType": "object"
+        }
+      ],
+      "key": "input_schema",
+      "outputType": "array"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Approve",
+          "value": "Confirm"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Confirm Button Label"
+        }
+      },
+      "key": "confirm_label",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Reject",
+          "value": "Reject"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Reject Button Label"
+        }
+      },
+      "key": "reject_label",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Action"
+        }
+      },
+      "key": "action",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Submitted Data"
+        }
+      },
+      "key": "submitted_data",
+      "outputType": "object"
+    }
+  ]
+}

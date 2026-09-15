@@ -1,0 +1,159 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "fieldWrapper": "FragmentWrapper",
+        "wrapperProps": {
+          "label": "Data"
+        }
+      },
+      "fields": [
+        {
+          "fieldConfig": {
+            "fieldWrapper": "FormItemWrapper"
+          },
+          "fields": [
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "$.input"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Key"
+                }
+              },
+              "key": "key",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "options": [
+                    {
+                      "id": "==",
+                      "value": "Equals"
+                    },
+                    {
+                      "id": "!=",
+                      "value": "Not Equals"
+                    },
+                    {
+                      "id": ">",
+                      "value": "Greater Than"
+                    },
+                    {
+                      "id": ">=",
+                      "value": "Greater or Equal"
+                    },
+                    {
+                      "id": "<",
+                      "value": "Less Than"
+                    },
+                    {
+                      "id": "<=",
+                      "value": "Less or Equal"
+                    },
+                    {
+                      "id": "contains",
+                      "value": "Contains"
+                    },
+                    {
+                      "id": "not_contains",
+                      "value": "Not Contains"
+                    },
+                    {
+                      "id": "starts_with",
+                      "value": "Starts With"
+                    },
+                    {
+                      "id": "ends_with",
+                      "value": "Ends With"
+                    },
+                    {
+                      "id": "is_empty",
+                      "value": "Is Empty"
+                    },
+                    {
+                      "id": "is_not_empty",
+                      "value": "Is Not Empty"
+                    },
+                    {
+                      "id": "in",
+                      "value": "In"
+                    },
+                    {
+                      "id": "not_in",
+                      "value": "Not In"
+                    },
+                    {
+                      "id": "regex",
+                      "value": "Matches Regex"
+                    }
+                  ],
+                  "placeholder": "Select operations"
+                },
+                "fieldControl": "SelectControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Operations"
+                }
+              },
+              "key": "operations",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "$"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Value"
+                }
+              },
+              "key": "value",
+              "outputType": "string"
+            }
+          ],
+          "key": "0",
+          "outputType": "object"
+        }
+      ],
+      "key": "data",
+      "outputType": "array"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "SwitchControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Result"
+        }
+      },
+      "key": "result",
+      "outputType": "boolean"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Branch"
+        }
+      },
+      "key": "branch",
+      "outputType": "string"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+name: worker-code-worker
+buildContext: ..
+buildContexts:
+  worker-sdk: ../../worker-sdk
+  json_csv_streamer: ../../../libs/json-csv-streamer
+
+http2: false
+
+memory:
+  dev: 256M
+  qas: 256M
+
+# 2 on the dev tier (which is what `solace`/tenant-1 deploys from), not 1.
+# Capacity was one instance x WORKER_MAX_CONCURRENT=2, and that ceiling is reached by
+# three concurrent workflow runs with a single code node each - measured 2026-08-28:
+# a fan-out of 3 code branches took 604s against 5s for 2, because everything over the
+# ceiling waits a full 60s broker redelivery per attempt. Scaling out rather than up
+# leaves the memory arithmetic above untouched: each instance keeps its own 256M quota
+# and derives the same per-script ceilings from it.
+instances:
+  dev: 2
+  qas: 1
+
+env:
+  # --- Memory budget for the code node (see runner/limits.py) --------------------
+  # The worker and every runner child share the `memory:` quota above. A code-node
+  # result costs the parent ~5-6x its serialized size, so the quota is spent in
+  # multiples of the output size times the number of scripts in flight.
+  #
+  # The child's memory ceiling and the output ceiling are NOT set here: the worker
+  # derives them at startup from the container's real quota and its own real baseline
+  # RSS, so they follow `memory:` and the concurrency below automatically. Raise
+  # `memory:` and they grow with it; the enforced values are logged at boot. Override
+  # with CODE_NODE_MAX_MEMORY_MB / CODE_NODE_MAX_OUTPUT_MB only if you must.
+  #
+  # Tasks in flight end-to-end (SA-1530): released only after the result has been
+  # streamed and the callback sent, so finished-but-still-held results cannot pile up.
+  # At capacity: 429 + Retry-After, and the executor requeues.
+  WORKER_MAX_CONCURRENT:
+    dev: "2"
+    qas: "2"
+  # Scripts executing at once inside the worker. This is the real input: it buys
+  # throughput, and it is paid for out of the two derived ceilings above — double it
+  # and each script gets half the memory. (Belt to SA-1530's braces; also covers the
+  # sync /execute and gRPC paths, which have no SA-1530 gate.)
+  CODE_NODE_MAX_CONCURRENT:
+    dev: "1"
+    qas: "1"
+  WORKER_CHUNKED_OUTPUT_ENABLED:
+    dev: "true"
+    qas: "true"
+  APP_NAME:
+    dev: "Code Worker"
+    qas: "Code Worker"
+  WORKER_TYPE:
+    dev: "code"
+    qas: "code"
+  WORKER_NODE_CLASS:
+    dev: "TECHNICAL"
+    qas: "TECHNICAL"
+  WORKER_ICON:
+    dev: "Braces"
+    qas: "Braces"
+  WORKER_COLOR:
+    dev: "#8B5CF6"
+    qas: "#8B5CF6"
+  WORKER_TAGS:
+    dev: "code,script,javascript,python,technical"
+    qas: "code,script,javascript,python,technical"
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  LOG_LEVEL:
+    dev: DEBUG
+    qas: INFO
+  SERVER_HOST:
+    dev: "0.0.0.0"
+    qas: "0.0.0.0"
+  SERVER_PORT:
+    dev: 35000
+    qas: 35000
+  PROXY_URL:
+    dev: https://smdg-ai-dev-worker-code-worker.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-worker-code-worker.cfapps.br10.hana.ondemand.com
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-worker-executor-qas.cfapps.br10.hana.ondemand.com
+  FILE_SERVICE_URL:
+    dev: https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+
+# No bindings on any tier. These workers reach the control plane over HTTP via
+# REGISTRY_URL/PROXY_URL and hold no state of their own, so they need neither
+# the HANA container nor an Event Mesh instance. They are unbound on tenant-1
+# today as well -- the empty value is parity, not an oversight. Adding a
+# `tenant-2:` key here would bind them to more than they run with anywhere else.
+services:
+

@@ -1,0 +1,2295 @@
+{
+  "categories": {
+    "control_flow": [
+      {
+        "id": "builtin:condition",
+        "name": "Condition",
+        "node_type": "CONDITION",
+        "category": "control_flow",
+        "description": "Evaluates a boolean expression and routes to true/false branches.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "expression",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Expression",
+              "description": "Boolean expression to evaluate (e.g. $.data.amount > 100).",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "$.data.field == 'value'"
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "true_label",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "True Branch Label",
+              "description": "Display label for the true branch.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Yes"
+              }
+            }
+          },
+          {
+            "key": "false_label",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "False Branch Label",
+              "description": "Display label for the false branch.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "No"
+              }
+            }
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "result",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Result",
+              "description": "The evaluated boolean result.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "branch",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Branch",
+              "description": "The branch taken: 'true' or 'false'.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "GitBranch",
+        "color": "#8B5CF6",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": [
+            {
+              "id": "true_branch",
+              "label": "True",
+              "required": true,
+              "description": ""
+            },
+            {
+              "id": "false_branch",
+              "label": "False",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      },
+      {
+        "id": "builtin:switch",
+        "name": "Switch",
+        "node_type": "SWITCH",
+        "category": "control_flow",
+        "description": "Routes execution to one of several branches based on a value.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "expression",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Expression",
+              "description": "Expression whose value determines the branch.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "$.data.status"
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "cases",
+            "outputType": "object",
+            "fieldConfig": {
+              "label": "Cases",
+              "description": "Map of value to branch name (e.g. {\"approved\": \"branch_a\", \"rejected\": \"branch_b\"}).",
+              "fieldControl": "Textarea",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "{\"value1\": \"branch_1\", \"value2\": \"branch_2\"}"
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "default_branch",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Default Branch",
+              "description": "Branch to take when no case matches.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "default"
+              }
+            }
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "evaluated_value",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Evaluated Value",
+              "description": "The value that the expression evaluated to.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "matched_case",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Matched Case",
+              "description": "The case key that matched the evaluated value.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "branch",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Branch",
+              "description": "The branch name routed to.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "Shuffle",
+        "color": "#6366F1",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": [
+            {
+              "id": "default",
+              "label": "Default",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      },
+      {
+        "id": "builtin:loop",
+        "name": "Loop",
+        "node_type": "LOOP",
+        "category": "control_flow",
+        "description": "Iterates over a collection or repeats until a condition is met.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "loop_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Loop Type",
+              "description": "How the loop iterates.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "options": [
+                  {
+                    "label": "Collection",
+                    "value": "collection"
+                  },
+                  {
+                    "label": "Count",
+                    "value": "count"
+                  },
+                  {
+                    "label": "Condition",
+                    "value": "condition"
+                  }
+                ]
+              }
+            },
+            "default": "collection",
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "collection",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Collection",
+              "description": "Expression pointing to the collection to iterate over.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "$.data.items"
+              }
+            },
+            "show_when": {
+              "field": "loop_type",
+              "operator": "eq",
+              "value": "collection"
+            }
+          },
+          {
+            "key": "max_iterations",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Max Iterations",
+              "description": "Maximum number of iterations (safety limit).",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "100"
+              }
+            }
+          },
+          {
+            "key": "condition",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Condition",
+              "description": "Boolean expression evaluated each iteration; loop continues while true.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "$.data.hasMore == true"
+              }
+            },
+            "show_when": {
+              "field": "loop_type",
+              "operator": "eq",
+              "value": "condition"
+            }
+          },
+          {
+            "key": "counter_variable",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Counter Variable",
+              "description": "Name of the variable holding the current iteration index.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "index"
+              }
+            },
+            "default": "index"
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "iteration_count",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Iteration Count",
+              "description": "Total number of iterations executed.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "completed",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Completed",
+              "description": "Whether the loop ran to completion (not broken early).",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "break_reason",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Break Reason",
+              "description": "Reason the loop exited early, if applicable.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "Repeat",
+        "color": "#F97316",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": [
+            {
+              "id": "loop_body",
+              "label": "Loop Body",
+              "required": true,
+              "description": ""
+            },
+            {
+              "id": "loop_complete",
+              "label": "Loop Complete",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      },
+      {
+        "id": "builtin:parallel",
+        "name": "Parallel",
+        "node_type": "PARALLEL",
+        "category": "control_flow",
+        "description": "Executes multiple branches concurrently.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "max_concurrency",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Max Concurrency",
+              "description": "Maximum number of branches to run simultaneously (0 = unlimited).",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "0"
+              }
+            },
+            "default": 0
+          },
+          {
+            "key": "fail_strategy",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Failure Strategy",
+              "description": "How to handle branch failures.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "options": [
+                  {
+                    "label": "Fail Fast",
+                    "value": "fail_fast"
+                  },
+                  {
+                    "label": "Wait All",
+                    "value": "wait_all"
+                  }
+                ]
+              }
+            },
+            "default": "fail_fast"
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "branches_total",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Branches Total",
+              "description": "Total number of parallel branches.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "branches_completed",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Branches Completed",
+              "description": "Number of branches that completed successfully.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "branches_failed",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Branches Failed",
+              "description": "Number of branches that failed.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "all_succeeded",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "All Succeeded",
+              "description": "Whether all branches completed successfully.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "LayoutGrid",
+        "color": "#0EA5E9",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": []
+        }
+      },
+      {
+        "id": "builtin:merge",
+        "name": "Merge",
+        "node_type": "MERGE",
+        "category": "control_flow",
+        "description": "Waits for all parallel branches to complete before continuing.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "merge_strategy",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Merge Strategy",
+              "description": "When to continue execution.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "options": [
+                  {
+                    "label": "Wait All",
+                    "value": "wait_all"
+                  },
+                  {
+                    "label": "Wait Any",
+                    "value": "wait_any"
+                  },
+                  {
+                    "label": "Wait N",
+                    "value": "wait_n"
+                  }
+                ]
+              }
+            },
+            "default": "wait_all",
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "wait_count",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Wait Count",
+              "description": "Number of branches to wait for (only for 'Wait N' strategy).",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "1"
+              }
+            },
+            "show_when": {
+              "field": "merge_strategy",
+              "operator": "eq",
+              "value": "wait_n"
+            }
+          },
+          {
+            "key": "timeout_seconds",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Timeout (seconds)",
+              "description": "Maximum time to wait for branches before timing out.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "3600"
+              }
+            },
+            "default": 3600
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "branches_received",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Branches Received",
+              "description": "Number of branches that reported in.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "completed",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Completed",
+              "description": "Whether the merge condition was satisfied.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "timed_out",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Timed Out",
+              "description": "Whether the merge timed out waiting for branches.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "Merge",
+        "color": "#10B981",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": [
+            {
+              "id": "out_default",
+              "label": "Output",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      },
+      {
+        "id": "builtin:trigger",
+        "name": "Trigger",
+        "node_type": "TRIGGER",
+        "category": "control_flow",
+        "description": "Entry point that starts workflow execution on an event or schedule.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "trigger_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Trigger Type",
+              "description": "How the workflow is triggered.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "options": [
+                  {
+                    "label": "Manual",
+                    "value": "manual"
+                  },
+                  {
+                    "label": "Schedule",
+                    "value": "schedule"
+                  },
+                  {
+                    "label": "Event",
+                    "value": "event"
+                  },
+                  {
+                    "label": "Webhook",
+                    "value": "webhook"
+                  }
+                ]
+              }
+            },
+            "default": "manual",
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "schedule_cron",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Cron Schedule",
+              "description": "Cron expression for scheduled triggers (e.g. '0 9 * * 1-5').",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "0 9 * * *"
+              }
+            },
+            "show_when": {
+              "field": "trigger_type",
+              "operator": "eq",
+              "value": "schedule"
+            }
+          },
+          {
+            "key": "event_topic",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Event Topic",
+              "description": "Event topic to subscribe to.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "orders.created"
+              }
+            },
+            "show_when": {
+              "field": "trigger_type",
+              "operator": "eq",
+              "value": "event"
+            }
+          },
+          {
+            "key": "event_filter",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Event Filter",
+              "description": "Optional filter expression for incoming events.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "$.data.priority == 'high'"
+              }
+            },
+            "show_when": {
+              "field": "trigger_type",
+              "operator": "eq",
+              "value": "event"
+            }
+          },
+          {
+            "key": "webhook_path",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Webhook Path",
+              "description": "URL path segment for the webhook endpoint.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "/hooks/my-trigger"
+              }
+            },
+            "show_when": {
+              "field": "trigger_type",
+              "operator": "eq",
+              "value": "webhook"
+            }
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "trigger_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Trigger Type",
+              "description": "The type of trigger that fired.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "triggered_at",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Triggered At",
+              "description": "ISO-8601 timestamp when the trigger fired.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "trigger_payload",
+            "outputType": "object",
+            "fieldConfig": {
+              "label": "Trigger Payload",
+              "description": "Data payload from the trigger event.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "correlation_id",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Correlation ID",
+              "description": "Unique identifier to correlate the trigger with external systems.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "Zap",
+        "color": "#F59E0B",
+        "tags": [],
+        "ports": {
+          "in": [],
+          "out": [
+            {
+              "id": "out_default",
+              "label": "Output",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      },
+      {
+        "id": "builtin:workflow",
+        "name": "Workflow",
+        "node_type": "WORKFLOW",
+        "category": "control_flow",
+        "description": "Invokes another workflow as a sub-workflow.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "workflow_id",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Workflow ID",
+              "description": "ID of the sub-workflow to invoke.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "wf-xxxxxxxx"
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "input_mapping",
+            "outputType": "object",
+            "fieldConfig": {
+              "label": "Input Mapping",
+              "description": "Map parent data to sub-workflow inputs.",
+              "fieldControl": "Textarea",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "{\"param1\": \"$.data.value\"}"
+              }
+            }
+          },
+          {
+            "key": "wait_for_completion",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Wait for Completion",
+              "description": "Whether to block until the sub-workflow finishes.",
+              "fieldControl": "Switch",
+              "fieldWrapper": "FormItem"
+            },
+            "default": true
+          },
+          {
+            "key": "timeout_seconds",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Timeout (seconds)",
+              "description": "Maximum time to wait for sub-workflow completion.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "3600"
+              }
+            },
+            "default": 3600
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "sub_run_id",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Sub-Run ID",
+              "description": "Run ID of the invoked sub-workflow.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "sub_workflow_status",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Sub-Workflow Status",
+              "description": "Final status of the sub-workflow run.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "output_data",
+            "outputType": "object",
+            "fieldConfig": {
+              "label": "Output Data",
+              "description": "Output data returned by the sub-workflow.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "Workflow",
+        "color": "#6366F1",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": [
+            {
+              "id": "success",
+              "label": "Success",
+              "required": true,
+              "description": ""
+            },
+            {
+              "id": "failure",
+              "label": "Failure",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      },
+      {
+        "id": "builtin:compute",
+        "name": "Compute",
+        "node_type": "COMPUTE",
+        "category": "control_flow",
+        "description": "Performs in-process data transformation or computation.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "expression",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Expression",
+              "description": "The transformation expression to evaluate.",
+              "fieldControl": "Textarea",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "$.data.items[?status=='active']"
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "language",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Language",
+              "description": "Expression language to use.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "options": [
+                  {
+                    "label": "JMESPath",
+                    "value": "jmespath"
+                  },
+                  {
+                    "label": "JSONata",
+                    "value": "jsonata"
+                  },
+                  {
+                    "label": "JavaScript",
+                    "value": "javascript"
+                  }
+                ]
+              }
+            },
+            "default": "jmespath"
+          },
+          {
+            "key": "input_data",
+            "outputType": "object",
+            "fieldConfig": {
+              "label": "Input Data",
+              "description": "Optional explicit input data to transform (defaults to node input).",
+              "fieldControl": "Textarea",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "{\"key\": \"value\"}"
+              }
+            }
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "result",
+            "outputType": "object",
+            "fieldConfig": {
+              "label": "Result",
+              "description": "The computed result of the expression.",
+              "fieldControl": "None"
+            }
+          },
+          {
+            "key": "execution_time_ms",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Execution Time (ms)",
+              "description": "Time taken to evaluate the expression in milliseconds.",
+              "fieldControl": "None"
+            }
+          }
+        ],
+        "node_class": "TECHNICAL",
+        "icon": "Code2",
+        "color": "#64748B",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": [
+            {
+              "id": "success",
+              "label": "Success",
+              "required": true,
+              "description": ""
+            },
+            {
+              "id": "failure",
+              "label": "Failure",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      },
+      {
+        "id": "builtin:group",
+        "name": "Group",
+        "node_type": "GROUP",
+        "category": "control_flow",
+        "description": "Visual grouping container for organizing related nodes. No execution semantics.",
+        "worker_id": null,
+        "capabilities": [],
+        "input_schema": [
+          {
+            "key": "children",
+            "outputType": "array",
+            "fieldConfig": {
+              "label": "Children",
+              "description": "List of node IDs that belong to this group.",
+              "fieldControl": "Textarea",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "[\"node_id_1\", \"node_id_2\"]"
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "label",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Group Label",
+              "description": "Display label for the group.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Data Preparation"
+              }
+            }
+          },
+          {
+            "key": "color",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Group Color",
+              "description": "Color for the group boundary (hex or CSS name).",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "#E3F2FD"
+              }
+            }
+          }
+        ],
+        "output_schema": [],
+        "node_class": "BUSINESS",
+        "icon": "Layers",
+        "color": "#E3F2FD",
+        "tags": [],
+        "ports": {
+          "in": [
+            {
+              "id": "in_default",
+              "label": "Input",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "out": [
+            {
+              "id": "success",
+              "label": "Success",
+              "required": true,
+              "description": ""
+            },
+            {
+              "id": "failure",
+              "label": "Failure",
+              "required": true,
+              "description": ""
+            }
+          ]
+        }
+      }
+    ],
+    "worker": [
+      {
+        "id": "worker:af020a89-9e9b-40f0-bcfd-d057b465579b",
+        "name": "Request Worker",
+        "node_type": "TASK",
+        "category": "worker",
+        "description": "Executes tasks via 'Request Worker'. Capabilities: Request Worker.execute.",
+        "worker_id": "af020a89-9e9b-40f0-bcfd-d057b465579b",
+        "worker_type": "Request Worker",
+        "version": "0.0.1-snapshot",
+        "capabilities": [
+          {
+            "domain": "Request Worker",
+            "action": "execute"
+          }
+        ],
+        "input_schema": [
+          {
+            "key": "method",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "HTTP Method",
+              "description": "The HTTP method to use.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Select method",
+                "options": [
+                  {
+                    "id": "GET",
+                    "value": "GET"
+                  },
+                  {
+                    "id": "POST",
+                    "value": "POST"
+                  },
+                  {
+                    "id": "PUT",
+                    "value": "PUT"
+                  },
+                  {
+                    "id": "PATCH",
+                    "value": "PATCH"
+                  },
+                  {
+                    "id": "DELETE",
+                    "value": "DELETE"
+                  },
+                  {
+                    "id": "HEAD",
+                    "value": "HEAD"
+                  },
+                  {
+                    "id": "OPTIONS",
+                    "value": "OPTIONS"
+                  }
+                ]
+              }
+            },
+            "default": "GET",
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "url",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "URL",
+              "description": "The target URL for the HTTP request.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "https://api.example.com/resource"
+              }
+            },
+            "rules": {
+              "isRequired": true,
+              "checks": [
+                {
+                  "method": "pattern",
+                  "value": "^https?://.+",
+                  "message": "Must be a valid URL"
+                }
+              ]
+            }
+          },
+          {
+            "key": "headers",
+            "outputType": "array",
+            "fieldConfig": {
+              "label": "Headers",
+              "description": "HTTP headers to include in the request.",
+              "fieldControl": "Input",
+              "fieldWrapper": "ArrayFormWrapper"
+            },
+            "default": [],
+            "fields": [
+              {
+                "key": "0",
+                "outputType": "object",
+                "fieldConfig": {
+                  "label": "",
+                  "fieldControl": "Input",
+                  "fieldWrapper": "FlexWrapper"
+                },
+                "fields": [
+                  {
+                    "key": "header_name",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Header Name",
+                      "fieldControl": "Input",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "placeholder": "Content-Type"
+                      }
+                    },
+                    "rules": {
+                      "isRequired": true
+                    }
+                  },
+                  {
+                    "key": "header_value",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Header Value",
+                      "fieldControl": "Input",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "placeholder": "application/json"
+                      }
+                    },
+                    "rules": {
+                      "isRequired": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "query_params",
+            "outputType": "array",
+            "fieldConfig": {
+              "label": "Query Parameters",
+              "description": "URL query parameters appended to the URL.",
+              "fieldControl": "Input",
+              "fieldWrapper": "ArrayFormWrapper"
+            },
+            "default": [],
+            "fields": [
+              {
+                "key": "0",
+                "outputType": "object",
+                "fieldConfig": {
+                  "label": "",
+                  "fieldControl": "Input",
+                  "fieldWrapper": "FlexWrapper"
+                },
+                "fields": [
+                  {
+                    "key": "param_name",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Parameter Name",
+                      "fieldControl": "Input",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "placeholder": "key"
+                      }
+                    },
+                    "rules": {
+                      "isRequired": true
+                    }
+                  },
+                  {
+                    "key": "param_value",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Parameter Value",
+                      "fieldControl": "Input",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "placeholder": "value"
+                      }
+                    },
+                    "rules": {
+                      "isRequired": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "body_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Body Type",
+              "description": "The format of the request body.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Select body type",
+                "options": [
+                  {
+                    "id": "none",
+                    "value": "none"
+                  },
+                  {
+                    "id": "raw_json",
+                    "value": "raw_json"
+                  },
+                  {
+                    "id": "raw_text",
+                    "value": "raw_text"
+                  },
+                  {
+                    "id": "structured",
+                    "value": "structured"
+                  },
+                  {
+                    "id": "form_urlencoded",
+                    "value": "form_urlencoded"
+                  }
+                ]
+              }
+            },
+            "default": "none",
+            "show_when": {
+              "field": "method",
+              "operator": "in",
+              "value": [
+                "POST",
+                "PUT",
+                "PATCH"
+              ]
+            }
+          },
+          {
+            "key": "body",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Request Body",
+              "description": "The request body. Can be a JSON object/array or a string.",
+              "fieldControl": "Textarea",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "{\"key\": \"value\"}"
+              }
+            },
+            "default": null,
+            "show_when": {
+              "field": "body_type",
+              "operator": "in",
+              "value": [
+                "raw_json",
+                "raw_text"
+              ]
+            }
+          },
+          {
+            "key": "body_fields",
+            "outputType": "array",
+            "fieldConfig": {
+              "label": "Body Fields",
+              "description": "Define structured fields for the request body.",
+              "fieldControl": "Input",
+              "fieldWrapper": "TableWrapper"
+            },
+            "default": [],
+            "show_when": {
+              "field": "body_type",
+              "operator": "in",
+              "value": [
+                "structured",
+                "form_urlencoded"
+              ]
+            },
+            "fields": [
+              {
+                "key": "0",
+                "outputType": "object",
+                "fieldConfig": {
+                  "label": "",
+                  "fieldControl": "Input",
+                  "fieldWrapper": "FlexWrapper"
+                },
+                "fields": [
+                  {
+                    "key": "field_name",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Field Name",
+                      "fieldControl": "Input",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "placeholder": "field_name"
+                      }
+                    },
+                    "rules": {
+                      "isRequired": true
+                    }
+                  },
+                  {
+                    "key": "field_type",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Type",
+                      "fieldControl": "Select",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "options": [
+                          {
+                            "id": "string",
+                            "value": "string"
+                          },
+                          {
+                            "id": "number",
+                            "value": "number"
+                          },
+                          {
+                            "id": "boolean",
+                            "value": "boolean"
+                          },
+                          {
+                            "id": "object",
+                            "value": "object"
+                          },
+                          {
+                            "id": "array",
+                            "value": "array"
+                          }
+                        ]
+                      }
+                    },
+                    "default": "string"
+                  },
+                  {
+                    "key": "field_value",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Value",
+                      "fieldControl": "Input",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "placeholder": "value"
+                      }
+                    }
+                  },
+                  {
+                    "key": "is_required",
+                    "outputType": "boolean",
+                    "fieldConfig": {
+                      "label": "Required",
+                      "fieldControl": "Switch",
+                      "fieldWrapper": "FormItem"
+                    },
+                    "default": false
+                  },
+                  {
+                    "key": "description",
+                    "outputType": "string",
+                    "fieldConfig": {
+                      "label": "Description",
+                      "fieldControl": "Input",
+                      "fieldWrapper": "FormItem",
+                      "controlProps": {
+                        "placeholder": "Field description"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "key": "timeout_seconds",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Timeout (seconds)",
+              "description": "Maximum time to wait for a response.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "30",
+                "type": "number"
+              }
+            },
+            "default": 30,
+            "rules": {
+              "checks": [
+                {
+                  "method": "min",
+                  "value": 1,
+                  "message": "Minimum timeout is 1 second"
+                },
+                {
+                  "method": "max",
+                  "value": 300,
+                  "message": "Maximum timeout is 300 seconds"
+                }
+              ]
+            }
+          },
+          {
+            "key": "auth_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Authentication Type",
+              "description": "The authentication method to use.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Select auth type",
+                "options": [
+                  {
+                    "id": "none",
+                    "value": "none"
+                  },
+                  {
+                    "id": "bearer",
+                    "value": "bearer"
+                  },
+                  {
+                    "id": "basic",
+                    "value": "basic"
+                  },
+                  {
+                    "id": "api_key",
+                    "value": "api_key"
+                  }
+                ]
+              }
+            },
+            "default": "none"
+          },
+          {
+            "key": "auth_token",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Auth Token / API Key",
+              "description": "Bearer token or API key value.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Enter token or API key"
+              }
+            },
+            "show_when": {
+              "field": "auth_type",
+              "operator": "in",
+              "value": [
+                "bearer",
+                "api_key"
+              ]
+            }
+          },
+          {
+            "key": "auth_username",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Username",
+              "description": "Username for Basic authentication.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Enter username"
+              }
+            },
+            "show_when": {
+              "field": "auth_type",
+              "operator": "eq",
+              "value": "basic"
+            }
+          },
+          {
+            "key": "auth_password",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Password",
+              "description": "Password for Basic authentication.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Enter password",
+                "type": "password"
+              }
+            },
+            "show_when": {
+              "field": "auth_type",
+              "operator": "eq",
+              "value": "basic"
+            }
+          },
+          {
+            "key": "api_key_header",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "API Key Header Name",
+              "description": "Header name for API key authentication.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "X-API-Key"
+              }
+            },
+            "default": "X-API-Key",
+            "show_when": {
+              "field": "auth_type",
+              "operator": "eq",
+              "value": "api_key"
+            }
+          },
+          {
+            "key": "follow_redirects",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Follow Redirects",
+              "description": "Whether to follow HTTP redirects.",
+              "fieldControl": "Switch",
+              "fieldWrapper": "FormItem"
+            },
+            "default": true
+          },
+          {
+            "key": "verify_ssl",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Verify SSL",
+              "description": "Whether to verify SSL certificates.",
+              "fieldControl": "Switch",
+              "fieldWrapper": "FormItem"
+            },
+            "default": true
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "status_code",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "HTTP Status Code",
+              "description": "The response HTTP status code.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "response_headers",
+            "outputType": "object",
+            "fieldConfig": {
+              "label": "Response Headers",
+              "description": "HTTP headers returned in the response.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            }
+          },
+          {
+            "key": "response_body",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Response Body",
+              "description": "The response body. Parsed as JSON if content-type is application/json, otherwise returned as a string.",
+              "fieldControl": "Textarea",
+              "fieldWrapper": "FormItem"
+            }
+          },
+          {
+            "key": "content_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Content-Type",
+              "description": "The Content-Type header from the response.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            }
+          },
+          {
+            "key": "elapsed_ms",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Elapsed Time (ms)",
+              "description": "Time taken for the HTTP round-trip in milliseconds.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "is_success",
+            "outputType": "boolean",
+            "fieldConfig": {
+              "label": "Is Success",
+              "description": "True if the status code is 2xx.",
+              "fieldControl": "Switch",
+              "fieldWrapper": "FormItem"
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "final_url",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Final URL",
+              "description": "The final URL after following any redirects.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            }
+          }
+        ],
+        "config_hints": {},
+        "node_class": "BUSINESS",
+        "icon": "Cog",
+        "color": "#3B82F6",
+        "tags": [],
+        "ports": {
+          "in": [],
+          "out": []
+        }
+      },
+      {
+        "id": "worker:706dcbd1-f138-4537-a59d-978db1a6dc39",
+        "name": "Wait Worker",
+        "node_type": "TASK",
+        "category": "worker",
+        "description": "Executes tasks via 'Wait Worker'. Capabilities: Wait Worker.execute.",
+        "worker_id": "706dcbd1-f138-4537-a59d-978db1a6dc39",
+        "worker_type": "Wait Worker",
+        "version": "0.0.1-snapshot",
+        "capabilities": [
+          {
+            "domain": "Wait Worker",
+            "action": "execute"
+          }
+        ],
+        "input_schema": [
+          {
+            "key": "wait_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Wait Type",
+              "description": "The type of wait to perform.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Select wait type",
+                "options": [
+                  {
+                    "id": "fixed_duration",
+                    "value": "fixed_duration"
+                  },
+                  {
+                    "id": "until_datetime",
+                    "value": "until_datetime"
+                  },
+                  {
+                    "id": "manual_approval",
+                    "value": "manual_approval"
+                  }
+                ]
+              }
+            },
+            "default": "fixed_duration",
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "duration_seconds",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Duration (seconds)",
+              "description": "Number of seconds to wait. Used when wait_type is 'fixed_duration'.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "60",
+                "type": "number"
+              }
+            },
+            "default": 60,
+            "rules": {
+              "checks": [
+                {
+                  "method": "min",
+                  "value": 0,
+                  "message": "Minimum is 0 seconds"
+                },
+                {
+                  "method": "max",
+                  "value": 86400,
+                  "message": "Maximum is 86400 seconds (24 hours)"
+                }
+              ]
+            },
+            "show_when": {
+              "field": "wait_type",
+              "operator": "eq",
+              "value": "fixed_duration"
+            }
+          },
+          {
+            "key": "duration_minutes",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Duration (minutes)",
+              "description": "Number of minutes to wait. Added to duration_seconds.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "0",
+                "type": "number"
+              }
+            },
+            "default": 0,
+            "rules": {
+              "checks": [
+                {
+                  "method": "min",
+                  "value": 0,
+                  "message": "Minimum is 0 minutes"
+                },
+                {
+                  "method": "max",
+                  "value": 1440,
+                  "message": "Maximum is 1440 minutes (24 hours)"
+                }
+              ]
+            },
+            "show_when": {
+              "field": "wait_type",
+              "operator": "eq",
+              "value": "fixed_duration"
+            }
+          },
+          {
+            "key": "until_datetime",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Wait Until (ISO 8601)",
+              "description": "Wait until this datetime. Format: ISO 8601 (e.g. '2025-06-01T12:00:00Z').",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "2025-06-01T12:00:00Z"
+              }
+            },
+            "show_when": {
+              "field": "wait_type",
+              "operator": "eq",
+              "value": "until_datetime"
+            }
+          },
+          {
+            "key": "timeout_seconds",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Timeout (seconds)",
+              "description": "Maximum time to wait before timing out. 0 means no timeout.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "3600",
+                "type": "number"
+              }
+            },
+            "default": 3600,
+            "rules": {
+              "checks": [
+                {
+                  "method": "min",
+                  "value": 0,
+                  "message": "Minimum is 0 seconds"
+                },
+                {
+                  "method": "max",
+                  "value": 604800,
+                  "message": "Maximum is 604800 seconds (7 days)"
+                }
+              ]
+            }
+          },
+          {
+            "key": "reason",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Reason",
+              "description": "Human-readable reason for the wait (e.g. 'Waiting for approval', 'Cool-down period').",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "placeholder": "Waiting for approval"
+              }
+            },
+            "rules": {
+              "checks": [
+                {
+                  "method": "maxLength",
+                  "value": 500,
+                  "message": "Reason must be 500 characters or fewer"
+                }
+              ]
+            }
+          }
+        ],
+        "output_schema": [
+          {
+            "key": "wait_status",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Wait Status",
+              "description": "Outcome of the wait operation.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "options": [
+                  {
+                    "id": "completed",
+                    "value": "completed"
+                  },
+                  {
+                    "id": "timed_out",
+                    "value": "timed_out"
+                  },
+                  {
+                    "id": "cancelled",
+                    "value": "cancelled"
+                  },
+                  {
+                    "id": "error",
+                    "value": "error"
+                  }
+                ]
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "wait_type",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Wait Type Used",
+              "description": "The wait type that was executed.",
+              "fieldControl": "Select",
+              "fieldWrapper": "FormItem",
+              "controlProps": {
+                "options": [
+                  {
+                    "id": "fixed_duration",
+                    "value": "fixed_duration"
+                  },
+                  {
+                    "id": "until_datetime",
+                    "value": "until_datetime"
+                  },
+                  {
+                    "id": "manual_approval",
+                    "value": "manual_approval"
+                  }
+                ]
+              }
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "started_at",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Started At",
+              "description": "ISO 8601 timestamp when the wait started.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "completed_at",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Completed At",
+              "description": "ISO 8601 timestamp when the wait finished.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "actual_duration_seconds",
+            "outputType": "number",
+            "fieldConfig": {
+              "label": "Actual Duration (seconds)",
+              "description": "How long the wait actually lasted.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            },
+            "rules": {
+              "isRequired": true
+            }
+          },
+          {
+            "key": "reason",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Reason",
+              "description": "The reason provided for the wait.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            }
+          },
+          {
+            "key": "message",
+            "outputType": "string",
+            "fieldConfig": {
+              "label": "Message",
+              "description": "Human-readable summary of the wait result.",
+              "fieldControl": "Input",
+              "fieldWrapper": "FormItem"
+            }
+          }
+        ],
+        "config_hints": {},
+        "node_class": "BUSINESS",
+        "icon": "Cog",
+        "color": "#3B82F6",
+        "tags": [],
+        "ports": {
+          "in": [],
+          "out": []
+        }
+      }
+    ]
+  },
+  "total": 11,
+  "node_types": [
+    {
+      "node_type": "TRIGGER",
+      "node_class": "TECHNICAL",
+      "icon": "Zap",
+      "color": "#F59E0B",
+      "ports": {
+        "in": [],
+        "out": [
+          {
+            "id": "out_default",
+            "label": "Output",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "CONDITION",
+      "node_class": "TECHNICAL",
+      "icon": "GitBranch",
+      "color": "#8B5CF6",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": [
+          {
+            "id": "true_branch",
+            "label": "True",
+            "required": true,
+            "description": ""
+          },
+          {
+            "id": "false_branch",
+            "label": "False",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "SWITCH",
+      "node_class": "TECHNICAL",
+      "icon": "Shuffle",
+      "color": "#6366F1",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": [
+          {
+            "id": "default",
+            "label": "Default",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "PARALLEL",
+      "node_class": "TECHNICAL",
+      "icon": "LayoutGrid",
+      "color": "#0EA5E9",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": []
+      }
+    },
+    {
+      "node_type": "MERGE",
+      "node_class": "TECHNICAL",
+      "icon": "Merge",
+      "color": "#10B981",
+      "ports": {
+        "in": [],
+        "out": [
+          {
+            "id": "out_default",
+            "label": "Output",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "LOOP",
+      "node_class": "TECHNICAL",
+      "icon": "Repeat",
+      "color": "#F97316",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": [
+          {
+            "id": "loop_body",
+            "label": "Loop Body",
+            "required": true,
+            "description": ""
+          },
+          {
+            "id": "loop_complete",
+            "label": "Loop Complete",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "TASK",
+      "node_class": "BUSINESS",
+      "icon": "Cog",
+      "color": "#3B82F6",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": [
+          {
+            "id": "success",
+            "label": "Success",
+            "required": true,
+            "description": ""
+          },
+          {
+            "id": "failure",
+            "label": "Failure",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "COMPUTE",
+      "node_class": "TECHNICAL",
+      "icon": "Code2",
+      "color": "#64748B",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": [
+          {
+            "id": "success",
+            "label": "Success",
+            "required": true,
+            "description": ""
+          },
+          {
+            "id": "failure",
+            "label": "Failure",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "GROUP",
+      "node_class": "BUSINESS",
+      "icon": "Layers",
+      "color": "#E3F2FD",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": [
+          {
+            "id": "success",
+            "label": "Success",
+            "required": true,
+            "description": ""
+          },
+          {
+            "id": "failure",
+            "label": "Failure",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "node_type": "WORKFLOW",
+      "node_class": "TECHNICAL",
+      "icon": "Workflow",
+      "color": "#6366F1",
+      "ports": {
+        "in": [
+          {
+            "id": "in_default",
+            "label": "Input",
+            "required": true,
+            "description": ""
+          }
+        ],
+        "out": [
+          {
+            "id": "success",
+            "label": "Success",
+            "required": true,
+            "description": ""
+          },
+          {
+            "id": "failure",
+            "label": "Failure",
+            "required": true,
+            "description": ""
+          }
+        ]
+      }
+    }
+  ]
+}

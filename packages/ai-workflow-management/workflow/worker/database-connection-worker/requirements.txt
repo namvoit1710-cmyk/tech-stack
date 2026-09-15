@@ -1,0 +1,20 @@
+# Worker SDK
+-e ../worker-sdk
+
+# SQLAlchemy 2.0+ (core)
+sqlalchemy>=2.0
+
+# PostgreSQL driver
+psycopg2-binary
+
+# MySQL driver
+pymysql
+
+# SAP HANA drivers
+hdbcli
+sqlalchemy-hana
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov

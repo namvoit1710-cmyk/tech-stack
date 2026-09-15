@@ -1,0 +1,222 @@
+@startuml input_data_sequence
+'==============================================================================
+' INPUT-data lifecycle — sequence diagram
+'------------------------------------------------------------------------------
+' Purpose: document how INPUT-node payload data flows through the workflow
+' control-plane end-to-end. Three stages are dividered below:
+'
+'   1. DISPATCH      — engine runs InputHandler; walker + provisioner create
+'                      empty CSVs (root + per-table) and the node's working
+'                      __file_ref tree; task is created PENDING with the tree
+'                      frozen as resolved_input; NodeOutputProduced seeds the
+'                      projector so view.variables[node_id] has the same tree.
+'   2. READ          — GET /data?side=input|output|both returns descriptor
+'                      trees keyed by artifact_id/file_id. No scalars dict:
+'                      the __root__ CSV's file_id is the source of truth.
+'   3. EDIT + SUBMIT — PATCH /data routes per-artifact ops: object_field
+'                      -> upsert row 1; array/nested_array -> factory row
+'                      ops. NodeDataEdited is emitted, projector swaps the
+'                      file_ids in view.variables[node_id]. POST /submit
+'                      resumes the pending task and emits NodeOutputProduced
+'                      + TaskCompleted.
+'
+' Styling: SAP brand palette — keep consistent with input_data_structure.puml.
+'==============================================================================
+
+!define SAP_GOLD #F0AB00
+!define SAP_DARK_BLUE #354A5F
+!define SAP_BLUE #0A6ED1
+!define SAP_LIGHT_BLUE #EBF8FF
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_YELLOW #E9730C
+!define SAP_GRAY #6A6D70
+!define SAP_LIGHT_GRAY #EDEFF0
+!define SAP_TEXT #32363A
+!define SAP_WHITE #FFFFFF
+
+skinparam backgroundColor SAP_WHITE
+skinparam defaultFontName "72", "SAP 72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontColor SAP_TEXT
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 8
+
+skinparam sequence {
+    ArrowColor SAP_DARK_BLUE
+    ArrowFontColor SAP_TEXT
+    ActorBorderColor SAP_DARK_BLUE
+    ActorBackgroundColor SAP_LIGHT_BLUE
+    ActorFontColor SAP_TEXT
+    ParticipantBorderColor SAP_BLUE
+    ParticipantBackgroundColor SAP_BLUE
+    ParticipantFontColor SAP_WHITE
+    LifeLineBorderColor SAP_GRAY
+    LifeLineBackgroundColor SAP_LIGHT_GRAY
+    BoxBorderColor SAP_DARK_BLUE
+    BoxBackgroundColor SAP_LIGHT_BLUE
+    DividerBorderColor SAP_GOLD
+    DividerBackgroundColor SAP_GOLD
+    DividerFontColor SAP_TEXT
+    GroupBorderColor SAP_DARK_BLUE
+    GroupBackgroundColor SAP_LIGHT_BLUE
+    GroupHeaderFontColor SAP_WHITE
+    NoteBackgroundColor SAP_LIGHT_GRAY
+    NoteBorderColor SAP_GRAY
+    NoteFontColor SAP_TEXT
+}
+
+title INPUT-node data lifecycle — dispatch, read, edit/submit
+
+actor "Frontend" as FE
+participant "REST Controller\n(run_controller.py)" as CTRL
+participant "Orchestration\nEngine" as ENG
+participant "INPUT\nHandler" as IH
+participant "Schema\nArtifact Walker" as WALK
+participant "Schema Artifact\nProvisioner" as PROV
+participant "File Service" as FS
+participant "Task Repository" as TR
+participant "Event Log\n+ Projector" as PROJ
+participant "View Store\n(cached_projector)" as VS
+participant "Data Factory\n(row-transform)" as DF
+participant "EditNodeData\nUseCase" as EDIT
+
+note over PROJ
+  Projector replays the event log into
+  view.variables[node_id]. Reduces
+  NodeOutputProduced + NodeDataEdited.
+end note
+
+== 1. Dispatch (engine runs INPUT handler) ==
+
+ENG -> IH : handle(node, run, workflow, dag)
+activate IH
+IH -> IH : _parse_input_schema(node.config.input_schema)
+IH -> IH : _resolve_schema_defaults(...)
+IH -> WALK : walk_schema_artifacts(schema)
+WALK --> IH : list[SchemaArtifact]\n(one per outputType="array")
+IH -> WALK : root_scalar_columns(schema)
+WALK --> IH : [scalar keys ...]
+IH -> PROV : provision_schema_artifacts(schema, existing_ref)
+activate PROV
+
+note right of PROV
+  Creates header-only CSVs for every
+  declared artifact that is missing
+  (merge-and-fill-gaps).
+end note
+
+PROV -> FS : upload_file(header, "node_root.csv")
+FS --> PROV : {file_id: f_root}\nartifact_type="object_field"
+loop for each SchemaArtifact (depth-sorted)
+  PROV -> FS : upload_file(header, "node_<name>.csv")
+  FS --> PROV : {file_id: f_tbl}\nartifact_type="array_field"\nor "nested_array_field"
+end
+PROV --> IH : provisioned_ref\n(__file_ref tree: root + tables)
+deactivate PROV
+
+IH -> IH : task = task_factory.create_task(\n  node, run,\n  resolved_input = provisioned_ref)
+IH -> IH : task.status = PENDING
+IH --> ENG : NodeHandlerResult\n(state_updates[node_id] = provisioned_ref,\n tasks_to_dispatch=[task])
+deactivate IH
+
+ENG -> TR : save(task)   ' PENDING
+ENG -> ENG : apply_state_updates_as_files({node_id: provisioned_ref})
+ENG -> PROJ : emit NodeOutputProduced(\n  node_id, write_set={node_id: ref})
+PROJ -> VS : reduce -> view.variables[node_id] = ref
+ENG --> CTRL : InputRequested event
+CTRL --> FE : run event (socket.io "input.requested")
+
+== 2. Read (frontend renders auto-form) ==
+
+FE -> CTRL : GET /runs/{run_id}/nodes/{node_id}/data?side=both
+CTRL -> TR : get_task(run_id, node_id)
+TR --> CTRL : task (resolved_input = frozen ref)
+CTRL -> VS : view = view_store.get(run_id)
+VS --> CTRL : view.variables[node_id]  (working copy)
+CTRL -> CTRL : build_descriptor_tree(input_ref)\nbuild_descriptor_tree(output_ref)
+
+note right of CTRL
+  ArtifactDescriptor tree:
+    { artifact_id, file_id, columns,
+      parent_row_key_column, artifact_type,
+      content_type, children[] }
+  No inline rows. No scalars dict —
+  the __root__ CSV's file_id is the
+  source of truth for top-level scalars.
+end note
+
+CTRL --> FE : NodeDataPayload\n{ etag, version,\n  data:  root=<input tree>,\n  output: root=<working tree> }
+
+FE -> FS : GET /files/{file_id}/odata?$count=true\n(per artifact, direct to file service)
+FS --> FE : CSV rows / OData
+
+== 3. Edit (PATCH /data) ==
+
+FE -> CTRL : PATCH /runs/{run_id}/nodes/{node_id}/data\nIf-Match: "<etag>"\n{ artifacts: [\n  {artifact_id:"__root__", operations:[{insert, data:{...}}]},\n  {artifact_id:"orders",   operations:[{insert,data}, {edit,row_id,data}, {delete,row_id}]}\n] }
+CTRL -> EDIT : execute(cmd)
+activate EDIT
+EDIT -> VS : view.variables[node_id] (working ref)
+VS --> EDIT : current_ref
+EDIT -> EDIT : If-Match check (412 on stale)
+EDIT -> EDIT : new_ref = deepcopy(current_ref)
+
+group For each artifact in order — atomic
+  alt artifact_type == "object_field"  (root CSV, scalars)
+    note right of EDIT
+      Only 'insert' allowed. Upserts row 1
+      in place — see _upsert_single_row.
+    end note
+    EDIT -> FS : download_file(old_file_id)
+    FS --> EDIT : CSV bytes
+    EDIT -> EDIT : _upsert_single_row(bytes, data)
+    EDIT -> FS : upload_file(new_bytes, "root.csv")
+    FS --> EDIT : new_file_id
+    EDIT -> EDIT : target.file_id = new_file_id\nfile_lineage[old]=new
+  else artifact_type == "array_field" / "nested_array_field"
+    loop for each op (insert / edit / delete)
+      EDIT -> EDIT : _translate_to_factory(op)\n(edit -> delete+insert keyed on __row_id,\n delete -> by __row_id)
+      EDIT -> DF : apply_row_operations(\n  file_id, ops, "csv")
+      DF --> EDIT : { success, file_id: new_file_id,\n  affected_rows }
+      EDIT -> EDIT : current_file_id = new_file_id
+    end
+    EDIT -> EDIT : target.file_id = current_file_id\nfile_lineage[old]=new
+  end
+end
+
+EDIT -> EDIT : new_ref.version += 1\nnew_etag = etag_calc.compute(new_ref)
+EDIT -> ENG : emit_node_data_edited(run, node_id, new_ref)
+ENG -> PROJ : emit NodeDataEdited(\n  node_id, write_set={node_id: new_ref})
+PROJ -> VS : reduce -> view.variables[node_id] = new_ref
+EDIT -> FS : (async) delete_file(old_file_id)  // orphan GC
+EDIT --> CTRL : EditNodeDataResult\n{ etag, version, file_lineage,\n  results:[{artifact_id, op_index, status, row_ids}] }
+deactivate EDIT
+CTRL --> FE : 200 OK  (new ETag)
+
+== 4. Submit (POST /submit — resume pending task) ==
+
+FE -> CTRL : POST /runs/{run_id}/nodes/{node_id}/submit
+CTRL -> ENG : ResumePendingTaskUseCase / apply_state_updates_as_files\n({node_id: node_output})
+ENG -> PROJ : emit NodeOutputProduced(\n  node_id, write_set={node_id: final_ref})
+PROJ -> VS : reduce -> variables[node_id]=final_ref\n              completed_nodes += node_id
+ENG -> PROJ : emit TaskCompleted
+ENG -> ENG : dispatch_or_handle_task(successors)
+ENG --> CTRL : InputSubmitted event
+CTRL --> FE : 200 OK + socket.io "task.completed"
+
+== Invariants ==
+
+note over TR, VS
+  task.resolved_input is FROZEN at dispatch —
+  it always reflects the file_ref tree the
+  node was dispatched with (side=input).
+
+  view.variables[node_id] is the WORKING COPY —
+  PATCH mutates it by swapping file_ids; the
+  projector rebuilds it from NodeOutputProduced
+  + NodeDataEdited. Served as side=output.
+end note
+
+footer INPUT-data lifecycle — workflow-control-plane-service
+
+@enduml

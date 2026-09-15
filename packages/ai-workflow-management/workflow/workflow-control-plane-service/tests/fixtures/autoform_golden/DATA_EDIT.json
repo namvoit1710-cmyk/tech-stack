@@ -1,0 +1,230 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "fieldWrapper": "TabWrapper"
+      },
+      "fields": [
+        {
+          "fieldConfig": {
+            "fieldWrapper": "TabItemWrapper",
+            "wrapperProps": {
+              "label": "Configuration"
+            }
+          },
+          "fields": [
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "{{$nodeA.__file_id}}"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "rules": [
+                  {
+                    "method": "required"
+                  }
+                ],
+                "wrapperProps": {
+                  "label": "Source Data",
+                  "required": true
+                }
+              },
+              "key": "file_id",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "uploaded_file"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Artifact Key"
+                }
+              },
+              "key": "artifact_key",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "Review and edit the data before proceeding.",
+                  "rowsLength": 3
+                },
+                "fieldControl": "TextareaControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Instruction"
+                }
+              },
+              "key": "instruction",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "options": [
+                    {
+                      "id": "csv_single",
+                      "value": "Single Row"
+                    },
+                    {
+                      "id": "csv_multi",
+                      "value": "Multiple Rows"
+                    }
+                  ],
+                  "placeholder": "Select data mode"
+                },
+                "fieldControl": "SelectControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Data Mode"
+                }
+              },
+              "key": "data_mode",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "placeholder": "$filter=qty gt 5&$top=10"
+                },
+                "fieldControl": "InputControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "OData Query"
+                }
+              },
+              "key": "query",
+              "outputType": "string"
+            }
+          ],
+          "key": "main",
+          "outputType": "object"
+        },
+        {
+          "fieldConfig": {
+            "fieldWrapper": "TabItemWrapper",
+            "wrapperProps": {
+              "label": "Settings"
+            }
+          },
+          "fields": [
+            {
+              "fieldConfig": {
+                "fieldControl": "CodeControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "fieldSpan": "xl-12 lg-12 md-12 xs-12",
+                  "label": "Actions (JSON array)",
+                  "labelSpan": "xl-12 lg-12 md-12 xs-12"
+                }
+              },
+              "key": "actions",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "fieldControl": "CodeControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "fieldSpan": "xl-12 lg-12 md-12 xs-12",
+                  "label": "Extra Settings (JSON array)",
+                  "labelSpan": "xl-12 lg-12 md-12 xs-12"
+                }
+              },
+              "key": "settings",
+              "outputType": "string"
+            },
+            {
+              "fieldConfig": {
+                "fieldControl": "SwitchControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Read Only"
+                }
+              },
+              "key": "readonly",
+              "outputType": "boolean"
+            },
+            {
+              "fieldConfig": {
+                "fieldControl": "SwitchControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Custom data update"
+                }
+              },
+              "key": "custom_data_update",
+              "outputType": "boolean"
+            },
+            {
+              "fieldConfig": {
+                "controlProps": {
+                  "options": [
+                    {
+                      "id": "none",
+                      "value": "None"
+                    },
+                    {
+                      "id": "single",
+                      "value": "Single"
+                    },
+                    {
+                      "id": "multiple",
+                      "value": "Multiple"
+                    }
+                  ],
+                  "placeholder": "Select select mode"
+                },
+                "fieldControl": "SelectControl",
+                "fieldWrapper": "FormItemWrapper",
+                "wrapperProps": {
+                  "label": "Select Mode"
+                }
+              },
+              "key": "selectionMode",
+              "outputType": "string"
+            }
+          ],
+          "key": "settings_tab",
+          "outputType": "object"
+        }
+      ],
+      "key": "data_edit_tabs",
+      "outputType": "object"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "File ID"
+        }
+      },
+      "key": "file_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Data Mode"
+        }
+      },
+      "key": "data_mode",
+      "outputType": "string"
+    }
+  ]
+}

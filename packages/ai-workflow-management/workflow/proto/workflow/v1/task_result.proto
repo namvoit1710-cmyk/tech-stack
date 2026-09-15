@@ -1,0 +1,37 @@
+syntax = "proto3";
+package workflow.v1;
+
+
+import "google/protobuf/struct.proto";
+
+// Served by Control Plane, called by Worker Executor.
+// Replaces HTTP POST /runs/{run_id}/tasks/{task_id}/complete and /fail.
+service TaskResultService {
+  rpc ReportCompleted(TaskCompletedRequest) returns (TaskCompletedResponse);
+  rpc ReportFailed(TaskFailedRequest) returns (TaskFailedResponse);
+}
+
+message TaskCompletedRequest {
+  string run_id = 1;
+  string task_id = 2;
+  string output_reference = 3;
+  google.protobuf.Struct output_metadata = 4;
+}
+
+message TaskCompletedResponse {
+  bool completed = 1;
+  string status = 2;
+}
+
+message TaskFailedRequest {
+  string run_id = 1;
+  string task_id = 2;
+  string error_code = 3;
+  string error_message = 4;
+  bool retryable = 5;
+}
+
+message TaskFailedResponse {
+  bool accepted = 1;
+  string status = 2;
+}

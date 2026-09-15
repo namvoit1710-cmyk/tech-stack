@@ -1,0 +1,34 @@
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+httpx>=0.24.0
+hdbcli>=2.18.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.0.0
+# SA-1905 — property-based differential fuzz over the Arrow sidecar
+# (tests/unit/test_arrow_nested_fuzz.py). Test-only, and the suite
+# `importorskip`s it, so an install without it still collects.
+hypothesis>=6.0.0
+sqlalchemy>=2.0.0
+aiosqlite>=0.20.0
+python-socketio[asyncio]>=5.10.0
+# Keep <1.82 in lockstep with the Dockerfile's grpcio-tools bound: 1.82 stubs
+# hard-require grpcio>=1.82.0 at import, and an unpinned build skews the two.
+grpcio>=1.60.0,<1.82.0
+protobuf>=4.25.0
+redis>=4.5.0
+confluent-kafka
+python-multipart
+uuid7>=0.1.0
+prometheus-client>=0.20.0
+cryptography>=42.0.0
+croniter>=2.0.0
+# AMQP 1.0 over WebSocket push consumer for SAP Event Mesh — replaces the REST
+# consumption polling that trips the per-instance 429 rate limit. No single
+# Python lib does AMQP-1.0-over-WS for SAP, so we bridge two: websocket-client
+# does the wss:// upgrade (TLS + 'amqp' sub-protocol + bearer on the handshake),
+# proton's engine does AMQP framing + SASL PLAIN (token as password). Optional
+# at runtime: the broker falls back to REST polling if either import fails.
+python-qpid-proton>=0.39.0
+websocket-client>=1.6.0

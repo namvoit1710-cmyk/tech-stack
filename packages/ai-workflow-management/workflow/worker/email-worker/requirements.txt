@@ -1,0 +1,12 @@
+# Email Worker Dependencies
+
+# Worker SDK (editable install from local path)
+-e ../worker-sdk
+
+# HTTP client for Microsoft Graph API (SMTP uses the stdlib)
+httpx>=0.27.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0

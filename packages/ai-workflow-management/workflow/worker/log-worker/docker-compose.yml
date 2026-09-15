@@ -1,0 +1,63 @@
+# Run the SMDG log-worker in Docker.
+#
+#   cd .../workflow/worker/log-worker
+#   docker compose up --build          # build + run in the foreground
+#   docker compose up -d --build       # ...detached
+#   docker compose logs -f             # follow logs
+#   docker compose down                # stop
+#
+# Build context is the PARENT worker/ dir (log-worker needs sibling worker-sdk).
+services:
+  log-worker:
+    build:
+      context: ..
+      dockerfile: log-worker/Dockerfile
+    image: log-worker:local
+    container_name: log-worker
+    # Pin public resolvers — the Docker/WSL embedded DNS intermittently throws
+    # "Temporary failure in name resolution", which drops the lease calls.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    # Credentials (env-first, app/secrets.py): LOG_WORKER_CLIENT_ID/_SECRET,
+    # LOG_WORKER_CLIENT_ID_QAS/_SECRET_QAS, CLS_URL/USERNAME/PASSWORD — from ./.env,
+    # injected as real env vars at runtime (never baked into the image).
+    env_file:
+      - .env
+    environment:
+      APP_MODE: PULL
+      # app/pull_multi.py forced lease renewal ON in code; the SDK's runner reads
+      # this setting and defaults it OFF. Pinned so deleting that fork does not
+      # silently disable renewal: a slow OData fetch can outlive the executor's lease TTL,
+      # so without renewal the lease expires mid-run, the executor re-leases the
+      # task, and the late callback is rejected 409 (TASK_SUPERSEDED) — a re-run loop.
+      LEASE_RENEW_ENABLED: "true"
+      WORKER_TENANT: ""
+      # Total in-flight tasks across ALL node types. Pinned because app/pull_multi.py
+      # is gone: that fork defaulted to one task at a time, while the SDK's multi-type
+      # runner gives every node type its own lease loop — three here — and is uncapped
+      # unless this says otherwise. "1" keeps exactly the behaviour this worker had.
+      # One OAuth call plus one OData GET per task — the gate, not the work, was the
+      # cost. At 1, a node arriving while the worker was busy was dropped and only
+      # retried when its ~85s lease expired: measured 181s for a 2s fetch. CORE fans
+      # out five log nodes at once, so this must cover that fan-out.
+      WORKER_MAX_CONCURRENT: 6
+      LEASE_MAX_BATCH: 4
+      REGISTRY_URL: https://smdg-ai-tenant-1-ai-workflow-worker-executor.cfapps.br10.hana.ondemand.com
+      # Dia chi registry de healthcheck tu kiem tra chinh minh.
+      HC_URL: https://smdg-ai-tenant-1-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com/api/v2/worker-replicas/request_log
+    # Tin hieu song: container NAY con heartbeat tuoi trong registry khong.
+    # Khong dung do tuoi cua log — worker ranh thi im lang, se bao dong gia.
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import json,os,socket,sys,urllib.request as u;h=socket.gethostname();d=json.load(u.urlopen(os.environ['HC_URL'],timeout=8));d=d.get('data',d) if isinstance(d,dict) else d;sys.exit(0 if [r for r in d if str(r.get('host'))==h and float(r.get('age_seconds') or 1e9)<180] else 1)\""]
+      interval: 60s
+      timeout: 15s
+      # 3 lan lien tiep moi tinh la hong, de mot lan mang chop khong gay restart.
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+    # Docker KHONG dung lai container `unhealthy` — `restart:` kich hoat khi tien
+    # trinh THOAT, con `HEALTHCHECK` chi ghi mot nhan. Nhan nay la bo loc cho
+    # `worker-autoheal.timer` (xem ../systemd/), thu lam phan dung lai.
+    labels:
+      autoheal: "true"

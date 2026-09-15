@@ -1,0 +1,134 @@
+@startuml input_data_structure
+'==============================================================================
+' INPUT-data lifecycle — structural view
+'------------------------------------------------------------------------------
+' Purpose: show the SHAPE of the data as it flows from the FE-owned
+' input_schema, through the walker + provisioner, into the two stored
+' trees (task.resolved_input, view.variables[node_id]), and out to the FE
+' as an ArtifactDescriptor tree. Pairs with input_data_sequence.puml.
+'==============================================================================
+
+!define SAP_GOLD #F0AB00
+!define SAP_DARK_BLUE #354A5F
+!define SAP_BLUE #0A6ED1
+!define SAP_LIGHT_BLUE #EBF8FF
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_YELLOW #E9730C
+!define SAP_GRAY #6A6D70
+!define SAP_LIGHT_GRAY #EDEFF0
+!define SAP_TEXT #32363A
+!define SAP_WHITE #FFFFFF
+
+skinparam backgroundColor SAP_WHITE
+skinparam defaultFontName "72", "SAP 72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontColor SAP_TEXT
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundcorner 8
+
+skinparam rectangle {
+    BackgroundColor SAP_LIGHT_BLUE
+    BorderColor SAP_BLUE
+    FontColor SAP_TEXT
+}
+skinparam package {
+    BackgroundColor SAP_LIGHT_GRAY
+    BorderColor SAP_DARK_BLUE
+    FontColor SAP_DARK_BLUE
+}
+skinparam database {
+    BackgroundColor SAP_GOLD
+    BorderColor SAP_GOLD
+    FontColor SAP_TEXT
+}
+skinparam ArrowColor SAP_DARK_BLUE
+skinparam ArrowFontColor SAP_TEXT
+
+title INPUT-node data — structural view\n(schema -> walker -> provisioner -> stored trees -> response DTO)
+
+' ---------------------------------------------------------------------------
+' 1) Input schema (FE-owned auto-form)
+' ---------------------------------------------------------------------------
+package "input_schema (FE-owned auto-form)" as SCHEMA_PKG #EDEFF0 {
+  rectangle "<b>input_schema : list[FieldSpec]</b>\n----\n• {key:\"name\",   outputType:\"string\"}\n• {key:\"age\",    outputType:\"number\"}\n• {key:\"active\", outputType:\"boolean\"}\n• {key:\"orders\", outputType:\"array\",\n     fields: [ TableRowWrapper\n       fields:[\n         {key:\"sku\",   outputType:\"string\"},\n         {key:\"qty\",   outputType:\"number\"},\n         {key:\"line_items\", outputType:\"array\",\n             fields:[ ... cells ... ] }\n       ]]}" as SCHEMA
+}
+
+' ---------------------------------------------------------------------------
+' 2) Walker output
+' ---------------------------------------------------------------------------
+package "schema_artifact_walker" as WALK_PKG {
+  rectangle "<b>Walker output</b>\n----\nroot_scalar_columns =\n  [\"name\", \"age\", \"active\"]\n\nartifacts : list[SchemaArtifact] =\n  • SchemaArtifact(\n      artifact_id=\"orders\",\n      name=\"orders\",\n      columns=[\"sku\",\"qty\"],\n      depth=0)\n  • SchemaArtifact(\n      artifact_id=\"orders.line_items\",\n      name=\"line_items\",\n      columns=[...],\n      depth=1)" as WALK_OUT
+}
+
+' ---------------------------------------------------------------------------
+' 3) Provisioner output — the __file_ref tree
+' ---------------------------------------------------------------------------
+package "schema_artifact_provisioner" as PROV_PKG {
+  rectangle "<b>__file_ref tree (provisioned)</b>\n----\n{\n  __file_ref: true,\n  artifact_id: \"__root__\",\n  file_id: f_root,\n  columns: [__row_id, name, age, active],\n  artifact_type: \"object_field\",\n  content_type: \"text/csv\",\n  artifacts: [ ... ]\n}" as ROOT
+  rectangle "<b>orders</b> (depth 0)\n----\n{\n  artifact_id: \"orders\",\n  file_id: f_orders,\n  columns: [__row_id, sku, qty],\n  artifact_type: \"array_field\",\n  content_type: \"text/csv\"\n}" as ART_ORDERS
+  rectangle "<b>orders.line_items</b> (depth 1)\n----\n{\n  artifact_id: \"orders.line_items\",\n  file_id: f_items,\n  columns: [__parent_row_id, __row_id, ...],\n  artifact_type: \"nested_array_field\",\n  parent_row_key_column: \"__parent_row_id\"\n}" as ART_ITEMS
+
+  ROOT -down-> ART_ORDERS : artifacts[]
+  ART_ORDERS -down-> ART_ITEMS : artifacts[]
+}
+
+' ---------------------------------------------------------------------------
+' 4) File Service — holds the CSV bytes
+' ---------------------------------------------------------------------------
+database "<b>File Service</b>\n(CSV bytes keyed by file_id)\n----\nf_root   : __row_id,name,age,active\\n...\nf_orders : __row_id,sku,qty\\n...\nf_items  : __parent_row_id,__row_id,...\\n..." as FILES
+
+' ---------------------------------------------------------------------------
+' 5) Stored trees
+' ---------------------------------------------------------------------------
+package "Stored state" as STATE_PKG {
+  rectangle "<b>task.resolved_input</b>\n(FROZEN @ dispatch)\n----\nSame shape as __file_ref tree.\nfile_ids = pre-edit snapshot.\nSource for GET /data?side=input." as TASK_REF
+  rectangle "<b>view.variables[node_id]</b>\n(WORKING COPY — projector output)\n----\nSame shape; file_ids evolve\non every PATCH.\nRebuilt from:\n  • NodeOutputProduced\n  • NodeDataEdited\nSource for GET /data?side=output." as VIEW_REF
+}
+
+' ---------------------------------------------------------------------------
+' 6) Response DTO (what GET /data returns)
+' ---------------------------------------------------------------------------
+package "Response DTO (layer3)" as DTO_PKG {
+  rectangle "<b>NodeDataPayload</b>\n----\netag : str (weak)\nversion : int\nroot : ArtifactDescriptor\noutput_port, taken_edge_ports\n(output side only)" as PAYLOAD
+  rectangle "<b>ArtifactDescriptor</b> (recursive)\n----\nartifact_id : str\nfile_id : str\ncolumns : list[str]\nparent_row_key_column : str | null\nartifact_type :\n  object_field | array_field | nested_array_field\ncontent_type : \"text/csv\"\nchildren : list[ArtifactDescriptor]" as DESC
+  PAYLOAD -down-> DESC : root
+  DESC -down-> DESC : children[]
+}
+
+' ---------------------------------------------------------------------------
+' Edges — the flow
+' ---------------------------------------------------------------------------
+SCHEMA -right-> WALK_OUT : <b>walk_schema_artifacts()</b>\n+ root_scalar_columns()
+WALK_OUT -right-> ROOT : <b>provision_schema_artifacts()</b>\nuploads header-only CSVs
+
+ROOT -down[#0A6ED1]-> FILES : file_id
+ART_ORDERS -down[#0A6ED1]-> FILES : file_id
+ART_ITEMS -down[#0A6ED1]-> FILES : file_id
+
+ROOT -right-> TASK_REF : copied into\n<b>resolved_input</b>\n(frozen)
+ROOT -right-> VIEW_REF : seeded via\n<b>NodeOutputProduced</b>\nat dispatch
+
+TASK_REF -right-> PAYLOAD : <b>GET /data?side=input</b>\nbuild_descriptor_tree()
+VIEW_REF -right-> PAYLOAD : <b>GET /data?side=output</b>\nbuild_descriptor_tree()
+
+TASK_REF -down[#6A6D70,dashed]-> FILES : file_ids -> bytes
+VIEW_REF -down[#6A6D70,dashed]-> FILES : file_ids -> bytes
+
+' PATCH flow — mutates only the working copy
+rectangle "<b>PATCH /data</b>\nEditNodeDataUseCase\n----\n• object_field  -> upsert row 1\n• array_field   -> data-factory ops\n  (insert / edit=delete+insert / delete)\nEmits NodeDataEdited" as PATCH #F0AB00
+PATCH -up[#BB0000,bold]-> VIEW_REF : projector swaps file_ids\nin view.variables[node_id]
+PATCH -up[#BB0000,bold]-> FILES : upload new CSV,\nGC old file_id
+
+legend bottom
+  |= Color |= Meaning |
+  | <#0A6ED1> blue | file_id lookup into File Service |
+  | <#BB0000> red  | PATCH mutation path (new file_ids) |
+  | <#6A6D70> gray | dashed: read-through for response bytes |
+  //task.resolved_input is frozen at dispatch; view.variables[node_id] is the working copy.//
+  //The __root__ CSV replaces any inline scalars dict — its file_id is the source of truth for top-level scalars.//
+endlegend
+
+footer INPUT-node data — structural view — workflow-control-plane-service
+
+@enduml

@@ -1,0 +1,27 @@
+syntax = "proto3";
+package pushgateway;
+
+// Mirrors the Push Gateway server proto exactly.
+// Service name: pushgateway.PushGateway
+// See push-gateway/app/layer3_adapters/protos/push_gateway.proto
+
+service PushGateway {
+  // Send a single data chunk to a topic (unary RPC)
+  rpc SendData(SendDataRequest) returns (SendDataResponse);
+
+  // Send multiple data chunks to a topic (streaming RPC)
+  rpc SendDataStream(stream SendDataRequest) returns (stream SendDataResponse);
+}
+
+message SendDataRequest {
+  string key = 1;
+  string data = 2;
+  bool is_final = 3;
+}
+
+message SendDataResponse {
+  bool success = 1;
+  string message = 2;
+  int32 chunk_index = 3;
+  bool is_final = 4;
+}

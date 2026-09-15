@@ -1,0 +1,205 @@
+@startuml event_publishing_chain
+' ===========================================================================
+' Diagram 6: Event Publishing Decorator Chain
+' Covers: EventLogAppending → RealtimeBroadcasting → Enriching → HttpTaskDispatcher → Backend
+'         plus broker-backed realtime fan-out to Socket.IO & Push Gateway
+'         plus task dispatch fork (HTTP to worker) and completion callback path
+' ===========================================================================
+
+!define SAP_BLUE #0070F2
+!define SAP_NAVY #002A5E
+!define SAP_GOLD #E9730C
+!define SAP_GREEN #107E3E
+!define SAP_RED #BB0000
+!define SAP_TEAL #049F9A
+!define SAP_GRAY #354A5F
+!define SAP_BG #F5F6F7
+
+skinparam backgroundColor SAP_BG
+skinparam defaultFontName "72", "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceLifeLineBorderColor SAP_GRAY
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor SAP_GOLD
+
+title **Event Publishing Chain**\n(Decorator Pattern — Outermost to Innermost)
+
+autonumber "<b>[#]</b>"
+
+participant "OrchestrationEngine\n/ UseCase" as Caller SAP_BLUE
+participant "EventLog\nAppending\nPublisher" as EL SAP_NAVY
+participant "IEventLogRepository\n(Memory/SQLite/HANA)" as LOG SAP_TEAL
+participant "Realtime\nBroadcasting\nPublisher" as RT SAP_NAVY
+participant "Enriching\nEvent\nPublisher" as EN SAP_NAVY
+participant "HttpTaskDispatcher\n/ GrpcTaskDispatcher" as DISP SAP_NAVY
+participant "Backend Publisher\n(Console/Kafka/\nEvent Mesh)" as BE SAP_NAVY
+participant "Broker Topic\n**realtime.events**\n(keyed by root_run_id)" as TOPIC SAP_RED
+participant "SocketIO\nRealtime\nConsumer" as SIOC SAP_GOLD
+participant "PushGateway\nRealtime\nConsumer" as PGC SAP_GOLD
+participant "Socket.IO\nServer" as SIO SAP_GOLD
+participant "Push Gateway\nREST API" as PG SAP_GOLD
+participant "Worker Executor\nService" as WEX SAP_GREEN
+participant "Worker\n(HTTP /execute)" as WORKER SAP_GREEN
+participant "CompleteTaskUseCase" as CTU SAP_BLUE
+participant "OrchestrationQueue\n(ContinueRunAction)" as OQ SAP_RED
+participant "OrchestrationWorker" as OW SAP_BLUE
+
+== publish(topic, event) ==
+
+Caller -> EL : publish(topic, event)
+activate EL
+
+note over EL
+  **Layer 1: Write-Ahead Log**
+  Append to event log BEFORE
+  broadcasting. Shadow log policy:
+  failures caught & logged,
+  never block publish.
+end note
+
+EL -> EL : Build EventLogEnvelope:\n- event_id (from event or uuid4)\n- run_id (fallback chain:\n  event.run_id → parent → root)\n- payload (dataclasses.asdict)
+EL -> LOG : append(envelope)
+LOG --> EL : True (ok) / False (dedupe)
+
+EL -> RT : publish(topic, event)
+activate RT
+
+RT -> EN : publish(topic, event)
+activate EN
+
+note over EN
+  **Layer 3: Centralized Enrichment**
+  Adds workflow-level metadata
+  and publishes to centralized
+  event topic for external
+  consumers.
+end note
+
+EN -> DISP : publish(topic, event)
+activate DISP
+
+note over DISP
+  **Layer 3b: Task Dispatch Fork**
+  If topic ∈ {task.dispatch, task.dispatched,
+  taskdispatched} AND worker_type is set,
+  submit an HTTP POST (ThreadPoolExecutor) to
+  the Worker Executor — fire-and-forget, does
+  not block the publish chain. Always calls
+  fallback publisher below.
+end note
+
+DISP -> BE : fallback.publish(topic, event)
+activate BE
+note over BE
+  **Layer 4: Base Backend**
+  - Console: log to stdout
+  - Kafka: produce to topic
+  - Event Mesh: HTTP POST
+end note
+BE --> DISP : done
+deactivate BE
+
+alt topic is task.dispatched
+  DISP -->> WEX : POST /api/v1/tasks/execute\n{task_id, run_id, worker_type,\n input, node_config, idempotency_key}
+  activate WEX
+  WEX -->> WORKER : POST /api/v1/execute\n(async dispatch)
+  deactivate WEX
+end
+
+DISP --> EN : done
+deactivate DISP
+
+EN -> EN : Enrich: override run_id\nwith root_run_id,\nadd metadata
+EN -> DISP : publish(centralized_topic,\nenriched_envelope)
+DISP -> BE : fallback.publish(...)
+
+deactivate EN
+
+note over RT
+  **Layer 2: Realtime Broadcast via Broker**
+  Build envelope {event_type, rooms, payload}
+  and publish to the **realtime.events** topic
+  keyed by root_run_id → all events for one run
+  land on the same partition (ordering preserved).
+  No direct Socket.IO call: delivery is async
+  and decoupled from orchestration latency.
+end note
+
+RT -> RT : Normalize topic:\n"taskdispatched"\n→ "task.dispatched"
+RT -> RT : Collect rooms:\nrun:{run_id}, run:{parent_run_id},\nrun:{root_run_id}, workflow:{workflow_id}
+RT -> TOPIC : publish_to_topic(\n  "realtime.events",\n  envelope,\n  key=root_run_id)
+
+deactivate RT
+deactivate EL
+
+== Fan-out from broker topic (async, in-process callback list) ==
+
+TOPIC -> SIOC : on_message(envelope)
+activate SIOC
+note over SIOC
+  Lane queues: CRITICAL / NORMAL / BULK
+  drain in priority order.
+end note
+SIOC -> SIO : emit(event_type, payload,\nroom=<each room>)
+deactivate SIOC
+
+TOPIC -> PGC : on_message(envelope)
+activate PGC
+note over PGC
+  Only wired if PUSH_GATEWAY_URL is set.
+end note
+PGC -> PG : POST /v1/pushgateway/send\n{key=room, data=payload}
+deactivate PGC
+
+== Worker completion → engine resumes run ==
+
+WORKER -->> CTU : POST /runs/{run_id}/tasks/{task_id}/complete\n{output_reference, output_metadata}
+activate CTU
+note over CTU
+  **CompleteTaskUseCase**
+  - saves task status=COMPLETED
+  - applies output_mapping / output_binding
+  - calls engine.emit_task_completed()
+    (re-enters the publish chain above with
+    topic "task.completed")
+end note
+CTU -> Caller : emit_task_completed(task, run, node)
+note right of Caller: re-enters publish chain\nfrom step [1]
+CTU -> OQ : enqueue(ContinueRunAction(run_id, task_id))
+deactivate CTU
+
+OQ -> OW : dequeue(ContinueRunAction)
+activate OW
+OW -> Caller : process_and_dispatch_successors(task, run, ...)
+note right of Caller
+  Engine walks the DAG, creates successor
+  tasks, and for each new TASK node re-enters
+  the publish chain with topic
+  "task.dispatched" — triggering another
+  HTTP dispatch via HttpTaskDispatcher.
+end note
+deactivate OW
+
+== Event Priority Ordering (EventCollector) ==
+
+note over Caller
+  Events are buffered via EventCollector
+  with priority classification:
+
+  **IMMEDIATE (0):** task.dispatched,
+  input.requested, child_run.started
+
+  **NORMAL (1):** edge.traversed,
+  task.completed, condition.evaluated
+
+  **TERMINAL (2):** run.completed,
+  run.failed, run.cancelled
+
+  drain() returns events sorted by
+  (priority, sequence) — guarantees
+  IMMEDIATE before NORMAL before TERMINAL
+  BEFORE they hit the broker.
+end note
+
+@enduml

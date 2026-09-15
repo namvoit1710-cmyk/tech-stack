@@ -1,0 +1,16 @@
+# Tooling config only (ruff ANN + PEP585, mypy). Minimal worker: no import-linter contract.
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["build"]
+
+[tool.ruff.lint]
+select = ["ANN", "UP006", "UP035"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true

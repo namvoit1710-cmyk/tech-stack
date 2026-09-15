@@ -1,0 +1,6 @@
+-e ../worker-sdk
+httpx
+PyYAML
+pytest
+pytest-asyncio
+pytest-cov

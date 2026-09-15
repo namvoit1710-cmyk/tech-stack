@@ -1,0 +1,172 @@
+{
+  "input_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "{{$nodeA.template_id}}"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Template ID",
+          "required": true
+        }
+      },
+      "key": "template_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "{{$nodeA.model_id}}"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Business Data Model ID",
+          "required": true
+        }
+      },
+      "key": "business_data_model_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "{{$nodeA.__file_id}}"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "rules": [
+          {
+            "method": "required"
+          }
+        ],
+        "wrapperProps": {
+          "label": "Requester File",
+          "required": true
+        }
+      },
+      "key": "requester_file_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "edited_data"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Artifact Key"
+        }
+      },
+      "key": "artifact_key",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "placeholder": "Review and complete the data before proceeding.",
+          "rowsLength": 3
+        },
+        "fieldControl": "TextareaControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Instruction"
+        }
+      },
+      "key": "instruction",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "type": "number"
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Search-Help Page Size"
+        }
+      },
+      "key": "page_size",
+      "outputType": "number"
+    },
+    {
+      "fieldConfig": {
+        "fieldControl": "SwitchControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Read Only"
+        }
+      },
+      "key": "readonly",
+      "outputType": "boolean"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "options": [
+            {
+              "id": "csv_single",
+              "value": "Single Row"
+            },
+            {
+              "id": "csv_multi",
+              "value": "Multiple Rows"
+            }
+          ],
+          "placeholder": "Select data mode"
+        },
+        "fieldControl": "SelectControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Data Mode"
+        }
+      },
+      "key": "data_mode",
+      "outputType": "string"
+    }
+  ],
+  "output_schema": [
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "File ID"
+        }
+      },
+      "key": "file_id",
+      "outputType": "string"
+    },
+    {
+      "fieldConfig": {
+        "controlProps": {
+          "readonly": true
+        },
+        "fieldControl": "InputControl",
+        "fieldWrapper": "FormItemWrapper",
+        "wrapperProps": {
+          "label": "Data Mode"
+        }
+      },
+      "key": "data_mode",
+      "outputType": "string"
+    }
+  ]
+}

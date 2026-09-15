@@ -1,0 +1,9 @@
+# SMDG Log Worker dependencies.
+# The nodes themselves use only the stdlib (urllib/json) — everything below comes in
+# through the SDK, which is installed editable from the local path like the siblings.
+-e ../worker-sdk
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov

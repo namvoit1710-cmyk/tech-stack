@@ -1,0 +1,279 @@
+# Multi-target pipeline: dev→smdg-ai-dev, main→qas, solace→smdg-ai-tenant-1
+# (env URLs auto-tenantized on the solace path). Build+deploy auto-trigger on
+# push to any of those branches.
+name: ai-workflow-control-plane
+buildContext: ..
+buildContexts:
+  proto_src: ../../proto/workflow
+  # SA-1905 — source for the native streaming JSON->CSV wheel, built in a
+  # Dockerfile stage (see Stage 1b). Only the compiled wheel lands in the
+  # runtime image; the Rust toolchain stays in the builder stage.
+  json_csv_streamer: ../../libs/json-csv-streamer
+
+memory:
+  dev: 2048M
+  qas: 2048M
+
+instances:
+  dev: 1
+  qas: 1
+http2: false
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "REST"
+    qas: "REST"
+  LOG_LEVEL:
+    dev: DEBUG
+    qas: WARNING
+  SERVICE_PORT:
+    dev: 8001
+    qas: 8001
+
+  # SA-1526: task dispatch + results flow over the Event Mesh on the dev path
+  # (dev tier also feeds the solace→tenant-1 deployment). The gRPC SERVER
+  # stays up in every mode (GRPC_SERVER_ENABLED) so the CF port health check
+  # passes and existing gRPC callers keep working; qas stays on grpc dispatch
+  # until verified there.
+  TRANSPORT_MODE:
+    dev: event_mesh
+    qas: grpc
+  GRPC_SERVER_ENABLED:
+    dev: "true"
+    qas: "true"
+  GRPC_PORT:
+    dev: 50051
+    qas: 50051
+  GRPC_MAX_WORKERS:
+    dev: 10
+    qas: 10
+
+  WORKER_EXECUTION_URL:
+    dev: https://smdg-ai-dev-ai-workflow-worker-executor-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-worker-executor-qas.cfapps.br10.hana.ondemand.com
+
+  WORKER_EXECUTION_GRPC_TARGET:
+    dev: ai-workflow-worker-executor-dev.apps.internal:50052
+    qas: ai-workflow-worker-executor-qas.apps.internal:50052
+
+  FILE_SERVICE_URL:
+    dev: https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+
+  SCHEMA_TRANSFORM_URL:
+    dev: https://smdg-ai-dev-schema-transform-service-qas.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-schema-transform-service-qas.cfapps.br10.hana.ondemand.com
+
+  # Push gateway is how the workflow backend emits live run updates to the
+  # frontend (SSE). Declared here (was previously set out-of-band on dev only),
+  # so the pipeline sets it per environment — and on solace it tenantizes to
+  # smdg-ai-tenant-1-push-gateway instead of leaking to dev's gateway.
+  PUSH_GATEWAY_PROVIDER:
+    dev: http
+    qas: http
+
+  PUSH_GATEWAY_URL:
+    dev: https://smdg-ai-dev-push-gateway-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-push-gateway-qas.cfapps.br10.hana.ondemand.com
+
+  # Credentials vault (SA-1335). Setting this activates the StartRun producer
+  # that resolves node credential_refs against credentials-management; empty =
+  # dormant (bootstrap logs a warning and skips the step). On the solace path
+  # the dev value tenantizes to smdg-ai-tenant-1-credentials-management. The
+  # resolver only fires for nodes that actually carry a credential_ref, so
+  # environments without the vault deployed are unaffected until they use it.
+  CREDENTIALS_VAULT_URL:
+    dev: https://smdg-ai-dev-credentials-management.cfapps.br10.hana.ondemand.com
+    qas: ""
+
+  ENABLE_NODE_CATALOG_V2:
+    dev: true
+    qas: true
+
+  STRICT_CONTRACT_VALIDATION:
+    dev: true
+    qas: true
+
+  # SA-1905 — the nested Arrow sidecar, in SHADOW.
+  #
+  # Write it, read BOTH on every materialize, structured-diff the two, and
+  # return the CSV value always. Behaviour is unchanged by construction; what
+  # this buys is `arrow_read_total{outcome=mismatch}` measured against the only
+  # corpus that contains the shapes production actually produces.
+  #
+  # Both flags are needed or the exercise is empty: `shadow` only compares when
+  # a ref carries an `arrow_file_id`, and only the write flag puts one there.
+  #
+  # What it costs, stated so nobody has to find out:
+  #   * every node output above CHUNKING_THRESHOLD_BYTES writes a second file —
+  #     one more upload, roughly +34% on that write path, and its storage;
+  #   * a read that finds a sidecar materializes twice. Each side runs on its
+  #     own _ByteBudget capped at RESOLVE_MATERIALIZE_MAX_BYTES (64 MB), so peak
+  #     is bounded at ~2x that on a 2 GB pod — but it IS 2x.
+  #
+  # `dev` is the tier solace reads (deploy.yml:125), so this is on for the dev
+  # environment too; the backend manifest has no per-tenant key. qas stays off.
+  #
+  # Next step is `on` — but NOT on the rule "wait for mismatch to stay flat",
+  # which is what this comment used to say and which the first soak disproved.
+  #
+  # Measured on tenant-1, 2026-08-08, 10 shapes one run each: one mismatch,
+  # `late_key_sa1988` — [{"a":1},{"a":2,"late":""}]. CSV reads `late` as null on
+  # every row (the empty string is destroyed, and row 0 grows a phantom key);
+  # Arrow reads row 1 as "". Arrow is RIGHT, and ARROW_STRICT_PARITY=true does
+  # not suppress it: strict only reproduces CSV's cast of `token` columns, so
+  # every SA-1984/SA-1988 shape diverges with it on or off. It reproduced
+  # exactly against the local corpus, where it is pinned as
+  # ARROW_BETTER_NOT_EXACT (test_arrow_nested_parity.py).
+  #
+  # So mismatch will NOT go to zero, and waiting for that would wait forever.
+  # `shadow` stays safe regardless — the CSV value is always the one returned.
+  # `on` is the step that changes observable values, for the better and NOT as
+  # a no-op; it needs a decision about those shapes, not a flat graph.
+  ARROW_SIDECAR_WRITE_ENABLED:
+    dev: "true"
+    qas: "false"
+
+  # DECIDED 2026-08-09: `""` must read back as `""`.
+  #
+  # The shadow soak named the divergence rather than leaving it as a rate:
+  # `arrow_read_total{outcome="mismatch",cause="empty_string_vs_null"}` is what
+  # 84% of mismatches were. CSV cannot represent the difference between an empty
+  # cell and a null one, so it returns null for a value the node actually
+  # produced as "". Arrow carries the type in the file and returns "".
+  #
+  # This is NOT a new behaviour. Measured on tenant-1 the same day, same value,
+  # two read tiers, with the flag still on `shadow`:
+  #
+  #     flat rows   -> row-rangeable -> OData row tier  -> ""
+  #     nested rows -> artifacts     -> full materialize -> null
+  #
+  # The row tier ALREADY returns "". `on` makes the materialize tier agree with
+  # it, so this removes an inconsistency rather than introducing one.
+  #
+  # Two things to know before reading a value and trusting it:
+  #   * `on` only applies where a sidecar EXISTS. Values written before
+  #     ARROW_SIDECAR_MIN_BYTES=0 have none and still read through CSV — so the
+  #     old reading persists for old data, by design, not by oversight.
+  #   * a failed Arrow read falls through to CSV, which silently restores the
+  #     old semantics. Under `shadow` that was free; under `on` it is a value
+  #     change. Watch `arrow_read_total{outcome="fallback"}` — it is no longer
+  #     just a performance signal.
+  #
+  # ARROW_STRICT_PARITY stays `true` and is a SEPARATE decision: it only
+  # reproduces CSV's cast of `token` columns (a path holding more than one
+  # scalar kind) and has no effect on the empty-string case — verified, strict
+  # and loose return "" identically.
+  ARROW_READ_MODE:
+    dev: "on"
+    qas: "off"
+
+  # 0 = write a sidecar for every file-backed value. The default borrows
+  # CHUNKING_THRESHOLD_BYTES (1 MB), which is an EMPTY window: an output that
+  # large fails the Event Mesh broker cap before it ever reaches store_data.
+  ARROW_SIDECAR_MIN_BYTES:
+    dev: "0"
+    qas: "0"
+
+  ARROW_STRICT_PARITY:
+    dev: "true"
+    qas: "true"
+
+  # SA-1910 — build the nested-array CSV tree with the crate (shared with
+  # worker-sdk) instead of the in-RAM Python writer. The Python writer stays as
+  # the fallback, so the risk of `true` is orphaned files on a partial failure,
+  # not lost output — and `_store_rows_native` deletes its own partial uploads
+  # before falling back.
+  #
+  # Watch `native_split_total{outcome=native|fallback}`. The counter exists
+  # BEFORE the flag was turned on, deliberately: the previous feature soaked
+  # without one and measured nothing, which looked exactly like a clean run.
+  #
+  # What it changes that is worth knowing: the two writers produce the same TREE
+  # but not the same BYTES (`write_csv_impl` puts `__row_id` first, `dict_to_csv`
+  # puts it last), so the same value stored either way gets a different file_id.
+  # Content-addressed dedupe therefore will not match across the switch. That is
+  # cosmetic — nothing reads a file_id it was not given — but it is why this is
+  # a deliberate flip and not a default.
+  NATIVE_RECURSIVE_SPLIT:
+    dev: "true"
+    qas: "false"
+
+  DISPATCHER_MODE:
+    dev: dispatcher
+    qas: dispatcher
+
+  EVENT_DRIVEN_LOOP:
+    dev: true
+    qas: true
+
+  UNIFORM_EXECUTION:
+    dev: true
+    qas: true
+
+  EVENT_LOG_BACKEND:
+    dev: hana
+    qas: hana
+
+  SNAPSHOT_MODE:
+    dev: authoritative
+    qas: authoritative
+
+  # dev's schema is owned by the hdi-deploy task (hdiService below), so the app
+  # issues no DDL there. qas keeps self-migrating against its current instance.
+  HANA_RUN_MIGRATIONS:
+    dev: "false"
+    qas: "true"
+
+  EVENT_TRIGGER_CONSUMER_ENABLED:
+    dev: true
+    qas: true
+
+  WEBHOOK_BACKEND:
+    dev: "hana"
+    qas: "hana"
+
+  # Smartsheet event trigger (smartsheet-event-trigger). Poller drains the org-wide
+  # Event Reporting API and republishes onto workflow.triggers (reuses the event
+  # consumer above). SMARTSHEET_TOKEN is a System Admin secret — set it as a secure
+  # user-provided variable, NOT here.
+  SMARTSHEET_POLLER_ENABLED:
+    dev: "true"
+    qas: "true"
+    # No Smartsheet integration on tenant-2 and no SMARTSHEET_TOKEN there —
+    # the dev default would start a poller that can only fail every 300s.
+    tenant-2: "false"
+  SMARTSHEET_TENANT_ID:
+    dev: "system"
+    qas: "system"
+  SMARTSHEET_POLL_INTERVAL_SECONDS:
+    dev: "300"
+    qas: "300"
+  SMARTSHEET_BOOTSTRAP_LOOKBACK_HOURS:
+    dev: "24"
+    qas: "24"
+
+# Per-tier hdi-shared container that @sap/hdi-deploy targets (from db/hdi/) before
+# the app starts. Only dev is HDI-managed for now; qas is omitted (no HDI deploy).
+hdiService:
+  dev: workflow-control-plane-db
+
+services:
+  dev:
+    - workflow-control-plane-db
+    - simplemdg-event-core-2
+  qas:
+    - wio-workflow-control-plane-db
+    - simplemdg-logging
+    - wio-orchestrator-management-001  # tenant-2 mirrors dev. CONFIG_TIER is literally 'tenant-2' there, and
+  # deploy.yml resolves services with `.[$tier] // []` — without this key
+  # the app is pushed with NO bindings (no HANA, no Event Mesh).
+  tenant-2:
+    - workflow-control-plane-db
+    - simplemdg-event-core-2
