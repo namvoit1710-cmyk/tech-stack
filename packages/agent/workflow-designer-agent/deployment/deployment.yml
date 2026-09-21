@@ -1,0 +1,81 @@
+name: workflow-designer-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8005
+    qas: 8005
+  APP_NAME:
+    dev: "Workflow Designer Agent"
+    qas: "Workflow Designer Agent"
+  AGENT_TYPE:
+    dev: "workflow-designer"
+    qas: "workflow-designer"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  AGENT_DOMAIN:
+    dev: "workflow"
+    qas: "workflow"
+  DESCRIPTION:
+    dev: "Conversational workflow designer. Given a natural-language goal, it designs a complete multi-node workflow (nodes + edges + per-node config) in one pass, and asks a single focused clarifying question when a required detail is missing. Example prompts: Build a workflow that ingests a CSV, validates it, then emails a report; Create a workflow that syncs new records every hour and notifies me on failure."
+    qas: "Conversational workflow designer. Given a natural-language goal, it designs a complete multi-node workflow (nodes + edges + per-node config) in one pass, and asks a single focused clarifying question when a required detail is missing. Example prompts: Build a workflow that ingests a CSV, validates it, then emails a report; Create a workflow that syncs new records every hour and notifies me on failure."
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-qas-agent-registry-qas.cfapps.br10.hana.ondemand.com
+  OPENAI_MODEL:
+    dev: "gpt-5"
+    qas: "gpt-5"
+  LLM_MODEL:
+    dev: "gpt-5"
+    qas: "gpt-5"
+  LLM_PROVIDER:
+    dev: "openai"
+    qas: "openai"
+  LLM_TEMPERATURE:
+    dev: "0.2"
+    qas: "0.2"
+  WORKFLOW_API_BASE_URL:
+    dev: https://smdg-ai-dev-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-qas-ai-workflow-control-plane-qas.cfapps.br10.hana.ondemand.com
+  ROUTING_TIMEOUT_SECONDS:
+    dev: "120.0"
+    qas: "120.0"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "workflow-designer.topic"
+    qas: "workflow-designer.topic"
+  EVENT_MESH_MANAGEMENT_URL:
+    dev: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_MESSAGING_URL:
+    dev: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"
+  TROUBLESHOOTING_AGENT_URL:
+    dev: "https://smdg-ai-dev-ai-workflow-troubleshooting-agent.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-simplemdg-ai-workflow-troubleshooting-agent.cfapps.br10.hana.ondemand.com"

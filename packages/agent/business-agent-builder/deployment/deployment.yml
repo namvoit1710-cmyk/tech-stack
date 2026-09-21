@@ -1,0 +1,85 @@
+name: business-agent-builder
+buildContext: ..
+# Local deps from requirements.txt, exposed as named Docker build contexts
+# (consumed by `COPY --from=<name>` in the Dockerfile):
+#   agent-sdk -> the editable dep `-e ../agent-sdk`
+#   mcp       -> agent-sdk's nested dep `simplemdg-mcp @ file:../../../../libs/mcp/python`
+# Paths are resolved relative to this deployment/ directory.
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 512M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  # --- Transport / Messaging (HTTP-driven agent; no event-mesh consumer) ---
+  APP_MODE:
+    dev: "SERVER"
+    qas: "SERVER"
+  MESSAGING_MODE:
+    dev: "mock"
+    qas: "mock"
+  INFRA_MODE:
+    dev: "mock"
+    qas: "mock"
+  PUSH_GATEWAY_TRANSPORT:
+    dev: "grpc"
+    qas: "grpc"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+
+  # --- Server ---
+  SERVER_PORT:
+    dev: 3366
+    qas: 3366
+
+  # --- Agent Identity ---
+  APP_NAME:
+    dev: "Business Agent Builder"
+    qas: "Business Agent Builder"
+  AGENT_TYPE:
+    dev: "business-agent-builder"
+    qas: "business-agent-builder"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  AGENT_DOMAIN:
+    dev: "orchestration"
+    qas: "orchestration"
+  DESCRIPTION:
+    dev: "Creates a business agent from a natural-language prompt (Agent Hub chat box)."
+    qas: "Creates a business agent from a natural-language prompt (Agent Hub chat box)."
+  DEFAULT_QUEUE_NAME:
+    dev: "agent.builder.queue"
+    qas: "agent.builder.queue"
+  DEFAULT_QUEUE_TYPE:
+    dev: "event"
+    qas: "event"
+
+  # --- Registry (SDK registers this agent's health endpoint here on startup) ---
+  REGISTRY_URL:
+    dev: "https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-qas-agent-registry.cfapps.br10.hana.ondemand.com"
+
+  # --- Routing Metadata (dynamic discovery by supervisor agents) ---
+  INPUT_SCHEMA:
+    dev: '{}'
+    qas: '{}'
+  OUTPUT_SCHEMA:
+    dev: '{}'
+    qas: '{}'
+  ROUTING_TIMEOUT_SECONDS:
+    dev: "30.0"
+    qas: "30.0"
+
+  # LLM is intentionally NOT set here: the SDK eagerly builds an OpenAI client from
+  # LLM_MODEL at boot and crashes without OPENAI_API_KEY. The agent runs in heuristic
+  # mode. To enable the LLM path, provision OPENAI_API_KEY (CF binding/secret) AND add
+  # LLM_MODEL back.

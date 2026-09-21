@@ -1,0 +1,100 @@
+@startuml
+title 04 — Workflow Human Input
+
+' ─────────────────────────────────────────────────────────────────────
+' Covers two connected moments when a workflow step needs human data:
+'
+'   PART A — Business Agent signals "I need input at this step"
+'     The Orchestrator tries to auto-fill values from prior task
+'     outputs so the user doesn't have to do it manually.
+'     If auto-fill is not possible, a form is sent to the user.
+'
+'   PART B — User submits the form
+'     The Orchestrator forwards the submitted values to the
+'     Workflow API and advances the paused workflow step.
+'     The Business Agent (Diagram 05) then continues from where
+'     it left off.
+' ─────────────────────────────────────────────────────────────────────
+
+hide footbox
+autonumber "<b>[00]"
+
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam wrapWidth 260
+skinparam maxMessageSize 260
+skinparam shadowing false
+skinparam roundcorner 8
+
+skinparam sequence {
+  ArrowColor        #2D6A9F
+  ArrowFontColor    #2D6A9F
+  ArrowFontSize     11
+
+  LifeLineBorderColor         #2D6A9F
+  LifeLineBackgroundColor     #EAF3FB
+
+  ParticipantBorderColor      #2D6A9F
+  ParticipantBackgroundColor  #DAEAF7
+  ParticipantFontColor        #1A3A52
+  ParticipantFontSize         12
+  ParticipantFontStyle        bold
+  ParticipantPadding          8
+  ParticipantBorderThickness  1.5
+
+  ActorBorderColor            #1A3A52
+  ActorBackgroundColor        #B8D6EE
+  ActorFontColor              #1A3A52
+  ActorFontSize               12
+  ActorFontStyle              bold
+
+  GroupBorderColor            #5A9ABF
+  GroupBackgroundColor        #F0F7FC
+  GroupHeaderFontColor        #1A3A52
+  GroupHeaderFontSize         12
+  GroupBorderThickness        1.2
+
+  NoteBackgroundColor         #FFF8DC
+  NoteBorderColor             #C8A800
+  NoteFontColor               #4A3800
+  NoteFontSize                11
+}
+
+skinparam shadowing false
+skinparam roundcorner 8
+
+' ─── Participants ────────────────────────────────────────────────────
+participant Orch        as "Orchestrator"
+database    DB          as "HANA DB"
+participant WorkflowAPI as "Workflow API"
+participant Push        as "Push Gateway"
+actor       User        as "User / UI"
+
+' ─────────────────────────────────────────────────────────────────────
+== User Submits the Form ==
+' ─────────────────────────────────────────────────────────────────────
+
+User -> Orch : POST /orchestrate/agent-action\n(submitted field values + reference to the workflow step)
+activate Orch
+
+note over Orch
+  The version tag (etag) from Part A is used here to ensure the
+  Orchestrator does not overwrite changes made by another process
+  between when the form was sent and when the user submitted it.
+end note
+
+Orch -> WorkflowAPI : GET current step data + version tag\n(to verify nothing changed while the user was filling the form)
+WorkflowAPI --> Orch : current data + version tag
+
+Orch -> WorkflowAPI : PATCH submitted values using the version tag\n(prevents conflicting writes)
+WorkflowAPI --> Orch : values saved
+
+Orch -> WorkflowAPI : submit this workflow step\n(signals the workflow to continue)
+WorkflowAPI --> Orch : step advanced
+
+Orch -> DB : save a record of this user action\n(so it appears in the conversation history)
+
+Orch --> User : 202 Accepted
+deactivate Orch
+
+@enduml

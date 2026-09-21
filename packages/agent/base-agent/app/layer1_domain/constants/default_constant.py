@@ -1,0 +1,5 @@
+DEFAULT_FEATURE_NAME = "main_agent"
+DEFAULT_RESPONSE_STATUS = "completed"
+DEFAULT_QUEUE_NAME = "workflow.default.queue"
+DEFAULT_QUEUE_TYPE = "event"
+DEFAULT_WORKFLOW_ID = "workflow-default"

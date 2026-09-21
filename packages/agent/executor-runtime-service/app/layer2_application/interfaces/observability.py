@@ -1,0 +1,13 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+
+class ILogger(Protocol):
+    def info(self, message: str, **kwargs) -> None: ...
+
+    def error(self, message: str, **kwargs) -> None: ...
+
+    def warning(self, message: str, **kwargs) -> None: ...
+
+    def debug(self, message: str, **kwargs) -> None: ...

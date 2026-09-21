@@ -1,0 +1,98 @@
+name: executor-runtime-service
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 512M
+  qas: 1024M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  APP_NAME:
+    dev: "Executor Runtime Service"
+    qas: "Executor Runtime Service"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  AGENT_TYPE:
+    dev: "executor"
+    qas: "executor"
+  SERVER_PORT:
+    dev: "8010"
+    qas: "8010"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  # Event Mesh HTTP-REST consumer endpoints (shared enterprise-messaging broker,
+  # env-agnostic). Without these the messaging URL defaults to localhost:18080
+  # and the consumer never connects. token/client creds still come from VCAP.
+  EVENT_MESH_MESSAGING_PROTOCOL:
+    dev: "httprest"
+    qas: "httprest"
+  EVENT_MESH_MESSAGING_URL:
+    dev: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_MANAGEMENT_URL:
+    dev: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "executor.topic, agent.reply.executor"
+    qas: "executor.topic, agent.reply.executor"
+  STATUS_PUBLISH_TOPIC:
+    dev: "business.topic"
+    qas: "business.topic"
+  EXECUTOR_AGENT_REPLY_TOPIC:
+    dev: "agent.reply.executor"
+    qas: "agent.reply.executor"
+  EXECUTOR_AGENT_REPLY_TIMEOUT_SECONDS:
+    dev: "60"
+    qas: "60"
+  AGENT_REQUEST_COMPATIBILITY_TOPIC:
+    dev: "executor.request.agent"
+    qas: "executor.request.agent"
+  DELEGATION_REQUEST_MESSAGE_TYPE:
+    dev: "executor.request.agent"
+    qas: "executor.request.agent"
+  DELEGATION_RESPONSE_MESSAGE_TYPE:
+    dev: "agent.step.status"
+    qas: "agent.step.status"
+  REGISTRY_URL:
+    dev: "https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com"
+  WORKFLOW_CONTROL_PLANE_URL:
+    dev: "https://smdg-ai-dev-ai-workflow-control-plane-dev.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-ai-workflow-control-plane-dev.cfapps.br10.hana.ondemand.com"
+  WORKFLOW_CONTROL_PLANE_TIMEOUT_SECONDS:
+    dev: "30"
+    qas: "30"
+  TARGET_TOPIC:
+    dev: "business.topic"
+    qas: "business.topic"
+  SOURCE:
+    dev: "agent"
+    qas: "agent"
+  # Durable transactional outbox (agent-sdk). The SDK enables it automatically once
+  # HANA_HOST/HANA_USERNAME/HANA_PASSWORD resolve (typically from a bound HANA service
+  # via VCAP): it persists status/delegation events, replays unpublished rows on startup,
+  # and retries them every OUTBOX_FLUSH_INTERVAL_SECONDS. Bind a HANA service to this app
+  # to turn it on in dev/qas (tracked as the rollout step of this ticket).
+  OUTBOX_FLUSH_INTERVAL_SECONDS:
+    dev: "30"
+    qas: "30"
+
+services:
+  dev:
+    - simplemdg-event-core-2
+    - smdg-ai-agent-schema-db
+    # - <hana-service-instance>   # bind to enable the durable outbox in dev (see env note above)

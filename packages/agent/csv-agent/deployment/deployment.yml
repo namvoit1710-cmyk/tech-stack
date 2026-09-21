@@ -1,0 +1,145 @@
+name: csv-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 512M
+  qas: 512M 
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+
+  SERVER_PORT:
+    dev: 8036
+    qas: 8036
+
+  APP_NAME:
+    dev: "CSV Agent"
+    qas: "CSV Agent"
+
+  AGENT_TYPE:
+    dev: "csv-agent"
+    qas: "csv-agent"
+
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+
+  AGENT_KIND:
+    dev: "TECHNICAL"
+    qas: "TECHNICAL"
+
+  IS_PUBLISHED:
+    dev: "true"
+    qas: "true"
+
+  DESCRIPTION:
+    dev: "CSV File transformation, template editing, node file import, read-only CSV data query, CSV/JSON conversion, CSV file generation, and file version recovery engine. This agent edits CSV file content, performs row and column operations, fills template values, toggles UI properties, maps data between tables and fields, imports uploaded CSV files into workflow node, queries CSV file data through read-only OData, converts CSV to JSON, converts JSON to CSV, creates CSV files from natural-language instructions, and uses conversation-aware file change history to resolve follow-up file requests. It tracks file versions created by earlier edits so requests to revert, roll back, restore the previous file version, or undo the last file change are routed here. It outputs either a file result for edits/conversions/version recovery requests, read-only data query results, or a workflow node input update result. Example prompts: \"Fill description data for me\", \"Map table ADR6 to field ADDRNUMBER\", \"Show the first 10 rows\", \"Filter rows where status is active\", \"Convert this JSON to CSV\", \"Convert this CSV to JSON\", \"Create a CSV file with sample customer data\", \"Add new row\", \"Delete column\", \"Revert to the previous file version\", \"Undo the last file change\", \"Import this uploaded CSV file into the fields\", \"Attach this CSV file to node input\"."
+    qas: "CSV File transformation, template editing, node file import, read-only CSV data query, CSV/JSON conversion, CSV file generation, and file version recovery engine. This agent edits CSV file content, performs row and column operations, fills template values, toggles UI properties, maps data between tables and fields, imports uploaded CSV files into workflow node, queries CSV file data through read-only OData, converts CSV to JSON, converts JSON to CSV, creates CSV files from natural-language instructions, and uses conversation-aware file change history to resolve follow-up file requests. It tracks file versions created by earlier edits so requests to revert, roll back, restore the previous file version, or undo the last file change are routed here. It outputs either a file result for edits/conversions/version recovery requests, read-only data query results, or a workflow node input update result. Example prompts: \"Fill description data for me\", \"Map table ADR6 to field ADDRNUMBER\", \"Show the first 10 rows\", \"Filter rows where status is active\", \"Convert this JSON to CSV\", \"Convert this CSV to JSON\", \"Create a CSV file with sample customer data\", \"Add new row\", \"Delete column\", \"Revert to the previous file version\", \"Undo the last file change\", \"Import this uploaded CSV file into the fields\", \"Attach this CSV file to node input\"."
+
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com
+
+  LLM_MODEL:
+    dev: "gpt-4o-mini"
+    qas: "gpt-4o-mini"
+    
+  REQUEST_TIMEOUT_SECONDS:
+    dev: "60"
+    qas: "60"
+
+  FILE_URL:
+    dev: "https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com"
+
+  FILE_SERVICE_UPLOAD_URL:
+    dev: "https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com/api/v1/upload"
+    qas: "https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com/api/v1/upload"
+  
+  SCHEMA_TRANSFORM_QUERY_DATA_URL:
+    dev: "https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com/api/v1/odata/{file_id}/data"
+    qas: "https://smdg-ai-dev-file-service-dev.cfapps.br10.hana.ondemand.com/api/v1/odata/{file_id}/data"
+
+  DATA_FACTORY_URL:
+    dev: "https://smdg-ai-dev-data-factory-dev.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-data-factory-dev.cfapps.br10.hana.ondemand.com"
+
+  DATA_FACTORY_MCP_TRANSPORT:
+    dev: "streamable-http"
+    qas: "streamable-http"
+
+  WORKFLOW_API_BASE_URL:
+    dev: "https://smdg-ai-dev-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com"
+
+  QUEUE_REQUEST_TOPIC:
+    dev: "executor.request.csv"
+    qas: "executor.request.csv"
+
+  QUEUE_REPLY_TOPIC:
+    dev: "agent.reply.executor"
+    qas: "agent.reply.executor"
+
+  QUEUE_REQUEST_MESSAGE_TYPE:
+    dev: "executor.request.agent"
+    qas: "executor.request.agent"
+
+  QUEUE_RESPONSE_MESSAGE_TYPE:
+    dev: "agent.step.status"
+    qas: "agent.step.status"
+
+  EVENT_MESH_REQUEST_TOPIC:
+    dev: "executor.request.csv"
+    qas: "executor.request.csv"
+
+  EVENT_MESH_REPLY_TOPIC:
+    dev: "agent.reply.executor"
+    qas: "agent.reply.executor"
+
+  CAPABILITIES:
+    dev: '["csv_content_editing","row_column_manipulation","data_value_injection","field_mapping_logic","attribute_toggling","template_input_csv_import","workflow_node_input_update","read_only_csv_query","odata_file_query","csv_to_json_conversion","json_to_csv_conversion","csv_file_generation","data_factory_mcp_transformation","csv_change_history_tracking","csv_version_tracking","csv_revert_restore"]'
+    qas: '["csv_content_editing","row_column_manipulation","data_value_injection","field_mapping_logic","attribute_toggling","template_input_csv_import","workflow_node_input_update","read_only_csv_query","odata_file_query","csv_to_json_conversion","json_to_csv_conversion","csv_file_generation","data_factory_mcp_transformation","csv_change_history_tracking","csv_version_tracking","csv_revert_restore"]'
+
+  INPUT_SCHEMA:
+    dev: '{"type":"object","properties":{"message":{"type":"string","description":"User instruction describing the CSV modification, conversion, data query, file generation, revert, or node import request"},"file_id":{"type":"string","description":"ID of the file to modify/query/convert, or uploaded file identifier for node import operations. Required for existing-file operations."},"json_data":{"description":"JSON string or object to convert to CSV"},"filename":{"type":"string","description":"Desired output filename for generated or converted CSV files"},"odata_query":{"type":"string","description":"Optional read-only OData query for querying file rows"},"run_id":{"type":"string","description":"Workflow run identifier for node import operations"},"node_id":{"type":"string","description":"Workflow node identifier for node import operations"},"target_field":{"type":"string","description":"Optional workflow node input field to assign the uploaded CSV file to"},"conversation_history":{"type":"array","description":"Optional previous turns used for follow-up file requests and revert resolution"}},"required":["message"]}'
+    qas: '{"type":"object","properties":{"message":{"type":"string","description":"User instruction describing the CSV modification, conversion, data query, file generation, revert, or node import request"},"file_id":{"type":"string","description":"ID of the file to modify/query/convert, or uploaded file identifier for node import operations. Required for existing-file operations."},"json_data":{"description":"JSON string or object to convert to CSV"},"filename":{"type":"string","description":"Desired output filename for generated or converted CSV files"},"odata_query":{"type":"string","description":"Optional read-only OData query for querying file rows"},"run_id":{"type":"string","description":"Workflow run identifier for node import operations"},"node_id":{"type":"string","description":"Workflow node identifier for node import operations"},"target_field":{"type":"string","description":"Optional workflow node input field to assign the uploaded CSV file to"},"conversation_history":{"type":"array","description":"Optional previous turns used for follow-up file requests and revert resolution"}},"required":["message"]}'
+
+  OUTPUT_SCHEMA:
+    dev: '{"type":"object","properties":{"success":{"type":"boolean"},"message":{"type":"string"},"file_id":{"type":"string"},"final_file_id":{"type":"string"},"download_url":{"type":"string"},"modified_file_url":{"type":"string"},"changes_summary":{"type":"string"},"row_count":{"type":"integer"},"data":{"type":"array"},"odata_query":{"type":"string"},"read_only":{"type":"boolean"},"workflow_node_updated":{"type":"boolean"},"run_id":{"type":"string"},"node_id":{"type":"string"},"step_results":{"type":"array"},"summary":{"type":"string"},"error":{"type":"object"}}}'
+    qas: '{"type":"object","properties":{"success":{"type":"boolean"},"message":{"type":"string"},"file_id":{"type":"string"},"final_file_id":{"type":"string"},"download_url":{"type":"string"},"modified_file_url":{"type":"string"},"changes_summary":{"type":"string"},"row_count":{"type":"integer"},"data":{"type":"array"},"odata_query":{"type":"string"},"read_only":{"type":"boolean"},"workflow_node_updated":{"type":"boolean"},"run_id":{"type":"string"},"node_id":{"type":"string"},"step_results":{"type":"array"},"summary":{"type":"string"},"error":{"type":"object"}}}'
+
+  REQUIRED_PARAMETERS:
+    dev: '["message"]'
+    qas: '["message"]'
+
+  NEGATIVE_EXAMPLES:
+    dev: '["extract data only from a PDF","what is this workflow","explain this concept","answer my question","summarize this document","search the knowledge base","classify this text"]'
+    qas: '["extract data only from a PDF","what is this workflow","explain this concept","answer my question","summarize this document","search the knowledge base","classify this text"]'
+
+  REQUIRED_CONFIRMATION:
+    dev: "true"
+    qas: "true"
+
+  ROUTING_TIMEOUT_SECONDS:
+    dev: "180.0"
+    qas: "180.0"
+
+services:
+  wio-workflow-control-plane-db

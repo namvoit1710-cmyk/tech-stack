@@ -1,0 +1,88 @@
+name: file-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8005
+    qas: 8005
+  APP_NAME:
+    dev: "File Agent"
+    qas: "File Agent"
+  AGENT_TYPE:
+    dev: "file"
+    qas: "file"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  AGENT_DOMAIN:
+    dev: "file"
+    qas: "file"
+  DESCRIPTION:
+      dev: "File transformation, template editing, node file import, and file version recovery engine. This agent edits file content, performs row and column operations, fills template values, toggles UI properties, maps data between tables and fields, imports uploaded files into workflow node, and uses conversation-aware file change history to resolve follow-up file requests. It tracks file versions created by earlier edits so requests to revert, roll back, restore the previous file version, or undo the last file change are routed here. It outputs either a file result for edits and version recovery requests or a workflow node input update result. Example prompts: Fill description data for me, Map table ADR6 to field ADDRNUMBER, Add new row, Delete column, Revert to the previous file version, Undo the last file change, Import this uploaded file into the fields, Attach this file to table or node input."
+      qas: "File transformation, template editing, node file import, and file version recovery engine. This agent edits file content, performs row and column operations, fills template values, toggles UI properties, maps data between tables and fields, imports uploaded files into workflow node, and uses conversation-aware file change history to resolve follow-up file requests. It tracks file versions created by earlier edits so requests to revert, roll back, restore the previous file version, or undo the last file change are routed here. It outputs either a file result for edits and version recovery requests or a workflow node input update result. Example prompts: Fill description data for me, Map table ADR6 to field ADDRNUMBER, Add new row, Delete column, Revert to the previous file version, Undo the last file change, Import this uploaded file into the fields, Attach this file to table or node input."
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-registry-qas.cfapps.br10.hana.ondemand.com
+  OPENAI_MODEL:
+    dev: "gpt-4o-mini"
+    qas: "gpt-4o-mini"
+  LLM_MODEL:
+    dev: "gpt-5.4-nano"
+    qas: "gpt-5.4-nano"
+  OPENAI_TEMPERATURE:
+    dev: "0.01"
+    qas: "0.01"
+  FILE_URL:
+    dev: https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+  DATA_FACTORY_URL:
+    dev: https://smdg-ai-dev-data-factory-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-data-factory-qas.cfapps.br10.hana.ondemand.com
+  WORKFLOW_API_BASE_URL:
+    dev: https://smdg-ai-dev-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-control-plane-qas.cfapps.br10.hana.ondemand.com
+  ROUTING_TIMEOUT_SECONDS:
+    dev: "180.0"
+    qas: "180.0"
+  GOVERNAMENT_API_BASE_URL:
+    dev: https://smdg-ai-dev-governance-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-governance-qas.cfapps.br10.hana.ondemand.com
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "file.topic"
+    qas: "file.topic"
+  EVENT_MESH_MESSAGING_PROTOCOL:
+    dev: "httprest"
+    qas: "httprest"
+  # Management API (queue/subscription provisioning) lives on hub-backend, not pubsub.
+  EVENT_MESH_MANAGEMENT_URL:
+    dev: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_MESSAGING_URL:
+    dev: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"

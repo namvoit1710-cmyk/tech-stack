@@ -1,0 +1,2 @@
+-e ../../ai-workflow-management/agent/agent-sdk
+httpx==0.28.1

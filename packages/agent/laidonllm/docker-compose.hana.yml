@@ -1,0 +1,34 @@
+# LaidonLLM — SAP HANA deployment (SA-1488)
+#
+# Runs the LaidonLLM proxy against SAP HANA with DB_BACKEND=hana instead of the
+# Prisma/PostgreSQL path. The image built from this repo already includes the
+# SAP HANA client (`hdbcli`, declared in pyproject.toml / uv.lock and installed
+# by the Dockerfile's `uv sync`). Provide HANA_* via a .env file or the shell.
+#
+#   HANA_HOST=... HANA_USER=... HANA_PASSWORD=... docker compose -f docker-compose.hana.yml up --build
+services:
+  laidonllm:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.non_root
+    image: laidonllm:hana
+    ports:
+      - "4000:4000"
+    environment:
+      DB_BACKEND: "hana"                      # <-- select the SAP HANA persistence backend
+      HANA_HOST: "${HANA_HOST:?set HANA_HOST}"
+      HANA_PORT: "${HANA_PORT:-443}"
+      HANA_USER: "${HANA_USER:?set HANA_USER}"
+      HANA_PASSWORD: "${HANA_PASSWORD:?set HANA_PASSWORD}"
+      HANA_SCHEMA: "${HANA_SCHEMA:-LAIDONLLM}"
+      HANA_ENCRYPT: "${HANA_ENCRYPT:-true}"
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-sk-1234}"
+      PYTHONUTF8: "1"
+    volumes:
+      - ./proxy_server_config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4000/health/readiness"]
+      interval: 30s
+      timeout: 5s
+      retries: 5

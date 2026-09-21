@@ -1,0 +1,119 @@
+@startuml
+title 05 — Conversation History & Queries
+
+' ─────────────────────────────────────────────────────────────────────
+' Covers the three ways a user can interact with past conversations:
+'
+'   SCENARIO A — List all conversations
+'     Returns a paginated list of conversations with titles.
+'
+'   SCENARIO B — Read a single conversation's full timeline
+'     Returns every message and event for that conversation,
+'     in chronological order.
+'
+'   SCENARIO C — Reopen a paused conversation
+'     Some conversations are paused mid-workflow (the chat input
+'     is disabled while a Business Agent is working). The user
+'     can request to continue — the Orchestrator checks whether
+'     confirmation is needed first.
+' ─────────────────────────────────────────────────────────────────────
+
+hide footbox
+autonumber "<b>[00]"
+
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam wrapWidth 260
+skinparam maxMessageSize 260
+skinparam shadowing false
+skinparam roundcorner 8
+
+skinparam sequence {
+  ArrowColor        #2D6A9F
+  ArrowFontColor    #2D6A9F
+  ArrowFontSize     11
+
+  LifeLineBorderColor         #2D6A9F
+  LifeLineBackgroundColor     #EAF3FB
+
+  ParticipantBorderColor      #2D6A9F
+  ParticipantBackgroundColor  #DAEAF7
+  ParticipantFontColor        #1A3A52
+  ParticipantFontSize         12
+  ParticipantFontStyle        bold
+  ParticipantPadding          8
+  ParticipantBorderThickness  1.5
+
+  ActorBorderColor            #1A3A52
+  ActorBackgroundColor        #B8D6EE
+  ActorFontColor              #1A3A52
+  ActorFontSize               12
+  ActorFontStyle              bold
+
+  GroupBorderColor            #5A9ABF
+  GroupBackgroundColor        #F0F7FC
+  GroupHeaderFontColor        #1A3A52
+  GroupHeaderFontSize         12
+  GroupBorderThickness        1.2
+
+  NoteBackgroundColor         #FFF8DC
+  NoteBorderColor             #C8A800
+  NoteFontColor               #4A3800
+  NoteFontSize                11
+}
+
+skinparam shadowing false
+skinparam roundcorner 8
+
+' ─── Participants ────────────────────────────────────────────────────
+actor       User  as "User / UI"
+participant Orch  as "Orchestrator"
+database    DB    as "HANA DB"
+
+' ─────────────────────────────────────────────────────────────────────
+alt #EAF6EA Scenario A — List all conversations
+
+  User -> Orch : GET /conversations\n(optional: page size, page number)
+  activate Orch
+
+  Orch -> DB : get the most recent event for each conversation\n(one row per conversation, ordered newest first)
+  DB --> Orch : latest event rows
+
+  Orch -> DB : load the saved conversation titles\nfor those conversation IDs
+  DB --> Orch : title map
+
+  note over Orch
+    If a conversation has an AI-generated title (from the strategy
+    summary in Diagram 02), that is used. Otherwise the Orchestrator
+    falls back to the first message text or "Untitled conversation".
+  end note
+
+  Orch --> User : paginated list — conversation ID, title, timestamp
+
+  deactivate Orch
+
+else #EAF0FA Scenario B — Read a single conversation's full timeline
+
+  User -> Orch : GET /conversations/{id}/messages
+  activate Orch
+
+  Orch -> DB : get all message and event records for this conversation,\nordered from oldest to newest
+  DB --> Orch : full ordered timeline
+
+  note over Orch
+    The timeline is reconstructed from two sources in HANA DB:
+    • A "timeline node" projection — one row per UI payload (e.g. form,
+      button group, text bubble), always showing the latest version of
+      each item. This handles the case where a form was updated after
+      the user submitted it.
+    • Raw event records — used as a fallback if the timeline table has
+      no rows for this conversation.
+  end note
+
+  Orch --> User : ordered message history
+
+  deactivate Orch
+
+end
+
+@enduml

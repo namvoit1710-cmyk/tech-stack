@@ -1,0 +1,19 @@
+[run]
+source = app
+omit =
+    */tests/*
+    */agent_sdk/*
+    app/layer4_frameworks/dependency/*
+    app/layer4_frameworks/providers/*
+    app/layer4_frameworks/graph/*
+    app/layer4_frameworks/config/*
+    app/layer4_frameworks/tools/*
+
+[report]
+show_missing = True
+skip_covered = True
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    if __name__ == .__main__.:
+    raise NotImplementedError

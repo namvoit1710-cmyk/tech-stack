@@ -1,0 +1,196 @@
+@startuml class_diagram_v2_from_mermaid
+left to right direction
+skinparam classAttributeIconSize 0
+
+package "Layer 1 Domain" {
+  class ExecutionPlan {
+    +goal : str
+    +steps : List<ExecutionStep>
+    +workflow_id : str
+    +to_dict() : dict
+    +from_dict(data) : ExecutionPlan
+  }
+
+  class ExecutionStep {
+    +order : int
+    +tool : str
+    +input : dict
+    +reason : str
+  }
+
+  class CSVExecutionResult {
+    +success : bool
+    +step_results : List<StepResult>
+    +final_file_id : str
+    +error : str
+    +summary : str
+    +to_dict() : dict
+    +from_dict(data) : CSVExecutionResult
+  }
+
+  class StepResult {
+    +order : int
+    +tool : str
+    +success : bool
+    +result : dict
+    +error : str
+  }
+
+  class FileState {
+    +message : str
+    +parameters : dict
+    +tool_catalog : list
+    +execution_plan : dict
+    +execution_result : dict
+    +is_reviewed : bool
+  }
+}
+
+package "Layer 2 Application" {
+  class MainFlow {
+    +register_main_flow(graph)
+  }
+
+  class PlanNode {
+    +plan_node(state, deps) : dict
+  }
+
+  class ExecuteNode {
+    +execute_node(state, deps) : dict
+  }
+
+  class ReviewNode {
+    +review_node(state) : dict
+  }
+
+  class UseCaseRegistry {
+    +register_usecase(name, instance)
+    +get_usecase(name)
+    +load_all_usecases(ioc_container, logger)
+  }
+
+  class PlanUseCase {
+    +execute(input_dto) : PlanOutputDto
+    -_build_system_prompt(tool_catalog) : str
+    -_build_user_prompt(input_dto) : str
+    -_create_fallback_plan(input_dto) : dict
+  }
+
+  class ReviewUseCase {
+    +execute(input_dto) : ReviewOutputDto
+  }
+
+  class TransformColumnTool {
+    +transform_column(long_input, file_id) : dict
+  }
+
+  class TransformRowTool {
+    +transform_row(long_input, file_id) : dict
+  }
+
+  class TransformColumnFeature {
+    +transform_column(long_input, file_id, llm_service) : dict
+  }
+
+  class TransformRowFeature {
+    +transform_row(long_input, file_id, llm_service) : dict
+  }
+
+  class InternalFeatureSet {
+    +convert_csv_to_json(...)
+    +convert_json_to_csv(...)
+    +get_header(...)
+    +revert_file(...)
+    +create_file(...)
+    +import_file_to_node(...)
+  }
+
+  class MCPDataFactoryTools {
+    +validate_file_mcp(...) : dict
+    +transform_file_mcp(...) : dict
+    +inspect_file_mcp(...) : dict
+    +list_rule_sets_mcp() : dict
+    +transform_rows_mcp(...) : dict
+    -_call_mcp_tool(tool_name, arguments) : dict
+  }
+}
+
+package "Layer 4 Frameworks" {
+  class Bootstrap {
+    +build_app_container() : dict
+  }
+
+  class IOCContainer {
+    +build_tools() : list
+    +build_dependencies() : dict
+  }
+
+  class ToolRegistry {
+    +scan_all_tools(root_package) : list
+    -_iter_tool_modules() : list
+    -_wrap_marked_tool_functions() : list
+  }
+
+  class GraphBuilderFW {
+    +build_graph(deps, checkpointer, builder_factory)
+    -_compile_graph(register_graph, deps, checkpointer, builder_factory)
+  }
+
+  class OpenAILLMProvider {
+    +get_chat_completion(...)
+    +get_structured_completion(...)
+  }
+
+  class HttpFileProvider {
+    +download_file(file_id) : bytes
+    +upload_file(content, filename, content_type) : dict
+  }
+}
+
+package "External Services" {
+  class OpenAIService {
+    +get_chat_completion(...)
+  }
+}
+
+Bootstrap --> IOCContainer : build deps/tools
+Bootstrap --> GraphBuilderFW : build graph
+IOCContainer --> ToolRegistry : scan tools
+IOCContainer --> UseCaseRegistry : register usecases
+UseCaseRegistry --> PlanUseCase : create/register
+UseCaseRegistry --> ReviewUseCase : create/register
+IOCContainer --> OpenAILLMProvider : llm_service
+IOCContainer --> OpenAIService : openai_service
+IOCContainer --> HttpFileProvider : file_service
+
+GraphBuilderFW --> MainFlow : register flow
+MainFlow --> PlanNode
+MainFlow --> ExecuteNode
+MainFlow --> ReviewNode
+
+PlanNode --> PlanUseCase
+PlanUseCase --> OpenAIService : optional call
+ExecuteNode --> ExecutionPlan : from_dict()
+ExecuteNode --> CSVExecutionResult : build result
+ReviewNode --> ReviewUseCase
+ReviewUseCase --> CSVExecutionResult
+
+ExecutionPlan *-- ExecutionStep
+CSVExecutionResult *-- StepResult
+
+ExecuteNode --> TransformColumnTool : call by name
+ExecuteNode --> TransformRowTool : call by name
+ExecuteNode --> MCPDataFactoryTools : call by name
+ExecuteNode --> InternalFeatureSet : via wrappers
+
+TransformColumnTool --> TransformColumnFeature : wrapper call
+TransformRowTool --> TransformRowFeature : wrapper call
+
+TransformColumnFeature --> MCPDataFactoryTools : MCP transform
+TransformRowFeature --> MCPDataFactoryTools : MCP transform
+TransformColumnFeature --> OpenAILLMProvider : LLM prompt/plan
+TransformRowFeature --> OpenAILLMProvider : LLM prompt/plan
+
+MCPDataFactoryTools --> MCPDataFactoryTools : _call_mcp_tool()
+
+@enduml

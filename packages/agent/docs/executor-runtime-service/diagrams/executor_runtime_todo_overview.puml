@@ -1,0 +1,215 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam maxMessageSize 90
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+
+skinparam sequence {
+  ArrowColor #374151
+  ArrowThickness 1
+  LifeLineBorderColor #CBD5E1
+  LifeLineBackgroundColor #FFFFFF
+
+  ParticipantBorderColor #475569
+  ParticipantBackgroundColor #F8FAFC
+  ParticipantFontColor #111827
+
+  ActorBorderColor #475569
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+
+  BoxBorderColor #CBD5E1
+  BoxFontColor #111827
+  BoxFontStyle bold
+
+  GroupBorderColor #CBD5E1
+  GroupBackgroundColor #F9FAFB
+  GroupFontColor #111827
+}
+
+skinparam note {
+  BackgroundColor #F9FAFB
+  BorderColor #CBD5E1
+  FontColor #111827
+}
+
+title Executor Runtime Service - Planned Runtime Overview
+autonumber
+
+box "Upstream" #F8FAFC
+actor "Business Agent" as BusinessAgent
+end box
+
+box "Messaging" #F8FAFC
+queue "SAP Event Mesh Request Topic" as EventMeshRequestTopic
+queue "Technical Agent Request Topic" as TechnicalAgentRequestTopic
+queue "Technical Agent Result Topic" as TechnicalAgentResultTopic
+queue "SAP Event Mesh Status Topic" as EventMeshStatusTopic
+queue "DLQ" as DeadLetterQueue
+end box
+
+box "Executor Runtime Service" #EFF6FF
+participant "Executor Runtime\nConsumer" as ExecutorConsumer
+participant "Step Batch\nValidator" as StepBatchValidator
+participant "Dispatch Step\nUse Case" as DispatchStepUseCase
+participant "Outbox Relay" as OutboxRelay
+participant "Retry Scheduler" as RetryScheduler
+end box
+
+box "Persistence / Recovery" #F8FAFC
+database "Inbox Store" as InboxStore
+database "Execution Store" as ExecutionStore
+database "Correlation Store" as CorrelationStore
+database "Outbox Repository" as OutboxRepository
+database "HANA DB" as HanaDb
+end box
+
+box "Execution Targets" #F8FAFC
+participant "Technical Agent" as TechnicalAgent
+end box
+
+box "Downstream" #F8FAFC
+actor "Business Agent /\nOrchestrator" as StatusConsumer
+end box
+
+note over ExecutorConsumer,HanaDb #FEF3C7
+TODO / WARNING:
+This diagram shows planned behavior only.
+All dashed arrows represent target-state behavior, not current implementation.
+end note
+
+BusinessAgent --> EventMeshRequestTopic: Publish agent.request.executor
+EventMeshRequestTopic --> ExecutorConsumer: Deliver raw envelope
+
+group Durable ingest and dedupe
+ExecutorConsumer --> InboxStore: Persist inbound envelope + idempotency keys
+InboxStore --> HanaDb: Store inbox row
+ExecutorConsumer --> ExecutionStore: Create batch/step execution records
+ExecutionStore --> HanaDb: Store RECEIVED or READY state
+alt Duplicate inbound request
+ExecutionStore --> ExecutorConsumer: Existing execution found
+ExecutorConsumer --> OutboxRepository: Reuse stored terminal status or skip duplicate
+else New inbound request
+ExecutorConsumer --> StepBatchValidator: Validate persisted request
+alt Poison message or malformed payload
+ExecutorConsumer --> DeadLetterQueue: Reject to DLQ
+note over DeadLetterQueue #FEE2E2
+TARGET FAILURE:
+Poison message or malformed payload is routed to DLQ.
+end note
+else Validation failure
+ExecutorConsumer --> OutboxRepository: Write validation-failure executor.step.status
+note over OutboxRepository #FEF3C7
+TODO / WARNING:
+Durable outbox persistence for validation-failure status.
+end note
+else Valid batch
+StepBatchValidator --> ExecutorConsumer: Validated StepBatchRequest
+ExecutorConsumer --> ExecutionStore: Mark step states READY
+end
+end
+end
+
+group Outbox-backed publishing
+ExecutorConsumer --> OutboxRepository: Write pending status/delegation events
+OutboxRepository --> HanaDb: Commit outbox rows with execution state
+OutboxRelay --> OutboxRepository: Poll unpublished rows
+alt Status event row
+OutboxRelay --> EventMeshStatusTopic: Publish executor.step.status
+EventMeshStatusTopic --> StatusConsumer: Deliver status event
+note over OutboxRelay #DCFCE7
+TARGET SUCCESS:
+Status can be recovered and replayed after crash.
+end note
+else Delegated request row
+OutboxRelay --> TechnicalAgentRequestTopic: Publish executor.request.agent
+end
+note over OutboxRelay #FEF3C7
+TODO / WARNING:
+Use a durable outbox so broker outages do not lose
+status updates or delegated requests.
+end note
+end
+
+group Parallel scheduling and dispatch
+RetryScheduler --> ExecutionStore: Claim READY or RETRYING steps
+note over RetryScheduler,ExecutionStore #FEF3C7
+TODO / WARNING:
+Run independent steps in parallel.
+Current code still processes steps sequentially in the consumer loop.
+end note
+par Local tool step
+RetryScheduler --> DispatchStepUseCase: Dispatch claimed local step
+DispatchStepUseCase --> ExecutionStore: Mark RUNNING_LOCAL_TOOL
+DispatchStepUseCase --> OutboxRepository: Queue processing status if required and Technical agent step
+RetryScheduler --> DispatchStepUseCase: Dispatch claimed delegated step
+DispatchStepUseCase --> ExecutionStore: Mark WAITING_TECHNICAL_AGENT
+DispatchStepUseCase --> CorrelationStore: Persist correlation_id -> step_execution_id
+CorrelationStore --> HanaDb: Store active waiting correlation
+DispatchStepUseCase --> OutboxRepository: Write executor.request.agent row
+end
+end
+
+group Delegated reply handling and recovery
+TechnicalAgent --> TechnicalAgentResultTopic: Publish agent.step.status
+TechnicalAgentResultTopic --> ExecutorConsumer: Deliver delegated reply
+ExecutorConsumer --> CorrelationStore: Resolve correlation_id
+alt First valid terminal reply
+CorrelationStore --> ExecutorConsumer: Matching waiting step
+ExecutorConsumer --> ExecutionStore: Mark delegated step COMPLETED or FAILED
+ExecutorConsumer --> OutboxRepository: Write executor.step.status row
+else Late duplicate or orphan reply
+CorrelationStore --> ExecutorConsumer: RESOLVED / TIMED_OUT / missing
+ExecutorConsumer --> InboxStore: Record response inbox tombstone
+note over ExecutorConsumer,CorrelationStore #FEF3C7
+TODO / WARNING:
+Keep correlation tombstones long enough to suppress
+duplicate or late delegated replies after retries or crash recovery.
+end note
+end
+
+opt Crash recovery / replay
+RetryScheduler --> ExecutionStore: Reload RUNNING_LOCAL_TOOL leases, WAITING_TECHNICAL_AGENT, unpublished outbox rows
+RetryScheduler --> CorrelationStore: Reload active waiting correlations
+RetryScheduler --> OutboxRepository: Republish unpublished rows through Outbox Relay
+note over RetryScheduler,OutboxRepository #DCFCE7
+TARGET SUCCESS:
+Persisted outbox and waiting-state recovery support replay after crash.
+end note
+end
+end
+
+group Retry, timeout, and poison-message controls
+alt Local tool or delegated execution times out
+RetryScheduler --> ExecutionStore: Mark attempt TIMED_OUT
+RetryScheduler --> OutboxRepository: Queue timeout status or retry event
+else Transient publish or transport failure
+RetryScheduler --> OutboxRepository: Requeue delegated request/status for retry with backoff
+else Retry budget exhausted
+RetryScheduler --> ExecutionStore: Mark terminal failure
+RetryScheduler --> DeadLetterQueue: Route poison or terminal infrastructure failure
+note over RetryScheduler,DeadLetterQueue #FEE2E2
+TARGET FAILURE:
+Repeated publish failure or exhausted retry budget routes work to DLQ.
+end note
+end
+note over RetryScheduler,DeadLetterQueue #FEF3C7
+TODO / WARNING:
+Add retry backoff, DLQ handling, duplicate protection,
+and recovery after crash.
+end note
+end
+
+legend right
+  |= Color |= Meaning |
+  |<#DCFCE7>| Success / implemented happy path |
+  |<#FEF3C7>| TODO / warning / unclear |
+  |<#FEE2E2>| Error / failure path |
+  |<#EFF6FF>| Executor Runtime Service boundary |
+  |<#F8FAFC>| External systems / queues / DB |
+endlegend
+
+@enduml

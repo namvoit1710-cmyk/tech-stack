@@ -1,0 +1,69 @@
+name: ai-workflow-base-agent
+image: ai-workflow-base-agent:latest
+routePrefix: smdg-ai-dev-ai-workflow-base-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "SERVER"
+    qas: "SERVER"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 36000
+    qas: 36000
+  APP_NAME:
+    dev: "Base Agent"
+    qas: "Base Agent"
+  AGENT_TYPE:
+    dev: "base"
+    qas: "base"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  AGENT_DOMAIN:
+    dev: "blueprints"
+    qas: "blueprints"
+  DESCRIPTION:
+      dev: "Reusable Python agent blueprint with clean layers and SDK integration."
+      qas: "Reusable Python agent blueprint with clean layers and SDK integration."
+  CAPABILITIES:
+    dev: '["base"]'
+    qas: '["base"]'
+  INPUT_SCHEMA:
+    dev: '{}'
+    qas: '{}'
+  OUTPUT_SCHEMA:
+    dev: '{}'
+    qas: '{}'
+  REQUIRED_PARAMETERS:
+    dev: '["message"]'
+    qas: '["message"]'
+  NEGATIVE_EXAMPLES:
+    dev: '["negative"]'
+    qas: '["negative"]'
+  REQUIRED_CONFIRMATION:
+    dev: "true"
+    qas: "true"
+  ROUTING_TIMEOUT_SECONDS:
+    dev: "180.0"
+    qas: "180.0"
+
+services:
+  wio-workflow-control-plane-db
+
+skipDeploy: true

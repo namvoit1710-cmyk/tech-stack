@@ -1,0 +1,145 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam maxMessageSize 90
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+
+skinparam sequence {
+  ArrowColor #374151
+  ArrowThickness 1
+  LifeLineBorderColor #CBD5E1
+  LifeLineBackgroundColor #FFFFFF
+
+  ParticipantBorderColor #475569
+  ParticipantBackgroundColor #F8FAFC
+  ParticipantFontColor #111827
+
+  ActorBorderColor #475569
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+
+  BoxBorderColor #CBD5E1
+  BoxFontColor #111827
+  BoxFontStyle bold
+
+  GroupBorderColor #CBD5E1
+  GroupBackgroundColor #F9FAFB
+  GroupFontColor #111827
+}
+
+skinparam note {
+  BackgroundColor #F9FAFB
+  BorderColor #CBD5E1
+  FontColor #111827
+}
+
+title Executor Runtime Service - Current Shared Runtime Flow
+autonumber
+
+box "Upstream" #F8FAFC
+actor "Business Agent" as BusinessAgent
+end box
+
+box "Messaging" #F8FAFC
+queue "Executor Request Topic" as ExecutorRequestTopic
+queue "Executor Status Topic" as ExecutorStatusTopic
+end box
+
+box "Executor Runtime Service" #EFF6FF
+participant "Executor Runtime\nConsumer" as ExecutorConsumer
+participant "Step Batch\nValidator" as StepBatchValidator
+participant "Dispatch Step\nUse Case" as DispatchStepUseCase
+participant "Status\nPublisher" as StatusPublisher
+end box
+
+box "Downstream" #F8FAFC
+actor "Business Agent /\nOrchestrator" as StatusConsumer
+end box
+
+BusinessAgent -> ExecutorRequestTopic: Publish agent.request.executor
+ExecutorRequestTopic -> ExecutorConsumer: Deliver raw envelope
+
+group Validation
+ExecutorConsumer -> StepBatchValidator: validate_step_batch(payload)
+alt Invalid envelope or missing required fields
+StepBatchValidator --> ExecutorConsumer: ValidationError
+note over ExecutorConsumer,StatusPublisher #FEE2E2
+ERROR:
+Validation failure is best-effort in the current MVP.
+The handler reconstructs step status from the raw payload when possible.
+end note
+ExecutorConsumer -> StatusPublisher: publish executor.step.status(error)
+alt Direct status publish succeeds
+StatusPublisher -> ExecutorStatusTopic: Publish validation error status
+ExecutorStatusTopic -> StatusConsumer: Deliver error status
+else Direct status publish fails
+StatusPublisher --> ExecutorConsumer: Log publish failure only
+note over StatusPublisher #FEE2E2
+ERROR:
+DirectStepStatusPublisher swallows broker publish errors.
+There is no outbox or automatic retry in the current code.
+end note
+end
+else Valid step batch
+StepBatchValidator --> ExecutorConsumer: StepBatchRequest
+note over StepBatchValidator #FEF3C7
+WARNING:
+Supported execute_by formats are only tool.<uuid> and agent.<uuid>.
+Unsupported values fail validation before dispatch.
+end note
+
+loop For each validated step
+group Publish processing status
+ExecutorConsumer -> StatusPublisher: publish executor.step.status(processing)
+alt Direct status publish succeeds
+StatusPublisher -> ExecutorStatusTopic: Publish processing status
+ExecutorStatusTopic -> StatusConsumer: Deliver processing status
+else Direct status publish fails
+StatusPublisher --> ExecutorConsumer: Log publish failure only
+end
+end
+
+group Dispatch overview
+ExecutorConsumer -> DispatchStepUseCase: dispatch(DispatchStepRequest)
+alt execute_by = tool.<uuid> - local tool path
+note over DispatchStepUseCase #FEF3C7
+WARNING:
+Branch-specific local execution is documented in
+executor_runtime_current_local_tool_flow.puml
+end note
+DispatchStepUseCase --> ExecutorConsumer: StepResult(success|error)
+else execute_by = agent.<uuid> - agent delegation path
+note over DispatchStepUseCase #FEF3C7
+WARNING:
+Branch-specific delegated execution is documented in
+executor_runtime_current_agent_flow.puml
+end note
+DispatchStepUseCase --> ExecutorConsumer: StepResult(success|error)
+end
+end
+
+group Publish terminal status
+ExecutorConsumer -> StatusPublisher: publish executor.step.status(success|error)
+alt Direct status publish succeeds
+StatusPublisher -> ExecutorStatusTopic: Publish terminal status
+ExecutorStatusTopic -> StatusConsumer: Deliver terminal status
+else Direct status publish fails
+StatusPublisher --> ExecutorConsumer: Log publish failure only
+end
+end
+end
+end
+
+legend right
+  |= Color |= Meaning |
+  |<#DCFCE7>| Success / implemented happy path |
+  |<#FEF3C7>| TODO / warning / unclear |
+  |<#FEE2E2>| Error / failure path |
+  |<#EFF6FF>| Executor Runtime Service boundary |
+  |<#F8FAFC>| External systems / queues / DB |
+endlegend
+
+@enduml

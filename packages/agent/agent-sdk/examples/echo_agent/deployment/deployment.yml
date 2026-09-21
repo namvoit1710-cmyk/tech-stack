@@ -1,0 +1,75 @@
+name: echo-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../../../agent-sdk
+  mcp: ../../../../../../../libs/mcp/python
+
+memory:
+  dev: 256M
+  qas: 256M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8050
+    qas: 8050
+  APP_NAME:
+    dev: "Echo Agent"
+    qas: "Echo Agent"
+  AGENT_TYPE:
+    dev: "echo-agent"
+    qas: "echo-agent"
+  AGENT_DOMAIN:
+    dev: "technical"
+    qas: "technical"
+  DESCRIPTION:
+    dev: "Echoes the user message back. Useful for testing multi-agent pipelines."
+    qas: "Echoes the user message back. Useful for testing multi-agent pipelines."
+  INPUT_SCHEMA:
+    dev: "{'type':'object','properties':{'message':{'type':'string','description':'User message to echo back'}},'required':['message']}"
+    qas: "{'type':'object','properties':{'message':{'type':'string','description':'User message to echo back'}},'required':['message']}"
+  OUTPUT_SCHEMA:
+    dev: "{'type':'object','properties':{'message':{'type':'string'}}}"
+    qas: "{'type':'object','properties':{'message':{'type':'string'}}}"
+  REQUIRED_PARAMETERS:
+    dev: "['message']"
+    qas: "['message']"
+  NEGATIVE_EXAMPLES:
+    dev: "['user needs actual work done, not just echoing']"
+    qas: "['user needs actual work done, not just echoing']"
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  CONSUMER_MAX_IN_FLIGHT_MESSAGES:
+    dev: "3"
+    qas: "3"
+  LLM_MODEL:
+    dev: "gpt-4o-mini"
+    qas: "gpt-4o-mini"
+  REGISTRY_URL:
+    dev: "https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-qas-agent-registry.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_REQUEST_TOPIC:
+    dev: "executor.request.echo"
+    qas: "executor.request.echo"
+  EVENT_MESH_REPLY_TOPIC:
+    dev: "agent.reply.executor"
+    qas: "agent.reply.executor"
+  QUEUE_REQUEST_MESSAGE_TYPE:
+    dev: "executor.request.agent"
+    qas: "executor.request.agent"
+  QUEUE_RESPONSE_MESSAGE_TYPE:
+    dev: "agent.step.status"
+    qas: "agent.step.status"

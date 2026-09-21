@@ -1,0 +1,86 @@
+name: laidonllm
+# Build context = the laidonllm app root (vendored LiteLLM + the HANA backend).
+buildContext: ..
+
+# LiteLLM proxy + (pre-built, static) Admin UI + HANA persistence.
+# 1024M is sufficient — proven to boot healthy on HANA (/health/readiness 200,
+# db=connected) — and conserves org memory quota. Bump if concurrent load grows.
+memory:
+  dev: 1024M
+  qas: 1024M
+
+disk:
+  dev: 4096M
+  qas: 4096M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  # --- Persistence backend (SA-1488): SAP HANA replaces Prisma/Postgres ---
+  DB_BACKEND:
+    dev: "hana"
+    qas: "hana"
+  STORE_MODEL_IN_DB:
+    dev: "true"
+    qas: "true"
+  # Non-secret HANA tuning. Connection SECRETS (HANA_HOST/USER/PASSWORD/SCHEMA)
+  # and LITELLM_MASTER_KEY are NOT committed here — they come from the bound HANA
+  # service (VCAP_SERVICES) or `cf set-env`. See deployment/README.md.
+  HANA_ENCRYPT:
+    dev: "true"
+    qas: "true"
+
+  # --- LiteLLM proxy ---
+  LITELLM_CONFIG_PATH:
+    dev: "/app/config.yaml"
+    qas: "/app/config.yaml"
+  LITELLM_MODE:
+    dev: "PRODUCTION"
+    qas: "PRODUCTION"
+  LITELLM_NUM_WORKERS:
+    dev: "1"
+    qas: "2"
+
+  # Trust the CF gorouter's X-Forwarded-* headers.
+  #
+  # uvicorn only honours X-Forwarded-Proto from peers listed in forwarded_allow_ips,
+  # which defaults to 127.0.0.1. The gorouter is not 127.0.0.1, so the header was
+  # ignored and the app believed it was serving plain http. Every /ui/<route> then
+  # emitted an absolute redirect to http://... :
+  #
+  #   GET /ui/teams -> 307  location: http://smdg-ai-tenant-1-laidonllm.../ui/teams/
+  #
+  # HSTS hides this from browsers that have already visited the host (they silently
+  # upgrade), so it goes unnoticed - but a first-time browser, an incognito window,
+  # curl, or a service-to-service caller follows the http:// hop literally.
+  #
+  # '*' is the standard CF setting: the container is only reachable through the
+  # gorouter, and CF publishes no stable router IP range to narrow this to. Residual
+  # risk is limited to spoofable X-Forwarded-For values in logs for anyone already
+  # inside the internal network - no data or authorization impact.
+  #
+  # litellm's CLI never sets forwarded_allow_ips (see proxy_cli.py: uvicorn_args),
+  # so this env var is the intended knob - uvicorn reads FORWARDED_ALLOW_IPS itself.
+  FORWARDED_ALLOW_IPS:
+    dev: "*"
+    qas: "*"
+
+  # UTF-8 (HANA banner + logs render cleanly)
+  PYTHONUTF8:
+    dev: "1"
+    qas: "1"
+  PYTHONIOENCODING:
+    dev: "utf-8"
+    qas: "utf-8"
+
+# CF service bindings. Bind the HANA (HDI/SQL) instance so its credentials arrive
+# in VCAP_SERVICES; cf_entrypoint.sh maps them to HANA_HOST/PORT/USER/PASSWORD/SCHEMA.
+# Replace <hana-service-instance> with the real instance name in each space, or
+# provide the HANA_* vars via `cf set-env` instead (see deployment/README.md).
+services:
+  dev:
+    - smdg-ai-laidonllm-db
+  qas:
+    - smdg-ai-laidonllm-db

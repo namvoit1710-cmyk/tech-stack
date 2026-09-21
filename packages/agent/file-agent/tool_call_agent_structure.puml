@@ -1,0 +1,42 @@
+@startuml
+title plan_execute_nodes.py - Execution Flow
+
+skinparam sequenceArrowThickness 1
+skinparam participantPadding 18
+skinparam boxPadding 10
+
+actor User
+participant "Plan Node" as PlanNode
+participant "Tool Catalog" as Catalog
+participant "LLM Planner" as AI
+participant "Plan Validator" as Validator
+participant "Step Executor" as Executor
+participant "Reference Resolver" as Resolver
+participant "Tool Runner" as Runner
+participant "Friendly Writer" as Writer
+
+User -> PlanNode: request state
+PlanNode -> Catalog: build tool catalog from registry
+PlanNode -> AI: create execution plan
+AI --> PlanNode: JSON plan
+PlanNode -> PlanNode: parse JSON payload
+PlanNode -> Validator: validate plan and references
+Validator --> PlanNode: valid or error
+PlanNode -> Executor: run ordered steps
+
+loop for each step
+    Executor -> Resolver: resolve step inputs
+    Resolver --> Executor: resolved input
+    Executor -> Runner: call selected tool
+    Runner --> Executor: tool output
+    Executor -> Executor: store output and step result
+    alt step failure
+        Executor -> Executor: stop early
+    end
+end
+
+Executor --> PlanNode: execution summary
+PlanNode -> Writer: rewrite summary as friendly JSON
+Writer --> PlanNode: friendly message
+PlanNode --> User: formatted response
+@enduml

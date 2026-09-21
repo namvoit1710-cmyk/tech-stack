@@ -1,0 +1,108 @@
+@startuml
+title 01 — User Message Acceptance
+
+' ─────────────────────────────────────────────────────────────────────
+' What happens when the user sends a message.
+' The Orchestrator saves the message, then immediately returns
+' 202 Accepted. Planning happens in the background — see Diagram 04.
+'
+' Key concept — why queue to itself?
+'   The Orchestrator is both a REST server (answers HTTP requests) and
+'   a background worker (processes planning jobs from the queue).
+'   By placing the planning job on the queue before replying, the
+'   REST response stays instant. The background worker picks the job
+'   up and starts planning without the user waiting.
+'
+' Safety and input checks (Diagram 10) run as the very first step
+' of the background planning flow, NOT here.
+' ─────────────────────────────────────────────────────────────────────
+
+hide footbox
+autonumber "<b>[00]"
+
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam wrapWidth 260
+skinparam maxMessageSize 260
+skinparam shadowing false
+skinparam roundcorner 8
+
+skinparam sequence {
+  ArrowColor        #2D6A9F
+  ArrowFontColor    #2D6A9F
+  ArrowFontSize     11
+
+  LifeLineBorderColor         #2D6A9F
+  LifeLineBackgroundColor     #EAF3FB
+
+  ParticipantBorderColor      #2D6A9F
+  ParticipantBackgroundColor  #DAEAF7
+  ParticipantFontColor        #1A3A52
+  ParticipantFontSize         12
+  ParticipantFontStyle        bold
+  ParticipantPadding          8
+  ParticipantBorderThickness  1.5
+
+  ActorBorderColor            #1A3A52
+  ActorBackgroundColor        #B8D6EE
+  ActorFontColor              #1A3A52
+  ActorFontSize               12
+  ActorFontStyle              bold
+
+  GroupBorderColor            #5A9ABF
+  GroupBackgroundColor        #F0F7FC
+  GroupHeaderFontColor        #1A3A52
+  GroupHeaderFontSize         12
+  GroupBorderThickness        1.2
+
+  NoteBackgroundColor         #FFF8DC
+  NoteBorderColor             #C8A800
+  NoteFontColor               #4A3800
+  NoteFontSize                11
+}
+
+skinparam shadowing false
+skinparam roundcorner 8
+
+' ─── Participants ────────────────────────────────────────────────────
+actor       User as "User / UI"
+participant Orch as "Orchestrator"
+database    DB   as "HANA DB"
+queue       Q    as "Agent Queue"
+
+' ─── Flow ────────────────────────────────────────────────────────────
+User -> Orch : POST /orchestrate/async\n(message text, conversation_id?, file_ids[])
+activate Orch
+
+Orch -> DB : look up this conversation_id — does it exist?
+DB --> Orch : found | not found
+
+alt #FFF4E5 New conversation — no conversation_id provided
+  Orch -> DB : create a new conversation record\n+ save the message and any uploaded file references
+  DB --> Orch : new conversation_id assigned
+
+else #EAF6EA Existing conversation — conversation_id was provided
+  Orch -> DB : append this message to the conversation history\n+ update the "current message" pointer
+  DB --> Orch : updated
+end
+
+note over Orch, Q
+  The Orchestrator now places a "begin planning" job on its own
+  internal queue channel (Orchestrator Topic). Its own background
+  worker will pick this up and run the full planning flow.
+
+  This is intentional — it means this REST call can return 202
+  immediately without making the user wait for AI planning to finish.
+
+  Safety checks (permission + message validation) run at the start
+  of planning, not here. See Diagram 06 — Guardrails & Error Handling.
+  Planning flow detail is in Diagram 02 — Planning & Task Routing.
+end note
+
+Orch -> Q : place "begin planning" job\non the Orchestrator's own queue channel
+Q --> Orch : accepted
+
+Orch --> User : 202 Accepted  { conversation_id }
+deactivate Orch
+
+@enduml

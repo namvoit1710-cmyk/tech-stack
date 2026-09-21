@@ -19,9 +19,10 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 | **Data Factory Platform** | High-Throughput Migration Engine, Polars SIMD Vectorized, Adaptive Batching (cgroups v1/v2), 126+ Rule Difficulty Router, SAP Delivery Tables | 📖 [Xem Tài Liệu](./docs/data-factory/) |
 | **Worker SDK (Package)** | Thư viện phát triển Workflow Workers (Server, Pull, Headless modes, gRPC/REST, Streaming I/O) | 📦 [Xem Mã Nguồn](./packages/worker-sdk/) |
 | **Agent SDK (Package)** | Thư viện phát triển Autonomous AI Agents (LangGraph, SAP HANA Checkpointing, HITL, Context Compaction) | 📦 [Xem Mã Nguồn](./packages/agent-sdk/) |
+| **Agent Registry (Package)** | Dịch vụ đăng ký, quản lý danh mục và điều phối quyền truy cập Agent (Agent Catalog, Capabilities, Discovery, RBAC) | 📦 [Xem Mã Nguồn](./packages/agent-registry/) |
+| **AI Agent Ecosystem (Package)** | Trọn bộ hệ sinh thái AI Agents (Orchestrator, Domain Agents, Runtime Service, LaidonLLM Gateway, Agent SDK, Agent Registry) | 📦 [Xem Mã Nguồn](./packages/agent/) |
 | **Eagle Platform Core (Package)** | Bộ đôi Smart Service SDK & Governance Smart API phát hiện trùng lặp dữ liệu và phân tích hóa chất SDS | 📦 [Xem Mã Nguồn](./packages/eagle/) |
 | **Data Factory Core (Package)** | Nền tảng di trú, chuẩn hóa và kiểm tra dữ liệu lớn (Migration, Validation, Transformation, Schema Mapping) | 📦 [Xem Mã Nguồn](./packages/data-factory/) |
-| **Agent Registry (Package)** | Dịch vụ đăng ký, quản lý danh mục và điều phối quyền truy cập Agent (Agent Catalog, Capabilities, Discovery, RBAC) | 📦 [Xem Mã Nguồn](./packages/agent-registry/) |
 | **AI Workflow Management (Package)** | Nền tảng điều phối quy trình AI cốt lõi (Workflow Control Plane Service, Worker Executor Service, 15+ Workers) | 📦 [Xem Mã Nguồn](./packages/ai-workflow-management/) |
 | *(Mở Rộng Trong Tương Lai)* | *Knowledge Graph Engine, SAP Integration Engine...* | *(Đang cập nhật)* |
 
@@ -31,6 +32,12 @@ Chào mừng bạn đến với **Tech-Stack Knowledge Hub**. Đây là nơi t�
 
 Toàn bộ mã nguồn phát triển chính thức của các SDK và gói dịch vụ lõi hiện đã được đưa vào thư mục [`packages/`](./packages/):
 
+- 🧠 **[`packages/agent/`](./packages/agent/):** Trọn bộ hệ sinh thái **AI Agent Ecosystem** bao gồm:
+  - `orchestrator`: Bộ điều phối trung tâm Supervisor điều hướng đa tác nhân, 6 tầng xử lý, Dynamic Agent Discovery.
+  - `laidonllm`: Cổng Gateway trừu tượng hóa mô hình AI đa nhà cung cấp (LiteLLM fork, load balancing, tenant billing, fallback).
+  - `executor-runtime-service`: Môi trường runtime thực thi các tác nhân AI và LangGraph workflows.
+  - Các Domain Agents chuyên biệt: `workflow-designer-agent`, `governance-schema-agent`, `validation-rule-agent`, `profile-manager-agent`, `file-agent`, `csv-agent`, `troubleshooting-agent`, `business-agent`.
+  - Bộ SDK và Registry: `agent-sdk`, `agent-registry`, `base-agent`, `business-agent-builder`.
 - ⚙️ **[`packages/ai-workflow-management/`](./packages/ai-workflow-management/):** Trọn bộ nền tảng điều phối quy trình **AI Workflow Management** gồm:
   - `workflow-control-plane-service`: Bộ máy điều phối trung tâm (FastAPI, Socket.IO, gRPC, 21 node types, Uniform Execution, Streaming I/O).
   - `worker-executor-service`: Dịch vụ điều phối và quản lý vòng đời Worker.

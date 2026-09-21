@@ -1,0 +1,139 @@
+@startuml
+title 02 — Planning & Task Routing
+
+' ─────────────────────────────────────────────────────────────────────
+' Triggered when the Orchestrator's background worker picks up
+' the "begin planning" job that was queued in Diagram 01.
+'
+' The Orchestrator first checks if the conversation is a sub-conversation
+' (tied to a specific active Business Agent). 
+'   - If YES: it skips planning and dispatches directly to the agent.
+'   - If NO: it runs safety checks, discovers agents, plans tasks, 
+'     and then dispatches.
+'
+' Next: Diagram 05 — Business Agent Execution & Result Handling
+' Errors: Diagram 10 — Guardrails & Error Handling
+' ─────────────────────────────────────────────────────────────────────
+
+hide footbox
+autonumber "<b>[00]"
+
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam wrapWidth 260
+skinparam maxMessageSize 260
+skinparam shadowing false
+skinparam roundcorner 8
+
+skinparam sequence {
+  ArrowColor        #2D6A9F
+  ArrowFontColor    #2D6A9F
+  ArrowFontSize     11
+
+  LifeLineBorderColor         #2D6A9F
+  LifeLineBackgroundColor     #EAF3FB
+
+  ParticipantBorderColor      #2D6A9F
+  ParticipantBackgroundColor  #DAEAF7
+  ParticipantFontColor        #1A3A52
+  ParticipantFontSize         12
+  ParticipantFontStyle        bold
+  ParticipantPadding          8
+  ParticipantBorderThickness  1.5
+
+  GroupBorderColor            #5A9ABF
+  GroupBackgroundColor        #F0F7FC
+  GroupHeaderFontColor        #1A3A52
+  GroupHeaderFontSize         12
+  GroupBorderThickness        1.2
+
+  NoteBackgroundColor         #FFF8DC
+  NoteBorderColor             #C8A800
+  NoteFontColor               #4A3800
+  NoteFontSize                11
+}
+
+' ─── Participants ────────────────────────────────────────────────────
+participant Orch     as "Orchestrator\n(background worker)"
+database    DB       as "HANA DB"
+participant Registry as "Agent Registry"
+queue       Q        as "Agent Queue"
+participant Push     as "Push Gateway"
+
+' ─── Entry ───────────────────────────────────────────────────────────
+note over Orch
+  The background worker has just picked up a "begin planning"
+  job from the Orchestrator's own queue channel.
+end note
+
+' ─── Routing Check ───────────────────────────────────────────────────
+Orch -> DB : get conversation shared state\n(Check for main_conv_id)
+DB --> Orch : shared state metadata
+
+alt #EAF0FA Sub-Conversation (Active Business Agent session)
+
+  note over Orch
+    This conversation is tied to an active Business Agent 
+    (main_conv_id is present). Skip validation/planning and 
+    forward directly to the agent queue.
+  end note
+  
+  Orch -> Q : publish "sub:user:chat" event to Agent Topic\n(Assigned Business Agent resumes its workflow)
+  Q --> Orch : acknowledged
+
+else #EAF6EA Main Conversation (New Request or Base Thread)
+
+  Orch -> Push : send "I received your request\nand am working on it..." to user
+
+  ' ─── Validation ──────────────────────────────────────────────────────
+  note over Orch
+    Before any planning begins, the Orchestrator runs two checks:
+    (1) Does this user have permission to use the system?
+    (2) Is the message content safe and within policy?
+  end note
+
+  Orch -> Orch : [Validation] check user permission\n+ check message content safety
+
+  alt #FDF3F3 Blocked — permission denied or message rejected
+    Orch -> Push : send error response to user\n(see Diagram 06 for error codes)
+
+  else #EAF6EA Allowed — proceed with planning
+
+    ' ─── Agent Discovery ───────────────────────────────────────────────
+    Orch -> Registry : fetch all active, published Business Agents\n(with their names, capabilities, and workflows)
+    Registry --> Orch : list of available agents
+
+    ' ─── AI Planning ───────────────────────────────────────────────────
+    note over Orch
+      The Orchestrator calls its built-in AI (LLM) twice:
+
+      [AI call 1 — Strategy]
+      Produces a plain-language summary of the goal
+      and a short title for this conversation.
+
+      [AI call 2 — Task Breakdown]
+      Breaks strategy into a concrete list of tasks,
+      assigning each to the best-matching Business Agent.
+    end note
+
+    Orch -> Orch : [AI call 1] analyse request\nand produce an execution strategy
+    Orch -> DB   : save conversation title\n(derived from the strategy summary)
+
+    Orch -> Orch : [AI call 2] break strategy into tasks;\nassign each task to a Business Agent
+
+    Orch -> DB   : save full task plan\n(task list, agent assignments, order, dependencies)
+
+    ' ─── Dispatch ──────────────────────────────────────────────────────
+    alt #EAF6EA At least one task was produced
+      Orch -> DB : save user message as a conversation event
+      Orch -> Q  : publish "conversation.plan.created" to Agent Topic\n(the assigned Business Agent will pick this up)
+      Orch -> Push : send progress update to user\n"Working on your request..."
+
+    else #FFF4E5 No tasks could be produced
+      Orch -> Push : send "Your request is not currently\nsupported — please try rephrasing"
+    end
+
+  end
+end
+
+@enduml

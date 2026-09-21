@@ -1,0 +1,89 @@
+name: business-agent
+buildContext: ..
+# Sibling/external local deps installed from requirements.txt, exposed as named
+# Docker build contexts (consumed by `COPY --from=<name>` in the Dockerfile):
+#   agent-sdk -> the editable dep `-e ../../agent/agent-sdk`
+#   mcp       -> agent-sdk's nested dep `simplemdg-mcp @ file:../../../../libs/mcp/python`
+# Paths are resolved relative to this deployment/ directory.
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 512M
+  qas: 1024M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVICE_PORT:
+    dev: 8005
+    qas: 8005
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  CONSUMER_MAX_IN_FLIGHT_MESSAGES:
+    dev: "1"
+    qas: "1"
+  PUSH_GATEWAY_TRANSPORT:
+    dev: "http"
+    qas: "http"
+  PUSH_GATEWAY_BUFFER_ENABLED:
+    dev: "false"
+    qas: "false"
+  PUSH_GATEWAY_URL:
+    dev: "https://smdg-ai-dev-push-gateway-dev.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-qas-push-gateway-qas.cfapps.br10.hana.ondemand.com"
+  LLM_MODEL:
+    dev: "gpt-4o"
+    qas: "gpt-4o"
+  AGENT_HUB_API_URL:
+    dev: "https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-qas-agent-registry.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "business.topic,workflow.topic"
+    qas: "business.topic,workflow.topic"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"
+  KAFKA_CONSUME_TOPICS:
+    dev: "business.topic,workflow.topic"
+    qas: "business.topic,workflow.topic"
+  CONSUMER_MAX_IN_FLIGHT_MESSAGES:
+    dev: "1"
+    qas: "1"
+  RAG_API_URL:
+    dev: "https://smdg-ai-dev-hana-rag-service.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-hana-rag-service.cfapps.br10.hana.ondemand.com"
+  RAG_RETRIEVAL_QUERY_PATH:
+    dev: "/api/v1/retrieval/query"
+    qas: "/api/v1/retrieval/query"
+  RAG_TOP_K:
+    dev: "3"
+    qas: "3"
+  WORKFLOW_API_URL:
+    dev: "https://smdg-ai-dev-ai-workflow-control-plane-dev.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-ai-workflow-control-plane-qas.cfapps.br10.hana.ondemand.com"
+  EXECUTOR_TOPIC:
+    dev: "executor.topic"
+    qas: "executor.topic"
+  BUSINESS_TOPIC:
+    dev: "business.topic"
+    qas: "business.topic"
+  RAG_TENANT_ID:
+    dev: "local-dev-tenant"
+    qas: "local-qas-tenant"
+  FILE_CLIENT_URL:
+    dev: "https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com"

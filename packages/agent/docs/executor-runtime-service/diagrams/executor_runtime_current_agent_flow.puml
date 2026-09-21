@@ -1,0 +1,162 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam maxMessageSize 90
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+
+skinparam sequence {
+  ArrowColor #374151
+  ArrowThickness 1
+  LifeLineBorderColor #CBD5E1
+  LifeLineBackgroundColor #FFFFFF
+
+  ParticipantBorderColor #475569
+  ParticipantBackgroundColor #F8FAFC
+  ParticipantFontColor #111827
+
+  ActorBorderColor #475569
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+
+  BoxBorderColor #CBD5E1
+  BoxFontColor #111827
+  BoxFontStyle bold
+
+  GroupBorderColor #CBD5E1
+  GroupBackgroundColor #F9FAFB
+  GroupFontColor #111827
+}
+
+skinparam note {
+  BackgroundColor #F9FAFB
+  BorderColor #CBD5E1
+  FontColor #111827
+}
+
+title Executor Runtime Service - Current Delegated Agent Flow
+autonumber
+
+box "Executor Runtime Service" #EFF6FF
+participant "Dispatch Step\nUse Case" as DispatchStepUseCase
+participant "Capability\nResolver" as CapabilityResolver
+participant "TechnicalAgentStepExecutor" as TechnicalAgentStepExecutor
+participant "AgentReplyWaiter" as AgentReplyWaiter
+participant "Technical Agent\nReply Handler" as TechnicalAgentReplyHandler
+end box
+
+box "Messaging" #F8FAFC
+queue "Technical Agent Request Topic" as TechnicalAgentRequestTopic
+queue "Technical Agent Result Topic" as TechnicalAgentResultTopic
+end box
+
+box "Execution Targets" #F8FAFC
+participant "AsyncAgent\nDelegator" as AsyncAgentDelegator
+participant "Technical Agent" as TechnicalAgent
+end box
+
+box "External Systems" #F8FAFC
+participant "Agent Registry" as AgentRegistry
+end box
+
+box "Downstream" #F8FAFC
+participant "Dispatch Step\nResult" as DispatchStepResult
+end box
+
+group Dispatch delegated agent step
+note over DispatchStepUseCase #FEF3C7
+WARNING:
+Entry point for this diagram:
+a validated agent.<uuid> step has already reached DispatchStepUseCase.
+Validation and status publishing are documented in
+executor_runtime_current_shared_flow.puml
+end note
+
+DispatchStepUseCase -> CapabilityResolver: resolve(step.execute_by)
+CapabilityResolver -> AgentRegistry: Lookup agent metadata + queue metadata
+AgentRegistry --> CapabilityResolver: ResolvedCapability(TECHNICAL_AGENT) or None
+
+alt Registry lookup failed
+CapabilityResolver --> DispatchStepUseCase: None
+DispatchStepUseCase --> DispatchStepResult: StepResult(error: capability not found)
+else Capability disabled
+CapabilityResolver --> DispatchStepUseCase: ResolvedCapability(enabled=false)
+DispatchStepUseCase --> DispatchStepResult: StepResult(error: capability disabled)
+else TECHNICAL_AGENT capability resolved
+CapabilityResolver --> DispatchStepUseCase: ResolvedCapability(TECHNICAL_AGENT)
+DispatchStepUseCase -> TechnicalAgentStepExecutor: execute(request, capability)
+note over TechnicalAgentStepExecutor #FEF3C7
+WARNING:
+TechnicalAgentStepExecutor builds AgentCallRequest, generates a delegated
+correlation_id, and captures executor context metadata.
+end note
+TechnicalAgentStepExecutor -> AgentReplyWaiter: register(delegated correlation_id)
+
+alt Delegation fails before wait
+TechnicalAgentStepExecutor -> AsyncAgentDelegator: delegate(agent_call)
+AsyncAgentDelegator --> TechnicalAgentStepExecutor: Exception
+TechnicalAgentStepExecutor --> DispatchStepUseCase: StepResult(error)
+DispatchStepUseCase --> DispatchStepResult: StepResult(error)
+note over TechnicalAgentStepExecutor,AsyncAgentDelegator #FEE2E2
+ERROR:
+Delegation failed before a terminal reply could be awaited.
+end note
+else Delegation published
+TechnicalAgentStepExecutor -> AsyncAgentDelegator: delegate(agent_call)
+AsyncAgentDelegator -> TechnicalAgentRequestTopic: Publish executor.request.agent
+TechnicalAgentRequestTopic -> TechnicalAgent: Deliver delegated request
+TechnicalAgent -> TechnicalAgentResultTopic: Publish agent.step.status
+TechnicalAgentResultTopic -> TechnicalAgentReplyHandler: Deliver reply
+
+alt Non-terminal reply
+TechnicalAgentReplyHandler --> AgentReplyWaiter: Ignore processing/running/in_progress/interrupted
+note over TechnicalAgentReplyHandler #FEF3C7
+WARNING:
+Non-terminal delegated replies are ignored and do not resolve the waiter.
+end note
+else Unknown correlation_id
+TechnicalAgentReplyHandler --> AgentReplyWaiter: resolve(...) = false
+note over TechnicalAgentReplyHandler #FEE2E2
+ERROR:
+Replies for unknown correlation IDs are logged and ignored.
+end note
+else Terminal reply with known correlation_id
+TechnicalAgentReplyHandler -> AgentReplyWaiter: resolve(correlation_id, payload)
+alt Reply normalization yields success
+AgentReplyWaiter --> TechnicalAgentStepExecutor: reply payload
+TechnicalAgentStepExecutor --> DispatchStepUseCase: StepResult(success, output)
+DispatchStepUseCase --> DispatchStepResult: StepResult(success)
+note over AsyncAgentDelegator,TechnicalAgent #DCFCE7
+SUCCESS:
+Delegated agent call completed and produced a correlated result.
+end note
+else Reply normalization yields error
+AgentReplyWaiter --> TechnicalAgentStepExecutor: reply payload
+TechnicalAgentStepExecutor --> DispatchStepUseCase: StepResult(error)
+DispatchStepUseCase --> DispatchStepResult: StepResult(error)
+end
+else Reply timeout
+AgentReplyWaiter --> TechnicalAgentStepExecutor: TimeoutError
+TechnicalAgentStepExecutor --> DispatchStepUseCase: StepResult(error)
+DispatchStepUseCase --> DispatchStepResult: StepResult(error)
+note over AgentReplyWaiter,TechnicalAgentStepExecutor #FEE2E2
+ERROR:
+No terminal delegated reply arrived before timeout.
+end note
+end
+end
+end
+end
+
+legend right
+  |= Color |= Meaning |
+  |<#DCFCE7>| Success / implemented happy path |
+  |<#FEF3C7>| TODO / warning / unclear |
+  |<#FEE2E2>| Error / failure path |
+  |<#EFF6FF>| Executor Runtime Service boundary |
+  |<#F8FAFC>| External systems / queues / DB |
+endlegend
+
+@enduml

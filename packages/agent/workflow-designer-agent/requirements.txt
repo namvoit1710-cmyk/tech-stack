@@ -1,0 +1,15 @@
+-e ../../agent/agent-sdk
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.12.0
+PyJWT>=2.8.0
+langgraph>=0.0.30
+httpx>=0.25.0
+openai>=1.6.0
+hdbcli>=2.18.0
+sqlalchemy>=2.0.0
+sqlalchemy-hana>=2.0.0
+confluent-kafka>=2.3.0
+pytest-cov
+pytest-asyncio>=0.23.0

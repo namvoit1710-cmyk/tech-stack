@@ -1,0 +1,87 @@
+name: agent-orchestrator
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 512M
+  qas: 1024M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8005
+    qas: 8005
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "orchestrator.topic"
+    qas: "orchestrator.topic"
+  PUSH_GATEWAY_TRANSPORT:
+    dev: "grpc"
+    qas: "grpc"
+  PUSH_GATEWAY_URL:
+    dev: "https://smdg-ai-dev-push-gateway-dev.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-qas-push-gateway-qas.cfapps.br10.hana.ondemand.com"
+  PUSH_GATEWAY_TRANSPORT:
+    dev: "http"
+    qas: "http"
+  PUSH_GATEWAY_BUFFER_ENABLED:
+    dev: "false"
+    qas: "false"
+  LLM_MODEL:
+    dev: "gpt-4o-mini"
+    qas: "gpt-4o-mini"
+  AGENT_HUB_API_URL:
+    dev: "https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-qas-agent-registry.cfapps.br10.hana.ondemand.com"
+  AGENT_REQUEST_TOPIC:
+    dev: "business.topic"
+    qas: "business.topic"
+  ORCHESTRATOR_REQUEST_TOPIC:
+    dev: "orchestrator.topic"
+    qas: "orchestrator.topic"
+  ORCHESTRATOR_EVENT_TYPE:
+    dev: "orchestrator_event"
+    qas: "orchestrator_event"
+  # SA-1948 — conversation-history compaction (reuses agent-sdk ContextBudgetManager).
+  # Values below are the code defaults; tune per environment. STRATEGY="none" disables it.
+  # NOTE: compaction requires LLM_MODEL to be set (fail-fast) — it is set above.
+  CONTEXT_COMPACTION_STRATEGY:
+    dev: "tiered"
+    qas: "tiered"
+  CONTEXT_MAX_TOTAL_TOKENS:
+    dev: 16000
+    qas: 16000
+  CONTEXT_COMPACTION_THRESHOLD:
+    dev: "0.80"
+    qas: "0.80"
+  CONTEXT_MAX_MESSAGE_HISTORY:
+    dev: 10
+    qas: 10
+  CONTEXT_AGGRESSIVE_THRESHOLD:
+    dev: "0.85"
+    qas: "0.85"
+  CONTEXT_DANGER_THRESHOLD:
+    dev: "0.95"
+    qas: "0.95"
+  # tiktoken token-count model only (budget estimate) — decoupled from LLM_MODEL so an
+  # exotic summarize model (e.g. gpt-5) can't break token counting. Keep tiktoken-known.
+  CONTEXT_TOKEN_COUNT_MODEL:
+    dev: "gpt-4o-mini"
+    qas: "gpt-4o-mini"
+

@@ -1,0 +1,124 @@
+@startuml
+title 06 — Guardrails & Error Handling
+
+' ─────────────────────────────────────────────────────────────────────
+' This diagram is referenced by Diagram 02 and Diagram 04.
+'
+' The Orchestrator applies three layers of protection on every
+' planning request, in this order:
+'
+'   Layer 1 — Permission check
+'     Is this user allowed to use the system at all?
+'
+'   Layer 2 — Input guard
+'     Is the message safe and within policy?
+'     Checks for prompt-injection attempts, blocked content patterns,
+'     and PII (email, phone, SSN, card numbers — masked, not rejected).
+'
+'   Layer 3 — Output guard
+'     Before the Business Agent's response is shown to the user,
+'     does it contain anything it shouldn't (secrets, credentials, PII)?
+'
+' Any layer that fails sends an error to the user and stops processing.
+'
+' Error code reference
+' ─────────────────────────────────────────────────────────────────────
+' ORCH_001  Could not understand the request — message was too unclear
+' ORCH_004  Business Agent response failed the output quality check
+' ORCH_005  User does not have permission to perform this action
+' ORCH_006  Message was flagged by the input safety check
+' ORCH_011  Request is not something the system can handle; try rephrasing
+' ORCH_003  Business Agent took too long to respond (timeout)
+' ORCH_009  Unexpected error occurred during processing
+' ─────────────────────────────────────────────────────────────────────
+
+hide footbox
+autonumber "<b>[00]"
+
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam wrapWidth 260
+skinparam maxMessageSize 260
+skinparam shadowing false
+skinparam roundcorner 8
+
+skinparam sequence {
+  ArrowColor        #2D6A9F
+  ArrowFontColor    #2D6A9F
+  ArrowFontSize     11
+
+  LifeLineBorderColor         #2D6A9F
+  LifeLineBackgroundColor     #EAF3FB
+
+  ParticipantBorderColor      #2D6A9F
+  ParticipantBackgroundColor  #DAEAF7
+  ParticipantFontColor        #1A3A52
+  ParticipantFontSize         12
+  ParticipantFontStyle        bold
+  ParticipantPadding          8
+  ParticipantBorderThickness  1.5
+
+  GroupBorderColor            #5A9ABF
+  GroupBackgroundColor        #F0F7FC
+  GroupHeaderFontColor        #1A3A52
+  GroupHeaderFontSize         12
+  GroupBorderThickness        1.2
+
+  NoteBackgroundColor         #FFF8DC
+  NoteBorderColor             #C8A800
+  NoteFontColor               #4A3800
+  NoteFontSize                11
+}
+
+skinparam shadowing false
+skinparam roundcorner 8
+
+' ─── Participants ────────────────────────────────────────────────────
+participant Orch as "Orchestrator"
+participant Push as "Push Gateway"
+database    DB   as "HANA DB"
+
+' ─── Entry ───────────────────────────────────────────────────────────
+note over Orch
+  Entry point: the background worker has picked up a "begin planning"
+  job and is about to start. These three checks always run first,
+  before any AI planning or Agent Registry calls happen.
+end note
+
+' ─── Layer 1 — Permission ────────────────────────────────────────────
+Orch -> Orch : [Layer 1 — Permission]\nIs this user allowed to use the system?
+
+alt #FDF3F3 Permission denied → ORCH_005
+  note right of Orch : User does not have permission\nfor this action.
+  Orch -> Push : send "You don't have permission\nto perform this action"\n(ORCH_005)
+
+else #EAF6EA Permission granted — move to Layer 2
+
+  ' ─── Layer 2 — Input Guard ─────────────────────────────────────────
+  Orch -> Orch : [Layer 2 — Input Guard]\nIs the message safe and within policy?\n\nChecks run in this order:\n  • Empty or over-length message\n  • Prompt injection attempt\n    (e.g. "ignore previous instructions")\n  • Blocked content pattern\n    (e.g. requests to generate malware)\n  • PII detection — emails, phones, card numbers\n    (masked and allowed through, not rejected)
+
+  alt #FDF3F3 Message blocked → ORCH_006
+    note right of Orch : Message matched a blocked pattern\nor a prompt injection attempt.
+    Orch -> Push : send "Your message was flagged\nby our safety system"\n(ORCH_006)
+
+  else #EAF6EA Message accepted (PII masked if found) — move to core processing
+
+    ' ─── Core Processing ───────────────────────────────────────────
+    Orch -> Orch : run planning, task dispatch, and workflow\n
+
+    ' ─── Layer 3 — Output Guard ────────────────────────────────────
+    Orch -> Orch : [Layer 3 — Output Guard]\nDoes the Business Agent's response\ncontain anything it should not?\n\nChecks run in this order:\n  • Required fields present (message + status)\n  • PII in output (masked before delivery)\n  • Secrets or credentials in output\n    (API keys, private keys, tokens)
+
+    alt #FDF3F3 Response blocked → ORCH_004
+      note right of Orch : Response contained policy-violating\ncontent or failed schema validation.
+      Orch -> Push : send "The response didn't pass quality\nchecks — please try again"\n(ORCH_004)
+
+    else #EAF6EA Response accepted — deliver to user
+      Orch -> DB   : save conversation state changes
+      Orch -> Push : send the (sanitised) response to user
+    end
+
+  end
+end
+
+@enduml

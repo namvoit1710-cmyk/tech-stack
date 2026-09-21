@@ -1,0 +1,12 @@
+# LaidonLLM proxy config for Cloud Foundry (SAP HANA persistence).
+# Models/keys/teams are managed at runtime via the Admin UI and persisted in HANA
+# (store_model_in_db: true), so model_list can be empty at boot.
+model_list: []
+
+general_settings:
+  store_model_in_db: true
+  # master_key comes from the LITELLM_MASTER_KEY env var (cf set-env) — never hardcode.
+
+litellm_settings:
+  drop_params: true
+  telemetry: false

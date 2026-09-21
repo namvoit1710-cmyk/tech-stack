@@ -1,0 +1,125 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam maxMessageSize 90
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+
+skinparam sequence {
+  ArrowColor #374151
+  ArrowThickness 1
+  LifeLineBorderColor #CBD5E1
+  LifeLineBackgroundColor #FFFFFF
+
+  ParticipantBorderColor #475569
+  ParticipantBackgroundColor #F8FAFC
+  ParticipantFontColor #111827
+
+  ActorBorderColor #475569
+  ActorBackgroundColor #F8FAFC
+  ActorFontColor #111827
+
+  BoxBorderColor #CBD5E1
+  BoxFontColor #111827
+  BoxFontStyle bold
+
+  GroupBorderColor #CBD5E1
+  GroupBackgroundColor #F9FAFB
+  GroupFontColor #111827
+}
+
+skinparam note {
+  BackgroundColor #F9FAFB
+  BorderColor #CBD5E1
+  FontColor #111827
+}
+
+title Executor Runtime Service - Current Local Tool Flow
+autonumber
+
+box "Executor Runtime Service" #EFF6FF
+participant "Dispatch Step\nUse Case" as DispatchStepUseCase
+participant "Capability\nResolver" as CapabilityResolver
+end box
+
+box "External Systems" #F8FAFC
+participant "Tool Registry" as ToolRegistry
+end box
+
+box "Execution Targets" #F8FAFC
+participant "Local Tool\nExecutor" as LocalToolExecutor
+participant "Workflow Control\nPlane" as WorkflowControlPlane
+end box
+
+box "Downstream" #F8FAFC
+participant "Dispatch Step\nResult" as DispatchStepResult
+end box
+
+group Dispatch local tool
+note over DispatchStepUseCase #FEF3C7
+WARNING:
+Entry point for this diagram:
+a validated tool.<uuid> step has already reached DispatchStepUseCase.
+Validation and status publishing are documented in
+executor_runtime_current_shared_flow.puml
+end note
+
+DispatchStepUseCase -> CapabilityResolver: resolve(step.execute_by)
+CapabilityResolver -> ToolRegistry: Lookup tool metadata via registry API
+ToolRegistry --> CapabilityResolver: ResolvedCapability(LOCAL_TOOL) or None
+
+alt Registry lookup failed
+CapabilityResolver --> DispatchStepUseCase: None
+DispatchStepUseCase --> DispatchStepResult: StepResult(error: capability not found)
+else Capability disabled
+CapabilityResolver --> DispatchStepUseCase: ResolvedCapability(enabled=false)
+DispatchStepUseCase --> DispatchStepResult: StepResult(error: capability disabled)
+else LOCAL_TOOL capability resolved
+CapabilityResolver --> DispatchStepUseCase: ResolvedCapability(LOCAL_TOOL)
+alt tool_name missing
+DispatchStepUseCase --> DispatchStepResult: StepResult(error: missing tool_name)
+note over DispatchStepUseCase #FEE2E2
+ERROR:
+Resolved LOCAL_TOOL capability has no usable tool_name.
+end note
+else Execute local tool
+DispatchStepUseCase -> LocalToolExecutor: execute(tool_name, step)
+opt Workflow tool calls control plane internally
+LocalToolExecutor -> WorkflowControlPlane: submit/start_run/patch_data
+WorkflowControlPlane --> LocalToolExecutor: Tool response
+note over WorkflowControlPlane #FEF3C7
+WARNING:
+Optional behavior for workflow-backed local tools.
+end note
+end
+alt Local tool execution succeeded
+LocalToolExecutor --> DispatchStepUseCase: StepResult(success, output)
+DispatchStepUseCase --> DispatchStepResult: StepResult(success)
+note over LocalToolExecutor #DCFCE7
+SUCCESS:
+Local tool execution completed and produced a step result.
+end note
+else Local tool execution failed
+LocalToolExecutor --> DispatchStepUseCase: StepResult(error)
+DispatchStepUseCase --> DispatchStepResult: StepResult(error)
+note over LocalToolExecutor #FEE2E2
+ERROR:
+Local tool execution failed and returned StepResult(error).
+end note
+end
+end
+end
+end
+
+legend right
+  |= Color |= Meaning |
+  |<#DCFCE7>| Success / implemented happy path |
+  |<#FEF3C7>| TODO / warning / unclear |
+  |<#FEE2E2>| Error / failure path |
+  |<#EFF6FF>| Executor Runtime Service boundary |
+  |<#F8FAFC>| External systems / queues / DB |
+endlegend
+
+@enduml

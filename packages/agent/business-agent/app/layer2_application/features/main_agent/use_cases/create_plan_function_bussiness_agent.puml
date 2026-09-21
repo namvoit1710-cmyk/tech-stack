@@ -1,0 +1,132 @@
+@startuml
+title Create Plan Function Sequence Diagram for Business Agent
+
+autonumber
+hide footbox
+
+skinparam responseMessageBelowArrow true
+skinparam sequenceMessageAlign center
+skinparam wrapWidth 220
+skinparam maxMessageSize 220
+
+participant Upstream as "Upstream Event Producer"
+queue AgentQueue as "Agent Queue"
+participant BA as "Business Agent"
+database ConversationDB as "Conversation DB"
+database BusinessDB as "Business DB"
+database ToolDB as "Tool DB"
+database SharedState as "Shared State"
+participant LLM as "LLM Planner"
+participant Hybrid as "Hybrid Planner"
+participant Rule as "Rule Planner"
+
+Upstream -> AgentQueue: event(type, conversation_id, payload)
+activate AgentQueue
+
+AgentQueue -> ConversationDB: resolve conversation_id
+ConversationDB --> AgentQueue: conversation record or missing
+
+alt conversation missing
+  AgentQueue -> AgentQueue: drop or log event
+else conversation found
+  alt child conversation
+    AgentQueue -> BA: route child event
+    activate BA
+
+    note right of BA
+      Child conversations stay on the queue bus.
+    end note
+
+    BA -> BusinessDB: load businesses
+    BusinessDB --> BA: business metadata
+    BA -> ToolDB: load available tools
+    ToolDB --> BA: tool metadata
+
+    alt type = sub:user:chat
+      BA -> SharedState: read intent, node type, node schema
+      SharedState --> BA: child conversation context
+      BA -> LLM: build step plan from context
+      LLM --> BA: step plan
+      BA -> SharedState: save plan to local state
+      BA -> AgentQueue: enqueue first step
+
+    else other child event
+      BA -> BA: return (unsupported child event)
+    end
+
+    deactivate BA
+
+  else parent conversation
+    AgentQueue -> BA: route parent event
+    activate BA
+
+    note right of BA
+      Only the Business Agent mutates shared state.
+    end note
+
+    BA -> BusinessDB: load businesses
+    BusinessDB --> BA: business metadata
+    BA -> ToolDB: load available tools
+    ToolDB --> BA: tool metadata
+
+    alt type = conversation.plan.created
+      BA -> SharedState: read task by conversation_id
+      SharedState --> BA: task row(s)
+      BA -> LLM: build task plan from business + tools + tasks
+      LLM --> BA: task plan
+      BA -> SharedState: store Task rows under parent_id = task.id
+      BA -> AgentQueue: enqueue first step
+
+    else type = workflow:input:requested
+      BA -> SharedState: read shared data for form filling
+      SharedState --> BA: current values
+      BA -> Hybrid: evaluate mapped data coverage
+      Hybrid --> BA: all data / part of data / no data
+
+      alt can map all data
+        BA -> Hybrid: build 1-step fill-data plan
+        Hybrid --> BA: step_1 call tool fill data
+        BA -> SharedState: store workflow plan
+        BA -> AgentQueue: enqueue first step
+
+      else can map part of data
+        BA -> Hybrid: build 2-step plan
+        Hybrid --> BA: step_1 fill part + step_2 send form
+        BA -> SharedState: store workflow plan
+        BA -> AgentQueue: enqueue first step
+
+      else can not map any
+        BA -> Hybrid: build 1-step send-form plan
+        Hybrid --> BA: step_1 send form direct
+        BA -> SharedState: store workflow plan
+        note right of BA
+        No queue.
+        This flow stays backend-only in the diagram.
+        end note
+      end
+
+    else type = workflow:date_edit:requested
+      BA -> Hybrid: build 2-step plan
+      Hybrid --> BA: format message + open workspace step
+      note right of BA
+        No queue.
+        This flow stays backend-only in the diagram.
+      end note
+
+    else type = main:user:rerun
+      BA -> Rule: build 1-step plan
+      Rule --> BA: rerun request
+      BA -> SharedState: store rerun request
+      BA -> AgentQueue: enqueue first step
+
+    else other event
+      BA -> BA: return (unsupported event)
+    end
+
+    deactivate BA
+  end
+end
+
+deactivate AgentQueue
+
+@enduml

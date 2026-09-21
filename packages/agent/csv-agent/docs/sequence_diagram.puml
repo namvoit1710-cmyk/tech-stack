@@ -1,0 +1,114 @@
+@startuml sequence_diagram_v2_from_mermaid
+autonumber
+
+actor Client as "API Client"
+participant SDK as "Agent SDK Runtime"
+participant Boot as "bootstrap.build_app_container"
+participant IoC as "IoC Container"
+participant Registry as "tool_registry.scan_all_tools"
+participant Graph as "LangGraph (Plan-Execute-Review)"
+participant PlanN as "plan_node"
+participant PlanUC as "PlanUseCase"
+participant LLM as "OpenAI/LLM Service"
+participant ExecN as "execute_node"
+participant Tool as "Registered Tool"
+participant Feature as "Feature Impl"
+participant DirectAPI as "Internal HTTP/API"
+participant MCPTool as "mcp_data_factory._call_mcp_tool"
+participant MCP as "Data Factory MCP Server"
+participant S3 as "Storage (S3/File)"
+participant RevN as "review_node"
+participant RevUC as "ReviewUseCase"
+
+Client -> SDK : POST /execute\n(message, parameters/file_id)
+SDK -> Boot : build_app_container()
+Boot -> IoC : build_dependencies()
+IoC -> Registry : scan_all_tools()
+Registry --> IoC : worker_tools[]
+Boot -> Graph : build_graph(deps)
+
+SDK -> Graph : run(state)
+
+loop Plan -> Execute -> Review (until route_after_review == __end__)
+  Graph -> PlanN : plan_node(state,deps)
+  PlanN -> PlanUC : execute(PlanInputDto)
+
+  alt llm_service configured
+    PlanUC -> LLM : create execution plan
+    LLM --> PlanUC : plan JSON
+  else no llm_service
+    PlanUC -> PlanUC : _create_fallback_plan(input_dto)
+  end
+
+  PlanUC --> PlanN : PlanOutputDto\n(execution_plan,is_reviewed=false)
+  PlanN --> Graph : execution_plan
+
+  Graph -> ExecN : execute_node(state,deps)
+  loop each step in execution_plan
+    ExecN -> ExecN : merge request_parameters + step.input
+    ExecN -> ExecN : tool_lookup[step.tool]
+
+    alt tool not found
+      ExecN -> ExecN : append failed StepResult\n("Tool not found")
+    else tool found
+      ExecN -> Tool : ainvoke(merged_input)
+
+      alt INTERNAL tool
+        Tool -> Feature : call implementation
+        alt feature calls internal HTTP/API
+          Feature -> DirectAPI : request/response
+          DirectAPI --> Feature : data/error
+        else purely local processing
+          Feature -> Feature : local business logic
+        end
+        Feature --> Tool : result or exception
+
+      else HYBRID tool (LLM + MCP)
+        Tool -> Feature : call implementation
+        Feature -> LLM : generate transform payload
+        LLM --> Feature : payload JSON
+        Feature -> MCPTool : transform_file_mcp / transform_rows_mcp
+        MCPTool -> MCP : MCP call_tool(...)
+        MCP -> S3 : read source / write transformed file
+        S3 --> MCP : content or storage error
+        MCP --> MCPTool : {success,result,message,...}
+        MCPTool --> Feature : parsed dict
+        Feature --> Tool : result or MCP/Transformation exception
+
+      else PURE-MCP tool
+        Tool -> MCPTool : validate/inspect/transform/list_rule_sets
+        MCPTool -> MCP : MCP call_tool(...)
+        MCP --> S3 : file I/O when needed
+        S3 --> MCP : content or error
+        MCP --> MCPTool : tool result
+        MCPTool --> Tool : parsed dict / error dict
+      end
+
+      alt invocation success
+        Tool --> ExecN : step result
+        ExecN -> ExecN : update final_file_id if present
+      else invocation exception
+        Tool --> ExecN : exception
+        ExecN -> ExecN : append failed StepResult(error)
+      end
+    end
+  end
+
+  ExecN --> Graph : execution_result + formatted_response
+
+  Graph -> RevN : review_node(state)
+  RevN -> RevUC : execute(ReviewInputDto)
+  RevUC --> RevN : ReviewOutputDto\n(is_reviewed,success,feedback)
+  RevN --> Graph : review status
+
+  alt route_after_review == "plan" (is_reviewed is False)
+    Graph -> Graph : loop back to PLAN
+  else route_after_review == "__end__"
+    Graph -> Graph : finish workflow
+  end
+end
+
+Graph --> SDK : final state
+SDK --> Client : response(status, agent_data.summary, error if any)
+
+@enduml

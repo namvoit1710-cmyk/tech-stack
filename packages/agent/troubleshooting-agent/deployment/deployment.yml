@@ -1,0 +1,113 @@
+name: ai-workflow-troubleshooting-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8005
+    qas: 8005
+  APP_NAME:
+    dev: "Troubleshooting Workflow Agent"
+    qas: "Troubleshooting Workflow Agent"
+  AGENT_TYPE:
+    dev: "troubleshooting-agent"
+    qas: "troubleshooting-agent"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  AGENT_DOMAIN:
+    dev: "workflow-ops"
+    qas: "workflow-ops"
+  DESCRIPTION:
+    dev: "Diagnoses Workflow Service run failures from the control-plane execution log (SA-1438). Diagnose-only: reads run history, never mutates the control plane."
+    qas: "Diagnoses Workflow Service run failures from the control-plane execution log (SA-1438). Diagnose-only: reads run history, never mutates the control plane."
+  CAPABILITIES:
+    dev: '["workflow-troubleshooting","tools"]'
+    qas: '["workflow-troubleshooting","tools"]'
+  INPUT_SCHEMA:
+    dev: '{"parameters":{"run_id":"string","workflow_id":"string","workflow_name":"string"}}'
+    qas: '{"parameters":{"run_id":"string","workflow_id":"string","workflow_name":"string"}}'
+  OUTPUT_SCHEMA:
+    dev: '{"category":"string","root_cause":"string","recommended_fix":"string","severity":"string","confidence":"number","owner":"string"}'
+    qas: '{"category":"string","root_cause":"string","recommended_fix":"string","severity":"string","confidence":"number","owner":"string"}'
+  REQUIRED_PARAMETERS:
+    dev: '["message"]'
+    qas: '["message"]'
+  NEGATIVE_EXAMPLES:
+    dev: '["negative"]'
+    qas: '["negative"]'
+  # Diagnose-only / read-only: no confirmation gate needed.
+  REQUIRED_CONFIRMATION:
+    dev: "false"
+    qas: "false"
+  ROUTING_TIMEOUT_SECONDS:
+    dev: "180.0"
+    qas: "180.0"
+  # Root URL of the workflow-control-plane-service (client appends /api/v1/...).
+  WORKFLOW_API_URL:
+    dev: "https://smdg-ai-tenant-1-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com"
+    qas: "https://smdg-ai-tenant-1-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com"
+  # LLM only enriches free-text errors the deterministic rules can't place.
+  LLM_MODEL:
+    dev: "gpt-4o"
+    qas: "gpt-4o"
+  # Empty -> in-memory per-process cache. Point at a mounted path for cross-instance A==B.
+  DIAGNOSIS_CACHE_PATH:
+    dev: ""
+    qas: ""
+  # --- Event Mesh (APP_MODE=HYBRID starts the consumer) ---
+  # Mirrors the executor-runtime reference. token/client creds come from the bound
+  # `simplemdg-event-core-2` (enterprise-messaging) instance via VCAP (see services:);
+  # these env vars only set the messaging/management endpoints + namespace + topics.
+  # Without the binding the consumer's token_url resolves to "" -> httpx.UnsupportedProtocol.
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  EVENT_MESH_MESSAGING_PROTOCOL:
+    dev: "httprest"
+    qas: "httprest"
+  EVENT_MESH_MESSAGING_URL:
+    dev: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_MANAGEMENT_URL:
+    dev: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"
+  # Convention across agents: consume topic = "<AGENT_TYPE>.topic".
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "troubleshooting-agent.topic"
+    qas: "troubleshooting-agent.topic"
+  # OPENAI_API_KEY / LLM_API_KEY: supplied by the platform (bound service or secret env),
+  # never hardcoded here (BORROWED_CREDENTIALS). Without it the agent runs deterministic-only.
+
+# Bind the enterprise-messaging instance so the Event Mesh consumer gets its
+# token_url + client creds from VCAP (canonical required service, see
+# .github/services/required-services.yml). Mirrors executor-runtime-service.
+services:
+  dev:
+    - simplemdg-event-core-2
+  qas:
+    - simplemdg-event-core-2
+
+

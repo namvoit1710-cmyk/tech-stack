@@ -1,0 +1,66 @@
+name: profile-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8005
+    qas: 8005
+  APP_NAME:
+    dev: "Profile Agent"
+    qas: "Profile Agent"
+  AGENT_TYPE:
+    dev: "profile-agent"
+    qas: "profile-agent"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  AGENT_DOMAIN:
+    dev: "profiles"
+    qas: "profiles"
+  AGENT_KIND:
+    dev: "technical"
+    qas: "technical"
+  DESCRIPTION:
+    dev: 'This agent is used to retrieve user information, including their existence in the system, permissions, and basic details such as email, name, and role.'
+    qas: 'This agent is used to retrieve user information, including their existence in the system, permissions, and basic details such as email, name, and role.'
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-agent-registry.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-registry-qas.cfapps.br10.hana.ondemand.com
+  PROFILE_MANAGEMENT_BASE_URL:
+    dev: https://smdg-ai-dev-profile-management.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-qas-profile-management.cfapps.br10.hana.ondemand.com
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "profile.topic"
+    qas: "profile.topic"
+  EVENT_MESH_MANAGEMENT_URL:
+    dev: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_MESSAGING_URL:
+    dev: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"

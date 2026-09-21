@@ -1,0 +1,75 @@
+name: validation-rule-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  INFRA_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8005
+    qas: 8005
+  APP_NAME:
+    dev: "Validation Rule Agent"
+    qas: "Validation Rule Agent"
+  AGENT_TYPE:
+    dev: "validation-rule"
+    qas: "validation-rule"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  LLM_MODEL:
+    dev: "gpt-5.4-nano"
+    qas: "gpt-5.4-nano"
+  AGENT_DOMAIN:
+    dev: "templates"
+    qas: "templates"
+  DESCRIPTION:
+    dev: 'Validate data for column of file.This agent performs active validation on column. It outputs the final modified file state or URL'
+    qas: 'Validate data for column of file.This agent performs active validation on column. It outputs the final modified file state or URL'
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-ai-workflow-executor-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-executor-qas.cfapps.br10.hana.ondemand.com
+  FILE_URL:
+    dev: https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+  DATA_FACTORY_URL:
+    dev: https://smdg-ai-dev-data-factory-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-data-factory-qas.cfapps.br10.hana.ondemand.com
+  WORKFLOW_API_BASE_URL:
+    dev: https://flow-ai-dev-orchestration-api.cfapps.br10.hana.ondemand.com
+    qas: https://flow-ai-dev-orchestration-api.cfapps.br10.hana.ondemand.com
+  GOVERNAMENT_API_BASE_URL:
+    dev: https://smdg-ai-dev-governance-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-governance-dev.cfapps.br10.hana.ondemand.com
+  MESSAGING_MODE:
+    dev: "sap"
+    qas: "sap"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "validation-rule.topic"
+    qas: "validation-rule.topic"
+  EVENT_MESH_MANAGEMENT_URL:
+    dev: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_MESSAGING_URL:
+    dev: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"

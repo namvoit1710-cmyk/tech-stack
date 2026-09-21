@@ -1,0 +1,79 @@
+name: governance-agent
+buildContext: ..
+buildContexts:
+  agent-sdk: ../../agent-sdk
+  mcp: ../../../../../libs/mcp/python
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  MESSAGE_MODE:
+    dev: "sap"
+    qas: "sap"
+  APP_MODE:
+    dev: "HYBRID"
+    qas: "HYBRID"
+  LOG_LEVEL:
+    dev: INFO
+    qas: WARNING
+  SERVER_PORT:
+    dev: 8005
+    qas: 8005
+  APP_NAME:
+    dev: "Governance Agent"
+    qas: "Governance Agent"
+  AGENT_TYPE:
+    dev: "governance"
+    qas: "governance"
+  AGENT_VERSION:
+    dev: "1.0.0"
+    qas: "1.0.0"
+  AGENT_DOMAIN:
+    dev: "templates"
+    qas: "templates"
+  DESCRIPTION:
+    dev: "Governance Agent. This agent generates record steps based on provided input, ensuring strict adherence to rules and constraints. It outputs structured record steps as JSON. Example Prompts: 1. Send to sara.le@company.com to contribute Procurement data (purchasing group, order unit), 2. Send to daniel.vo@company.com to contribute Supply Chain data (MRP type, lot size)."
+    qas: "Governance Agent. This agent generates record steps based on provided input, ensuring strict adherence to rules and constraints. It outputs structured record steps as JSON. Example Prompts: 1. Send to sara.le@company.com to contribute Procurement data (purchasing group, order unit), 2. Send to daniel.vo@company.com to contribute Supply Chain data (MRP type, lot size)."
+  AGENT_ADVERTISED_HOST:
+    dev: "localhost"
+    qas: "localhost"
+  REGISTRY_URL:
+    dev: https://smdg-ai-dev-ai-workflow-executor.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-executor-qas.cfapps.br10.hana.ondemand.com
+  LLM_MODEL:
+    dev: "gpt-5.4-nano"
+    qas: "gpt-5.4-nano"
+  OPENAI_TEMPERATURE:
+    dev: "0.01"
+    qas: "0.01"
+  FILE_URL:
+    dev: https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+  DATA_FACTORY_URL:
+    dev: https://smdg-ai-dev-data-factory.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-data-factory-qas.cfapps.br10.hana.ondemand.com
+  GOVERNANCE_URL:
+    dev: https://smdg-ai-dev-governance-dev.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-governance-qas.cfapps.br10.hana.ondemand.com
+  ROUTING_TIMEOUT_SECONDS:
+    dev: "180.0"
+    qas: "180.0"
+  EVENT_MESH_CONSUME_TOPICS:
+    dev: "governance.topic"
+    qas: "governance.topic"
+  EVENT_MESH_MANAGEMENT_URL:
+    dev: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-hub-backend.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_MESSAGING_URL:
+    dev: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+    qas: "https://enterprise-messaging-pubsub.cfapps.br10.hana.ondemand.com"
+  EVENT_MESH_NAMESPACE:
+    dev: "simplemdg/event/core-2"
+    qas: "simplemdg/event/core-2"
+ 

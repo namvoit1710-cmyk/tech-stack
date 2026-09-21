@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SA-1948 — Conversation Compaction Explainer</title>
+<style>
+  :root{
+    --none:#94a3b8; --tool:#f59e0b; --sum:#22c55e; --danger:#ef4444;
+    --bg:#0f172a; --card:#1e293b; --line:#334155; --txt:#e2e8f0; --mut:#94a3b8; --accent:#818cf8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);line-height:1.55}
+  .wrap{max-width:1120px;margin:0 auto;padding:24px 18px 64px}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  h2{font-size:1.15rem;margin:32px 0 10px;border-left:4px solid var(--accent);padding-left:10px}
+  h3{font-size:.98rem;margin:0 0 8px}
+  .sub{color:var(--mut);margin:0 0 8px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:12px 0}
+  code{background:#0b1220;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.88em}
+  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:.9rem}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:#0b1220;color:var(--mut);font-weight:600}
+  .k{color:var(--accent);font-weight:600}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.8rem;font-weight:600;color:#0b1220}
+  .b-none{background:var(--none)} .b-tool{background:var(--tool)} .b-sum{background:var(--sum)} .b-danger{background:var(--danger)}
+  .flow li{margin:5px 0}
+  .tag{font-size:.72rem;color:var(--mut)}
+  .lab{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+  .controls{position:sticky;top:12px}
+  .outputs{display:flex;flex-direction:column;gap:14px;min-width:0}
+  @media(max-width:860px){.lab{grid-template-columns:1fr}.controls{position:static}}
+  .cfg2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  label{display:block;font-size:.76rem;color:var(--mut);margin:7px 0 3px}
+  input[type=number],select{width:100%;background:#0b1220;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:7px 9px;font-size:.92rem}
+  .out .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--line);font-size:.93rem}
+  .out .row b{font-variant-numeric:tabular-nums}
+  .verdict{margin-top:12px;padding:11px 13px;border-radius:10px;font-weight:600;font-size:.9rem}
+  .v-yes{background:rgba(34,197,94,.15);border:1px solid var(--sum);color:#bbf7d0}
+  .v-no{background:rgba(239,68,68,.13);border:1px solid var(--danger);color:#fecaca}
+  .bar{position:relative;height:38px;background:#0b1220;border:1px solid var(--line);border-radius:8px;margin:16px 0 6px;overflow:hidden}
+  .seg{position:absolute;top:0;bottom:0;font-size:.7rem;color:#0b1220;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .marker{position:absolute;top:-4px;bottom:-4px;width:3px;background:#fff;box-shadow:0 0 0 2px #000}
+  .mlab{position:absolute;top:-14px;transform:translateX(-50%);font-size:.72rem;color:#fff;white-space:nowrap}
+  .note{color:var(--mut);font-size:.83rem;margin-top:6px}
+  .divide{border:none;border-top:1px dashed var(--line);margin:14px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SA-1948 — Conversation Compaction Explainer</h1>
+  <p class="sub">When does it <b>summarize</b>, what does it keep, and why a given config may never compact. Config lives in the sticky left column — change it and the results on the right update live.</p>
+
+  <h2>1. Three knobs — don't mix up their roles</h2>
+  <div class="card">
+    <table>
+      <tr><th>Variable</th><th>Role</th></tr>
+      <tr><td class="k">CONTEXT_MAX_TOTAL_TOKENS</td><td><b>WHEN to consider compacting</b>. Compaction is only attempted when <code>total_tokens &gt; MAX_TOTAL_TOKENS × THRESHOLD</code> (the <b>gate</b>).</td></tr>
+      <tr><td class="k">CONTEXT_COMPACTION_THRESHOLD</td><td>Gate ratio (default 0.80 = 80%). Together with the above it forms the <b>gate</b>.</td></tr>
+      <tr><td class="k">CONTEXT_MAX_MESSAGE_HISTORY</td><td><b>HOW MANY recent turns to keep verbatim</b>. Only turns <b>OLDER</b> than this are summarized ⇒ you need <b>more turns than this</b> before anything can be summarized.</td></tr>
+      <tr><td class="k">CONTEXT_AGGRESSIVE_THRESHOLD<br>CONTEXT_DANGER_THRESHOLD</td><td><b>Which strategy</b> to apply, based on <b>pressure = total_tokens / MAX_TOTAL_TOKENS</b> (see section 2).</td></tr>
+    </table>
+    <p class="note">👉 <b>MAX_TOTAL_TOKENS = WHEN. MAX_MESSAGE_HISTORY = HOW MANY to keep. AGGRESSIVE/DANGER = HOW to handle it.</b></p>
+  </div>
+
+  <h2>2. Decision flow (runs every chat turn)</h2>
+  <div class="card">
+    <ol class="flow">
+      <li>Count <code>total_tokens</code> of the whole history.</li>
+      <li>If <code>total ≤ gate</code> → <span class="pill b-none">NO compaction</span></li>
+      <li>If over the gate → compute <code>pressure = total / MAX_TOTAL_TOKENS</code>, then pick the band:</li>
+    </ol>
+    <table>
+      <tr><th>Pressure band</th><th>Action</th><th>Produces <code>[Conversation summary]</code>?</th></tr>
+      <tr><td>THRESHOLD → AGGRESSIVE <span class="tag">e.g. 0.80→0.85</span></td><td><span class="pill b-tool">tool_result_clear</span></td><td>❌ no-op for role "user" messages</td></tr>
+      <tr><td>AGGRESSIVE → DANGER <span class="tag">e.g. 0.85→0.95</span></td><td><span class="pill b-sum">SUMMARIZE (LLM)</span></td><td>✅ <b>only when turns &gt; MAX_MESSAGE_HISTORY</b></td></tr>
+      <tr><td>≥ DANGER <span class="tag">e.g. ≥0.95</span></td><td><span class="pill b-danger">head/tail (drop middle)</span></td><td>❌ just trims, does NOT call the LLM</td></tr>
+    </table>
+    <p class="note"><b>The code only writes the DB when a <code>[Conversation summary]</code> is produced.</b> Landing in tool-clear / head-tail → <b>nothing is written</b> → the history never shrinks (it keeps growing).</p>
+  </div>
+
+  <h2>3. Conditions to ACTUALLY summarize (all 3 required)</h2>
+  <div class="card">
+    <table>
+      <tr><td>①</td><td><code>total_tokens &gt; MAX_TOTAL_TOKENS × THRESHOLD</code> (over the gate)</td></tr>
+      <tr><td>②</td><td><code>AGGRESSIVE ≤ pressure &lt; DANGER</code> (inside the summarize band)</td></tr>
+      <tr><td>③</td><td><code>turns &gt; MAX_MESSAGE_HISTORY</code> (there are turns older than the kept tail)</td></tr>
+    </table>
+  </div>
+
+  <h2>4. Interactive playground 🧪 <span class="tag">— config in the sticky left column, results on the right</span></h2>
+  <div class="lab">
+    <div class="controls">
+      <div class="card" style="padding:14px 15px;margin-top:0">
+        <label>🤖 Pick a model (sets MAX_TOTAL to its window)</label>
+        <select id="modelSel"><option value="">— pick a model —</option></select>
+        <label>📋 Sample scenario</label>
+        <select id="presetSel"><option value="">— pick a scenario —</option></select>
+        <hr class="divide">
+        <h3>⚙️ Config</h3>
+        <div class="cfg2">
+          <div><label>MAX_TOTAL_TOKENS</label><input id="cMaxTotal" type="number" value="16000"></div>
+          <div><label>THRESHOLD</label><input id="cThreshold" type="number" step="0.01" value="0.80"></div>
+          <div><label>AGGRESSIVE</label><input id="cAggressive" type="number" step="0.01" value="0.85"></div>
+          <div><label>DANGER</label><input id="cDanger" type="number" step="0.01" value="0.95"></div>
+          <div><label>keep (MAX_MSG_HISTORY)</label><input id="cKeep" type="number" value="10"></div>
+        </div>
+        <hr class="divide">
+        <h3>🧮 Snapshot inputs</h3>
+        <div class="cfg2">
+          <div><label>Current total tokens</label><input id="cTokens" type="number" value="14000"></div>
+          <div><label>Current turns</label><input id="cTurns" type="number" value="40"></div>
+        </div>
+        <hr class="divide">
+        <h3>📈 Timeline inputs</h3>
+        <div class="cfg2">
+          <div><label>Avg tokens / turn</label><input id="cAvg" type="number" value="350"></div>
+          <div><label>Summary size (tokens)</label><input id="cSum" type="number" value="800"></div>
+          <div><label>Turns to simulate</label><input id="cN" type="number" value="150"></div>
+        </div>
+        <p class="note" id="hint"></p>
+      </div>
+    </div>
+    <div class="outputs">
+      <div class="card" style="margin:0">
+        <h3>🧮 Single-point result</h3>
+        <div class="bar" id="bar"></div>
+        <div class="out" id="out"></div>
+        <div class="verdict" id="verdict"></div>
+      </div>
+      <div class="card" style="margin:0">
+        <h3>📈 Timeline (repeated compactions — sawtooth)</h3>
+        <svg id="chart" viewBox="0 0 480 250" style="width:100%;height:auto;background:#0b1220;border:1px solid var(--line);border-radius:8px"></svg>
+        <div class="note" id="legend"></div>
+        <div style="max-height:170px;overflow:auto;margin-top:8px"><table id="log"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>5. Takeaway on a too-small budget</h2>
+  <div class="card">
+    <p>Example broken config: <code>MAX_TOTAL_TOKENS=100</code>, <code>DANGER=0.95</code>, <code>keep=10</code>.</p>
+    <ul>
+      <li>A real conversation ~300 tokens → <code>pressure ≈ 3.0</code> → <b>≥ DANGER 0.95</b> → always lands in <span class="pill b-danger">head/tail</span> → <b>never summarizes</b>.</li>
+      <li>The summarize band is only <b>85–95 tokens</b> — smaller than a single real message → the history jumps straight past it into the danger zone.</li>
+    </ul>
+    <p><b>To make it compact</b> (try the "③ FIX" scenario): raise <code class="k">DANGER=10</code> and lower <code class="k">AGGRESSIVE=0.80</code>; to compact from turn 2, also set <code class="k">keep=1</code>. For production: pick a model in the dropdown so <code>MAX_TOTAL_TOKENS ≈ the model window</code> and keep danger 0.95.</p>
+  </div>
+
+  <h2>6. Suggested MAX_TOTAL_TOKENS per model 🤖</h2>
+  <div class="card">
+    <p class="sub"><code>MAX_TOTAL_TOKENS</code> is the <b>token budget for the CONVERSATION HISTORY</b> replayed to the model each turn. Set it <b>below the context window</b> to leave room for the system prompt + tools + the reply. Rule of thumb: <b>≈ 50–70% of the context window</b>. Keep <code>0.80/0.85/0.95</code>.</p>
+    <table id="modelTable"></table>
+    <p class="note">⚠️ Context-window sizes <b>vary by version &amp; provider</b> — verify against the actual model &amp; API you use before committing. These are reference figures only. Use the dropdown in section 4 to load them quickly.</p>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const num=id=>parseFloat($(id).value)||0;
+const ALLF=['cMaxTotal','cThreshold','cAggressive','cDanger','cKeep','cTokens','cTurns','cAvg','cSum','cN'];
+function getcfg(){return {maxTotal:num('cMaxTotal'),threshold:num('cThreshold'),aggressive:num('cAggressive'),danger:num('cDanger'),keep:Math.max(1,Math.round(num('cKeep')))};}
+
+function simulate(cfg,tokens,turns){
+  const gate=cfg.maxTotal*cfg.threshold;
+  if(tokens<=gate) return {gate,pressure:cfg.maxTotal?tokens/cfg.maxTotal:0,band:'none',summary:false,written:false,
+    reason:`total ${tokens} ≤ gate ${gate.toFixed(0)} → below the gate`, after:`${turns} turns (unchanged)`};
+  const p=tokens/cfg.maxTotal;
+  if(p>=cfg.danger) return {gate,pressure:p,band:'danger',summary:false,written:false,
+    reason:`pressure ${p.toFixed(2)} ≥ DANGER ${cfg.danger} → head/tail (drop, NO summary)`, after:`${turns} turns (not written)`};
+  if(p>=cfg.aggressive){
+    if(turns>cfg.keep){const old=turns-cfg.keep;
+      return {gate,pressure:p,band:'summarize',summary:true,written:true,
+        reason:`AGGRESSIVE ${cfg.aggressive} ≤ pressure ${p.toFixed(2)} < DANGER ${cfg.danger} and ${turns} turns > keep ${cfg.keep} → SUMMARIZE`,
+        after:`[Summary of ${old} old turns] + ${cfg.keep} most recent = ${cfg.keep+1} turns`};}
+    return {gate,pressure:p,band:'summarize',summary:false,written:false,
+      reason:`pressure is in the summarize band BUT only ${turns} turns ≤ keep ${cfg.keep} → no old turns to summarize`, after:`${turns} turns (unchanged)`};
+  }
+  return {gate,pressure:p,band:'tool',summary:false,written:false,
+    reason:`THRESHOLD ${cfg.threshold} ≤ pressure ${p.toFixed(2)} < AGGRESSIVE ${cfg.aggressive} → tool_result_clear`, after:`${turns} turns (unchanged)`};
+}
+function drawBar(cfg,p){
+  const max=Math.max(cfg.danger*1.15,p*1.1,1.05);
+  const pct=x=>Math.min(100,Math.max(0,x/max*100));
+  const segs=[['b-none',0,cfg.threshold],['b-tool',cfg.threshold,cfg.aggressive],['b-sum',cfg.aggressive,cfg.danger],['b-danger',cfg.danger,max]];
+  let html='';
+  for(const [cls,a,b] of segs){const l=pct(a),w=pct(b)-pct(a);if(w>0.5)html+=`<div class="seg ${cls}" style="left:${l}%;width:${w}%">${cls.replace('b-','')}</div>`;}
+  html+=`<div class="marker" style="left:${pct(p)}%"></div><div class="mlab" style="left:${pct(p)}%">pressure ${p.toFixed(2)}</div>`;
+  $('bar').innerHTML=html;
+}
+function runSnapshot(){
+  const cfg=getcfg(), r=simulate(cfg,num('cTokens'),Math.round(num('cTurns')));
+  drawBar(cfg,r.pressure);
+  $('out').innerHTML=`
+    <div class="row"><span>gate = MAX_TOTAL × THRESHOLD</span><b>${r.gate.toFixed(0)} tokens</b></div>
+    <div class="row"><span>pressure = total / MAX_TOTAL</span><b>${r.pressure.toFixed(2)}</b></div>
+    <div class="row"><span>Band</span><b><span class="pill b-${r.band}">${r.band}</span></b></div>
+    <div class="row"><span>Produces [Conversation summary]?</span><b>${r.summary?'✅ Yes':'❌ No'}</b></div>
+    <div class="row"><span>Writes DB (shrinks history)?</span><b>${r.written?'✅ Yes':'❌ No'}</b></div>
+    <div class="row"><span>conversation_context after</span><b style="text-align:right;max-width:58%">${r.after}</b></div>`;
+  const v=$('verdict');
+  if(r.written){v.className='verdict v-yes';v.innerHTML='✅ COMPACTS — '+r.reason;}
+  else{v.className='verdict v-no';v.innerHTML='❌ NO compaction — '+r.reason;}
+}
+function runTimeline(){
+  const cfg=getcfg(), avg=num('cAvg'), sumSize=num('cSum'), N=Math.max(2,Math.round(num('cN')));
+  const gate=cfg.maxTotal*cfg.threshold;
+  let entries=[]; const series=[]; const events=[];
+  for(let turn=1;turn<=N;turn++){
+    entries.push(avg);
+    let total=entries.reduce((a,b)=>a+b,0);
+    if(total>gate){
+      const p=total/cfg.maxTotal;
+      if(p>=cfg.danger){/* head/tail: not written */}
+      else if(p>=cfg.aggressive && entries.length>cfg.keep){
+        const before=total;
+        entries=[sumSize].concat(entries.slice(-cfg.keep));
+        total=entries.reduce((a,b)=>a+b,0);
+        events.push({turn,before,after:total,entries:entries.length});
+      }
+    }
+    series.push({turn,total});
+  }
+  drawChart(series,gate,events);
+  $('legend').innerHTML = events.length
+    ? `<b style="color:#22c55e">green</b> = tokens/turn · <b style="color:#f59e0b">dashed orange</b> = gate (${gate.toFixed(0)}) · <b style="color:#ef4444">red dots</b> = compaction (<b>${events.length}×</b>). Sawtooth: grow → compact drops → grow again.`
+    : `⚠️ No compaction over ${series.length} turns — not large enough to cross the gate, or tokens jumped into head/tail. Increase "turns to simulate" / "avg tokens per turn", or adjust the config.`;
+  const rows=events.map(e=>`<tr><td>${e.turn}</td><td><span class="pill b-sum">SUMMARIZE</span></td><td>${e.before}</td><td>→ ${e.after}</td><td>${e.entries}</td></tr>`).join('');
+  $('log').innerHTML=`<tr><th>Turn</th><th>Event</th><th>Before</th><th>After</th><th>Entries</th></tr>`+(rows||`<tr><td colspan="5" style="color:var(--mut)">— no compaction yet —</td></tr>`);
+}
+function drawChart(series,gate,events){
+  const W=480,H=250,pad=30;
+  const maxY=(Math.max(gate*1.15,...series.map(s=>s.total))*1.05)||1;
+  const X=t=>pad+(t-1)/((series.length-1)||1)*(W-pad*1.4);
+  const Y=v=>H-pad-(v/maxY)*(H-pad*1.5);
+  const path=series.map((s,i)=>(i?'L':'M')+X(s.turn).toFixed(1)+' '+Y(s.total).toFixed(1)).join(' ');
+  const gY=Y(gate);
+  const dots=events.map(e=>`<line x1="${X(e.turn).toFixed(1)}" y1="${Y(e.before).toFixed(1)}" x2="${X(e.turn).toFixed(1)}" y2="${Y(e.after).toFixed(1)}" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2"/><circle cx="${X(e.turn).toFixed(1)}" cy="${Y(e.after).toFixed(1)}" r="3.4" fill="#ef4444"/>`).join('');
+  $('chart').innerHTML=`
+    <line x1="${pad}" y1="${gY.toFixed(1)}" x2="${W-pad*0.4}" y2="${gY.toFixed(1)}" stroke="#f59e0b" stroke-dasharray="5 4" stroke-width="1"/>
+    <text x="${W-pad*0.4}" y="${(gY-4).toFixed(1)}" fill="#f59e0b" font-size="9" text-anchor="end">gate ${gate.toFixed(0)}</text>
+    <path d="${path}" fill="none" stroke="#22c55e" stroke-width="1.7"/>${dots}
+    <text x="${pad}" y="${H-8}" fill="#94a3b8" font-size="9">turn 1</text>
+    <text x="${W-pad*0.4}" y="${H-8}" fill="#94a3b8" font-size="9" text-anchor="end">turn ${series.length}</text>
+    <text x="6" y="${pad-6}" fill="#94a3b8" font-size="9">tokens</text>`;
+}
+function runAll(){ runSnapshot(); runTimeline(); }
+ALLF.forEach(k=>$(k).addEventListener('input',runAll));
+
+/* ---- Models (approx context window + suggested MAX_TOTAL ≈ 60% of window) ---- */
+const MODELS=[
+  {g:'OpenAI', items:[
+    {n:'GPT-5 / GPT-5 mini / nano', w:'~256K–400K', t:200000},
+    {n:'GPT-4.1 / 4.1-mini / nano', w:'~1M', t:200000},
+    {n:'GPT-4o / GPT-4o-mini', w:'~128K', t:80000},
+    {n:'o3 / o4-mini', w:'~200K', t:128000},
+    {n:'GPT-4 Turbo', w:'~128K', t:80000},
+  ]},
+  {g:'Anthropic (Claude)', items:[
+    {n:'Claude Opus 4.5 / Sonnet 4.5', w:'~200K (1M beta)', t:128000},
+    {n:'Claude Opus 4 / Sonnet 4', w:'~200K (1M beta)', t:128000},
+    {n:'Claude 3.7 Sonnet', w:'~200K', t:128000},
+    {n:'Claude 3.5 Sonnet / Haiku', w:'~200K', t:128000},
+  ]},
+  {g:'Google (Gemini)', items:[
+    {n:'Gemini 2.5 Pro / Flash', w:'~1M', t:200000},
+    {n:'Gemini 1.5 Pro', w:'~2M', t:200000},
+    {n:'Gemini 1.5 Flash', w:'~1M', t:200000},
+  ]},
+  {g:'xAI (Grok)', items:[
+    {n:'Grok 4 / 4.1', w:'~256K', t:160000},
+    {n:'Grok 3', w:'~128K', t:80000},
+  ]},
+  {g:'Moonshot (Kimi)', items:[
+    {n:'Kimi K3', w:'~256K', t:160000},
+    {n:'Kimi K2', w:'~128K–200K', t:128000},
+  ]},
+  {g:'Others', items:[
+    {n:'DeepSeek V3 / R1', w:'~128K', t:80000},
+    {n:'Solar Pro (Upstage)', w:'~64K–128K', t:64000},
+    {n:'Llama 3.1 / 3.3 (Meta)', w:'~128K', t:80000},
+    {n:'Mistral Large 2', w:'~128K', t:80000},
+    {n:'Qwen 2.5 / Qwen3 (Alibaba)', w:'~128K–1M', t:96000},
+    {n:'GLM-4.6 (Zhipu)', w:'~200K', t:128000},
+    {n:'Cohere Command R+', w:'~128K', t:80000},
+  ]},
+];
+const flat=[];
+MODELS.forEach(grp=>{
+  const og=document.createElement('optgroup'); og.label=grp.g;
+  grp.items.forEach(m=>{const idx=flat.length; flat.push(m);
+    const o=document.createElement('option'); o.value=idx; o.textContent=`${m.n} (${m.w}) → ${m.t.toLocaleString()}`; og.appendChild(o);});
+  $('modelSel').appendChild(og);
+});
+$('modelSel').addEventListener('change',e=>{ if(e.target.value==='')return; const m=flat[+e.target.value];
+  $('cMaxTotal').value=m.t; $('cThreshold').value=0.80; $('cAggressive').value=0.85; $('cDanger').value=0.95; $('cKeep').value=10;
+  $('cTokens').value=Math.round(m.t*0.85); $('cTurns').value=50;
+  $('cAvg').value=Math.round(m.t/40); $('cSum').value=Math.round(m.t/20); $('cN').value=200;
+  $('presetSel').value=''; $('hint').textContent=`ℹ️ ${m.n}: MAX_TOTAL=${m.t.toLocaleString()} (≈ ${m.w}), threshold/aggressive/danger = production.`;
+  runAll();
+});
+
+/* ---- Preset scenarios ---- */
+const PRESETS=[
+  {name:'① Too-small budget (100, danger 0.95) — NEVER compacts', v:{cMaxTotal:100,cThreshold:0.80,cAggressive:0.85,cDanger:0.95,cKeep:10,cTokens:300,cTurns:20,cAvg:200,cSum:80,cN:40}},
+  {name:'② Second message (same config)', v:{cMaxTotal:100,cThreshold:0.80,cAggressive:0.85,cDanger:0.95,cKeep:10,cTokens:200,cTurns:2,cAvg:200,cSum:80,cN:12}},
+  {name:'③ FIX (100, danger 10, aggressive 0.80)', v:{cMaxTotal:100,cThreshold:0.80,cAggressive:0.80,cDanger:10,cKeep:10,cTokens:300,cTurns:20,cAvg:120,cSum:60,cN:40}},
+  {name:'④ Compact from turn 2 (keep=1, danger=10)', v:{cMaxTotal:100,cThreshold:0.80,cAggressive:0.80,cDanger:10,cKeep:1,cTokens:200,cTurns:2,cAvg:120,cSum:60,cN:24}},
+  {name:'⑤ Production (16000) — clean sawtooth', v:{cMaxTotal:16000,cThreshold:0.80,cAggressive:0.85,cDanger:0.95,cKeep:10,cTokens:14000,cTurns:40,cAvg:350,cSum:800,cN:150}},
+];
+PRESETS.forEach((e,i)=>{const o=document.createElement('option');o.value=i;o.textContent=e.name;$('presetSel').appendChild(o);});
+$('presetSel').addEventListener('change',ev=>{ if(ev.target.value==='')return; const e=PRESETS[+ev.target.value];
+  Object.keys(e.v).forEach(k=>$(k).value=e.v[k]); $('modelSel').value=''; $('hint').textContent='ℹ️ '+e.name; runAll();});
+
+/* ---- Model reference table (section 6) ---- */
+$('modelTable').innerHTML=`<tr><th>Group</th><th>Model</th><th>Context window (approx)</th><th>Suggested MAX_TOTAL_TOKENS</th></tr>`+
+  MODELS.map(g=>g.items.map((m,i)=>`<tr>${i===0?`<td rowspan="${g.items.length}">${g.g}</td>`:''}<td>${m.n}</td><td>${m.w}</td><td class="k">${m.t.toLocaleString()}</td></tr>`).join('')).join('');
+
+runAll();
+</script>
+</body>
+</html>
