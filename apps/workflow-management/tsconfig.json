@@ -1,0 +1,11 @@
+{
+  "extends": "@ldc/tsconfig/base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "dist",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "src/**/*.d.ts", "env.d.ts", "rsbuild.config.ts"]
+}

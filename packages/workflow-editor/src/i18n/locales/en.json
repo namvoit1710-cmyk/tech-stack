@@ -1,0 +1,77 @@
+{
+    "notification": {
+        "success": "Success",
+        "warning": "Warning",
+        "error": "Error",
+        "copied_successfully": "Copied successfully",
+        "pasted_json_successfully": "Pasted JSON successfully",
+        "failed_to_parse_pasted_json": "Failed to parse pasted JSON",
+        "pasted_json_is_not_valid": "Pasted JSON is not valid"
+    },
+    "confirmation": {
+        "delete_node": "Are you sure you want to delete this node?",
+        "confirm_deletion": "Delete Node"
+    },
+    "button": {
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "close": "Close",
+        "delete": "Delete",
+        "edit": "Edit",
+        "execute": "Execute",
+        "add_node": "Add node",
+        "copy": "Copy",
+        "paste": "Paste",
+        "open": "Open",
+        "save": "Save",
+        "export": "Export",
+        "import": "Import",
+        "clear": "Clear"
+    },
+    "toolbar": {
+        "redo": "Redo",
+        "undo": "Undo",
+        "zoom_in": "Zoom in",
+        "zoom_out": "Zoom out",
+        "zoom_fit": "Fit view",
+        "add_node": "Add node",
+        "paste": "Paste",
+        "copy": "Copy",
+        "delete": "Delete",
+        "execute": "Execute",
+        "open": "Open",
+        "save": "Save",
+        "load": "Load",
+        "export": "Export",
+        "import": "Import",
+        "clear": "Clear",
+        "zoom": "Zoom",
+        "add": "Add",
+        "clean_up": "Clean up",
+        "auto_layout": "Auto layout"
+    },
+    "context_menu": {
+        "open": "Open",
+        "execute_step": "Execute step",
+        "copy": "Copy",
+        "delete": "Delete",
+        "close": "Close",
+        "update_node_info": "Update node info"
+    },
+    "approval_status": {
+        "rework": "REWORK",
+        "rejected": "REJECTED",
+        "completed": "COMPLETED",
+        "awaiting": "AWAITING",
+        "processing": "PROCESSING",
+        "none": "NONE",
+        "in_progress": "IN PROGRESS",
+        "unknown_role": "Unknown Role"
+    },
+    "connection": {
+        "focus_path": "Focus path",
+        "delete": "Delete"
+    },
+    "description": "Description",
+    "instruction": "Instruction"
+}

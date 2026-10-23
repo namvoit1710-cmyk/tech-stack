@@ -1,0 +1,187 @@
+@reference "@ldc/tailwind-config/core";
+
+.base-node-shell {
+    @apply relative p-1 rounded-lg;
+    @apply grid grid-cols-1;
+}
+
+.base-node-shell--selected {
+    @apply bg-green-100;
+}
+
+.base-node-shell__content {
+    @apply bg-card/70 backdrop-blur-sm border border-border;
+    @apply w-full h-full rounded-lg;
+    @apply flex items-center gap-2 justify-between;
+}
+
+.base-node-shell__title {
+    @apply text-xs text-muted-foreground;
+}
+
+.base-node-shell .node--executing {
+    border: 2px solid #3b82f6 !important;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.base-node-shell .node--completed {
+    border: 2px solid #34d399 !important;
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.3);
+}
+
+.base-node-shell .node--failed {
+    border: 2px solid #f87171 !important;
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+}
+
+.socket-row {
+    @apply relative top-0 h-full;
+    @apply flex flex-col justify-center items-start gap-2;
+}
+
+.socket-row--input {
+    @apply left-0 items-start;
+}
+
+.socket-row--output {
+    @apply right-0 items-end;
+}
+
+.socket-column {
+    @apply absolute left-0 w-full;
+    @apply flex flex-row justify-center items-center gap-2;
+}
+
+.socket-column--input {
+    @apply -top-1.5;
+}
+
+.socket-column--output {
+    @apply -bottom-1.5;
+}
+
+.socket-item {
+    @apply flex items-center gap-1;
+}
+
+.socket-item__label {
+    @apply text-xs text-muted-foreground;
+}
+
+.socket-item--horizontal {
+    &.socket-item--input {
+        @apply flex-row-reverse;
+
+        .input-socket {
+            @apply p-0! flex items-center justify-center! relative;
+
+            &::before {
+                content: "";
+                @apply absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2;
+                @apply size-4;
+                background: transparent;
+                z-index: 1;
+            }
+
+            span > div {
+                @apply p-0! h-fit! flex items-center justify-center;
+            }
+
+            div > div {
+                @apply relative -left-1.5 w-[10px] h-[10px] rounded-full bg-muted-foreground/40 border border-border p-0! hover:scale-150 hover:bg-primary/70;
+            }
+        }
+    }
+
+    &.socket-item--output {
+        @apply flex-row-reverse;
+
+        .output-socket {
+            @apply p-0! flex items-center justify-center! relative;
+
+            &::before {
+                content: "";
+                @apply absolute top-1/2 left-full -translate-x-1/2 -translate-y-1/2;
+                @apply size-4;
+                background: transparent;
+                z-index: 1;
+            }
+
+            span > div {
+                @apply p-0! h-fit! flex items-center justify-center relative;
+            }
+
+            div > div {
+                @apply relative -right-1.5 w-[10px] h-[10px] rounded-full bg-muted-foreground/40 border border-border p-0! hover:scale-150 hover:bg-primary/70;
+            }
+        }
+    }
+
+    &.socket-item--readonly {
+        cursor: not-allowed;
+
+        .output-socket,
+        .input-socket {
+            @apply pointer-events-none!;
+
+            span > div {
+                @apply pointer-events-none!;
+            }
+
+            div > div {
+                @apply pointer-events-none!;
+            }
+        }
+    }
+}
+
+.socket-item--vertical {
+    @apply flex-col relative;
+
+    &.socket-item--input {
+        .input-socket {
+            @apply p-0! flex items-center justify-center!;
+
+            span > div {
+                @apply p-0! h-fit! flex items-center justify-center;
+            }
+
+            div > div {
+                @apply relative left-0! w-[10px] h-[10px] rounded-full bg-muted-foreground/40 border border-border p-0! hover:scale-150 hover:bg-primary/70;
+            }
+        }
+    }
+
+    &.socket-item--output {
+        @apply flex-col-reverse;
+
+        .output-socket {
+            @apply p-0! flex items-center justify-center!;
+
+            span > div {
+                @apply p-0! h-fit! flex items-center justify-center;
+            }
+
+            div > div {
+                @apply relative right-0! w-[10px] h-[10px] rounded-full bg-muted-foreground/40 border border-border p-0! hover:scale-150 hover:bg-primary/70;
+            }
+        }
+    }
+
+    &.socket-item--readonly {
+        cursor: not-allowed;
+
+        .output-socket,
+        .input-socket {
+            @apply pointer-events-none!;
+
+            span > div {
+                @apply pointer-events-none!;
+            }
+
+            div > div {
+                @apply pointer-events-none!;
+            }
+        }
+    }
+}

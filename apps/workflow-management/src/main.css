@@ -1,0 +1,68 @@
+@import "@ldc/tailwind-config/core";
+@import "@ldc/tailwind-config/themes/ldc-default";
+
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../packages/workflow-editor/src/**/*.{ts,tsx}";
+@source "../../../packages/autoform/src/**/*.{ts,tsx}";
+@source "../../../packages/data-table/src/**/*.{ts,tsx}";
+@source "../../../packages/form-tool/src/**/*.{ts,tsx}";
+
+/* SA-2047 R14 — worker status colours.
+   The shared theme defines --primary, --destructive, --muted and --chart-*, but
+   no success/warning token. That absence is why this page reached for
+   bg-green-500 and border-amber-500 — raw Tailwind, outside the theme, and the
+   "loud" the operator reported. Tokens live here (app scope) rather than in
+   packages/ui because repainting Badge would also repaint profile-management
+   and smdg-ai (operator ruling D4). Promoting these into the three shared
+   themes as --success/--warning is the recorded follow-up.
+
+   Two tokens per state, not one: the chroma that makes a 6px dot readable and
+   the lightness that gets 12px text to AA contrast are different problems, and
+   one token loses whichever it is not tuned for. Chroma 0.14 against
+   green-500's ~0.19 is the specific step away from loud.
+   Critical needs no token — the theme's --destructive is already right. */
+@theme inline {
+  --color-status-ok:      var(--status-ok);
+  --color-status-ok-fg:   var(--status-ok-fg);
+  --color-status-warn:    var(--status-warn);
+  --color-status-warn-fg: var(--status-warn-fg);
+}
+
+:root {
+  --status-ok:      oklch(0.62 0.14 155);
+  --status-ok-fg:   oklch(0.45 0.12 155);
+  --status-warn:    oklch(0.72 0.15 78);
+  --status-warn-fg: oklch(0.48 0.11 70);
+}
+
+.dark {
+  --status-ok:      oklch(0.72 0.14 155);
+  --status-ok-fg:   oklch(0.82 0.11 155);
+  --status-warn:    oklch(0.78 0.14 80);
+  --status-warn-fg: oklch(0.86 0.10 82);
+}
+
+/* SA-2650 — the run-progress chip only updates every ~4s (poll), so a static
+   chip read as "frozen, then jumps". These keep a RUNNING chip visibly alive
+   between updates: a soft pulsing ring on the chip + a highlight shimmer
+   sweeping across the bar. Running-only; disabled under reduced-motion. */
+@keyframes chip-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+  50%      { box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.30); }
+}
+@keyframes chip-shimmer {
+  0%   { background-position: 180% 0; }
+  100% { background-position: -80% 0; }
+}
+.chip-running {
+  animation: chip-pulse 1.6s ease-in-out infinite;
+}
+.chip-bar-running {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.65) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: chip-shimmer 1.3s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-running, .chip-bar-running { animation: none; }
+}
+

@@ -1,0 +1,2 @@
+Rebuild this app when a shared package it bundles changes (last: @ldc/form-tool loads table artifacts at any depth as form defaults).
+reusable-discover.yml only rebuilds an app when a file under its own directory changes; shared packages match no app.

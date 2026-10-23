@@ -1,0 +1,18 @@
+{
+  "extends": "@ldc/tsconfig/compiled-package.json",
+  "compilerOptions": {
+      "jsx": "react-jsx",
+      "paths": {
+        "@/*": [
+          "./src/*"
+        ]
+      }
+    },
+  "include": [
+    "*.ts",
+    "src"
+  ],
+  "exclude": ["rstest.config.ts", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx", 
+    "node_modules"
+  ]
+}

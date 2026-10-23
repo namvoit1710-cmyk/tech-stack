@@ -1,0 +1,119 @@
+name: frontend-workflow-management
+buildContext: ../../..
+
+memory:
+  dev: 256M
+  qas: 512M
+
+instances:
+  dev: 1
+  qas: 1
+
+env:
+  NODE_ENV: production
+
+# Frontend env: the pipeline materializes this map into <buildContext>/.env.production
+# BEFORE `docker build`, so rsbuild bakes the URLs into the bundle (rsbuild loadEnv
+# reads .env.production in production mode). This is the frontend path — no per-var
+# ARG in the Dockerfile. Was `buildArgs:`, which needs matching ARG declarations the
+# Dockerfile doesn't have, so those values were being dropped at build time.
+frontendEnvFile: .env.production
+
+frontendEnv:
+  PUBLIC_URL_FILE_SERVICE:
+    dev: https://smdg-ai-dev-file-service.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-file-service-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_ORCHESTRATOR:
+    dev: https://smdg-ai-dev-agent-orchestrator.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-orchestrator-qas.cfapps.br10.hana.ondemand.com
+
+  # The api-gateway is the one service deployed at the bare org root
+  # (its deployment.yml sets `routeName: ""`), so its host is the subdomain
+  # itself with no per-service suffix. The value that used to be here,
+  # …-api-gateway-dev, 404s on dev, tenant-1 AND tenant-2 — it names a route
+  # nobody creates. Used by endpoints.config.ts as the prefix for services with
+  # no absolute PUBLIC_URL_* of their own, so a 404 base breaks those silently.
+  # tenantize.sh maps this org root to each tenant's own root; no per-tier key.
+  PUBLIC_URL_API_GATEWAY:
+    dev: https://smdg-ai-dev.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_PUSH_GATEWAY:
+    dev: https://smdg-ai-dev-push-gateway.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-push-gateway-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_AI_WORKFLOW_CONTROL_PLANE:
+    dev: https://smdg-ai-dev-ai-workflow-control-plane.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-control-plane-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_GOVERNANCE_API:
+    dev: https://smdg-ai-dev-governance.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-orchestrator-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_WORKFLOW_VALIDATION_RULE_AGENT_API_URL:
+    dev: https://smdg-ai-dev-validation-rule-agent.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-orchestrator-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_WORKFLOW_GOVERNANCE_AGENT_API_URL:
+    dev: https://smdg-ai-dev-governance-agent.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-ai-workflow-governance-schema-agent-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_WORKFLOW_PROFILE_MANAGER_API_URL:
+    dev: https://smdg-ai-dev-profile-agent.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-orchestrator-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_INTEGRATION_HUB_API_URL:
+    dev: https://smdg-ai-dev-integration-hub.cfapps.br10.hana.ondemand.com
+    qas: https://smdg-ai-dev-agent-orchestrator-qas.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_SCHEMA_TRANSFORM:
+    dev: https://smdg-ai-dev-schema-transform.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_API_GATEWAY_PROFILE_MANAGEMENT:
+    dev: https://smdg-ai-dev-profile-management.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_API_GATEWAY_FEATURE_MANAGEMENT:
+    dev: https://smdg-ai-dev-feature-management.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_WORKFLOW_SUPERVISOR_AGENT_API_URL:
+    dev: https://smdg-ai-dev-ai-workflow-workflow-supervisor-agent.cfapps.br10.hana.ondemand.com
+
+  # SA-1582: the "Create with AI" chat calls the Workflow Designer Agent directly.
+  # dev template; tenantize.sh swaps smdg-ai-dev- -> smdg-ai-tenant-1- for the
+  # tenant-1 build. Without this the FE client falls back to the supervisor URL.
+  PUBLIC_WORKFLOW_DESIGNER_AGENT_API_URL:
+    dev: https://smdg-ai-dev-workflow-designer-agent.cfapps.br10.hana.ondemand.com
+
+  PUBLIC_URL_PROFILE_MANAGEMENT:
+    dev: https://smdg-ai-dev-profile-management.cfapps.br10.hana.ondemand.com
+
+  # Credentials vault (SA-1335 T7). Dormant-aware: empty = the node credential
+  # picker + settings page stay hidden. Each tier reads the dev-template URL and
+  # tenantize.sh swaps the subdomain (smdg-ai-tenant-1- / smdg-ai-tenant-2-).
+  # This value is BAKED INTO THE BUNDLE at build time (rsbuild reads the
+  # .env.production the pipeline writes), so activating a tier means a REBUILD
+  # of frontend-workflow-management — `cf set-env` + restart does nothing, which
+  # is what the UI's own "…and restart" message misleadingly suggests.
+  # dev/qas stay dormant until the vault service is deployed there too.
+  PUBLIC_CREDENTIALS_MANAGEMENT_API_URL:
+    dev: ""
+    tenant-1: https://smdg-ai-dev-credentials-management.cfapps.br10.hana.ondemand.com
+    tenant-2: https://smdg-ai-dev-credentials-management.cfapps.br10.hana.ondemand.com
+
+  # Neither tenant routes the vault through its API gateway — the FE calls it
+  # directly, exactly as it calls the control plane, file-service and the rest —
+  # so the FE sends the x-tenant-id/x-user-id headers itself. "system" matches
+  # the control plane's default run tenant (start_run_use_case:40), so
+  # credentials stored from the UI resolve for workflow runs. Empty (dev/qas) =
+  # headers omitted.
+  PUBLIC_DEV_TENANT_ID:
+    dev: ""
+    tenant-1: system
+    tenant-2: system
+  PUBLIC_DEV_USER_ID:
+    dev: ""
+    tenant-1: system
+    tenant-2: system
+
+  PUBLIC_APP_VERSION:
+    dev: 1.0.0

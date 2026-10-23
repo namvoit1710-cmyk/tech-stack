@@ -1,0 +1,53 @@
+{
+  "name": "@ldc/workflow-editor",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsc",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint",
+    "test": "rstest run",
+    "test:watch": "rstest",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "peerDependencies": {
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19"
+  },
+  "devDependencies": {
+    "@ldc/eslint-config": "workspace:*",
+    "@rstest/core": "catalog:",
+    "jsdom": "catalog:",
+    "@ldc/prettier-config": "workspace:*",
+    "@ldc/tailwind-config": "workspace:^",
+    "@ldc/tsconfig": "workspace:*",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@ldc/i18n": "workspace:*",
+    "@ldc/ui": "workspace:*",
+    "lucide-react": "catalog:",
+    "popmotion": "^11.0.5",
+    "rete": "2.0.6",
+    "rete-area-plugin": "2.1.5",
+    "rete-auto-arrange-plugin": "2.0.2",
+    "rete-connection-path-plugin": "2.0.4",
+    "rete-connection-plugin": "2.0.5",
+    "rete-context-menu-plugin": "2.0.6",
+    "rete-history-plugin": "2.1.1",
+    "rete-react-plugin": "2.1.0",
+    "rete-render-utils": "^2.0.3",
+    "styled-components": "^6.4.1"
+  },
+  "prettier": "@ldc/prettier-config"
+}
